@@ -1,0 +1,11 @@
+{
+    "user_id": "00000000-0000-0000-0000-000000000001",
+    "full_name": "Curl Player",
+    "birth_date": "2015-01-01",
+    "technical_level": "B",
+    "subscription_type": "Silver",
+    "u_category": "U11",
+    "parent_name": "Curl Parent",
+    "parent_whatsapp": "12345",
+    "account_status": "Pending"
+}
