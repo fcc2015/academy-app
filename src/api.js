@@ -1,5 +1,7 @@
+import { API_URL } from './config';
+
 export async function sendMessage(message) {
-  const res = await fetch("http://127.0.0.1:8000/chat", {
+  const res = await fetch(`${API_URL}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
