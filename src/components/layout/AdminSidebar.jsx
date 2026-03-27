@@ -36,7 +36,8 @@ const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setM
             {!collapsed && (
                 <div className="flex items-center gap-3">
                     <div className="relative">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                        <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain drop-shadow-md" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                        <div className="hidden w-9 h-9 rounded-xl items-center justify-center"
                             style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 4px 16px rgba(79,70,229,0.4)' }}>
                             <Trophy size={18} className="text-white" />
                         </div>
@@ -51,10 +52,13 @@ const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setM
                 </div>
             )}
             {collapsed && (
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                <>
+                <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain drop-shadow-md" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                <div className="hidden w-9 h-9 rounded-xl items-center justify-center"
                     style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
                     <Trophy size={18} className="text-white" />
                 </div>
+                </>
             )}
             <button
                 onClick={() => setCollapsed(!collapsed)}

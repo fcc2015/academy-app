@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import { isAuthenticated } from '../api';
 
 const LandingPage = () => {
     const navigate = useNavigate();
@@ -27,10 +28,18 @@ const LandingPage = () => {
     const [landingPlans, setLandingPlans] = useState([]);
 
     useEffect(() => {
+        // Auto-login redirect for returning users
+        if (isAuthenticated()) {
+            const role = localStorage.getItem('role');
+            if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+            else if (role === 'coach') navigate('/coach/dashboard', { replace: true });
+            else if (role === 'parent') navigate('/parent/dashboard', { replace: true });
+        }
+
         const handleScroll = () => setIsScrolled(window.scrollY > 20);
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+    }, [navigate]);
 
     useEffect(() => {
         fetch(`${API_URL}/plans/public`)
@@ -145,7 +154,16 @@ const LandingPage = () => {
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
                     {/* Logo */}
                     <div className={`flex items-center gap-2.5 cursor-pointer ${isRTL ? 'flex-row-reverse' : ''}`} onClick={() => window.scrollTo(0,0)}>
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm"
+                        <img 
+                            src="/logo.png" 
+                            alt="FC Casablanca Logo" 
+                            className="h-10 object-contain drop-shadow-md"
+                            onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                            }}
+                        />
+                        <div className="hidden w-9 h-9 rounded-xl items-center justify-center text-white font-black text-sm"
                             style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 4px 12px rgba(79,70,229,0.3)' }}>
                             FA
                         </div>

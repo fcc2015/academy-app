@@ -77,7 +77,8 @@ const CoachLayout = () => {
                 <div className="w-72 h-full flex flex-col">
                     <div className="h-20 flex items-center px-6 border-b border-slate-100 shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-tr from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
+                        <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                        <div className="hidden w-10 h-10 bg-gradient-to-tr from-green-500 to-emerald-600 rounded-xl items-center justify-center shadow-lg transform rotate-3">
                             <span className="text-white font-black text-xl tracking-tighter -rotate-3">CA</span>
                         </div>
                         <div>
