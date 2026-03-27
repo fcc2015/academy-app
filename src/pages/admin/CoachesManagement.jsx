@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
     UserPlus, Mail, Phone, Shield, Trash2, Search,
     X, AlertCircle, Loader2, CheckCircle, Dumbbell,
-    Target, Star, Users, RefreshCw
+    Target, Star, Users, RefreshCw, Edit2, Plus
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -29,7 +29,7 @@ const getGradient = (name = '') =>
     AVATAR_GRADIENTS[name.charCodeAt(0) % AVATAR_GRADIENTS.length];
 
 // ─── Coach Card ───────────────────────────────────────────────────────
-const CoachCard = ({ coach, onDelete, isRTL }) => {
+const CoachCard = ({ coach, onEdit, onDelete, isRTL }) => {
     const spec = SPEC_CONFIG[coach.specialization] || SPEC_CONFIG.Technical;
     const SpecIcon = spec.icon;
     const gradient = getGradient(coach.full_name);
@@ -86,14 +86,24 @@ const CoachCard = ({ coach, onDelete, isRTL }) => {
                         <Star size={10} fill="currentColor" />
                         {isRTL ? 'طاقم الأكاديمية' : 'Academy Staff'}
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => onDelete(coach.id)}
-                        className="p-2.5 text-red-400 bg-red-50 border border-red-100 rounded-xl hover:bg-red-500 hover:text-white transition-all"
-                        title={isRTL ? 'حذف المدرب' : 'Delete coach'}
-                    >
-                        <Trash2 size={14} strokeWidth={2.5} />
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => onEdit(coach)}
+                            className="p-2.5 text-slate-400 bg-slate-50 border border-slate-100 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-all"
+                            title={isRTL ? 'تعديل المدرب' : 'Edit coach'}
+                        >
+                            <Edit2 size={14} strokeWidth={2.5} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onDelete(coach.id)}
+                            className="p-2.5 text-red-400 bg-red-50 border border-red-100 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                            title={isRTL ? 'حذف المدرب' : 'Delete coach'}
+                        >
+                            <Trash2 size={14} strokeWidth={2.5} />
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -110,6 +120,8 @@ const CoachesManagement = () => {
     const [search, setSearch] = useState('');
     const [statusBanner, setStatusBanner] = useState({ show: false, message: '', type: 'success', id: 0 });
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null });
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
         full_name: '', email: '', phone: '',
         specialization: 'Technical', status: 'Active',
@@ -140,44 +152,76 @@ const CoachesManagement = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleAddClick = () => {
+        setFormData({ full_name: '', email: '', phone: '', specialization: 'Technical', status: 'Active', photo_url: '', diploma_url: '' });
+        setIsEditMode(false);
+        setEditingId(null);
+        setIsAddModalOpen(true);
+    };
+
+    const handleEditClick = (coach) => {
+        setFormData({
+            full_name: coach.full_name,
+            email: coach.email,
+            phone: coach.phone,
+            specialization: coach.specialization,
+            status: coach.status,
+            photo_url: coach.photo_url || '',
+            diploma_url: coach.diploma_url || ''
+        });
+        setIsEditMode(true);
+        setEditingId(coach.id);
+        setIsAddModalOpen(true);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            const res = await authFetch(`${API_URL}/coaches/`, {
-                method: 'POST',
+            const url = isEditMode ? `${API_URL}/coaches/${editingId}` : `${API_URL}/coaches/`;
+            const method = isEditMode ? 'PUT' : 'POST';
+
+            const res = await authFetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
             if (res.ok) {
-                const createdCoach = await res.json();
+                const savedCoach = await res.json();
                 setIsAddModalOpen(false);
                 setFormData({ full_name: '', email: '', phone: '', specialization: 'Technical', status: 'Active', photo_url: '', diploma_url: '' });
-                await fetchCoaches();
                 
-                // Show the temporary password using SweetAlert2
-                import('sweetalert2').then(({ default: Swal }) => {
-                    Swal.fire({
-                        icon: 'success',
-                        title: isRTL ? 'تم إضافة المدرب بنجاح' : 'Coach Added Successfully',
-                        html: `
-                            <div class="text-left mt-4" dir="ltr">
-                                <p class="text-slate-600 mb-2">${isRTL ? 'يرجى مشاركة بيانات الدخول هذه مع المدرب:' : 'Please share these credentials with the coach:'}</p>
-                                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                    <div class="mb-2"><strong>Email:</strong> ${createdCoach.email}</div>
-                                    <div><strong>Password:</strong> <code class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">${createdCoach.temp_password}</code></div>
+                // Miza (Synchronization) - immediately update local state
+                if (isEditMode) {
+                    setCoaches(prev => prev.map(c => c.id === savedCoach.id ? savedCoach : c));
+                    showBanner(isRTL ? 'تم تحديث المدرب بنجاح' : 'Coach updated successfully', 'success');
+                } else {
+                    setCoaches(prev => [savedCoach, ...prev]);
+                    
+                    // Show the temporary password for new coaches using SweetAlert2
+                    import('sweetalert2').then(({ default: Swal }) => {
+                        Swal.fire({
+                            icon: 'success',
+                            title: isRTL ? 'تم إضافة المدرب بنجاح' : 'Coach Added Successfully',
+                            html: `
+                                <div class="text-left mt-4" dir="ltr">
+                                    <p class="text-slate-600 mb-2">${isRTL ? 'يرجى مشاركة بيانات الدخول هذه مع المدرب:' : 'Please share these credentials with the coach:'}</p>
+                                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                        <div class="mb-2"><strong>Email:</strong> ${savedCoach.email}</div>
+                                        <div><strong>Password:</strong> <code class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">${savedCoach.temp_password}</code></div>
+                                    </div>
+                                    <p class="text-sm text-amber-600 mt-4">${isRTL ? 'هذه كلمة المرور ستظهر لمرة واحدة فقط!' : 'This password will only be shown once!'}</p>
                                 </div>
-                                <p class="text-sm text-amber-600 mt-4">${isRTL ? 'هذه كلمة المرور ستظهر لمرة واحدة فقط!' : 'This password will only be shown once!'}</p>
-                            </div>
-                        `,
-                        confirmButtonText: isRTL ? 'حسناً مجدداً' : 'Got it',
-                        confirmButtonColor: '#4f46e5',
-                        customClass: {
-                            popup: 'rounded-3xl',
-                            confirmButton: 'rounded-xl px-8 font-black uppercase tracking-wider',
-                        }
+                            `,
+                            confirmButtonText: isRTL ? 'حسناً مجدداً' : 'Got it',
+                            confirmButtonColor: '#4f46e5',
+                            customClass: {
+                                popup: 'rounded-3xl',
+                                confirmButton: 'rounded-xl px-8 font-black uppercase tracking-wider',
+                            }
+                        });
                     });
-                });
+                }
             } else {
                 const err = await res.json();
                 
@@ -251,7 +295,7 @@ const CoachesManagement = () => {
                     </button>
                     <button
                         type="button"
-                        onClick={() => setIsAddModalOpen(true)}
+                        onClick={handleAddClick}
                         className={`flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-7 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl hover:-translate-y-1 transition-all ${isRTL ? 'flex-row-reverse' : ''}`}
                     >
                         <UserPlus size={18} />
@@ -319,7 +363,7 @@ const CoachesManagement = () => {
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filtered.map(coach => (
-                        <CoachCard key={coach.id} coach={coach} onDelete={handleDelete} isRTL={isRTL} />
+                        <CoachCard key={coach.id} coach={coach} onEdit={handleEditClick} onDelete={handleDelete} isRTL={isRTL} />
                     ))}
                 </div>
             )}
@@ -331,8 +375,8 @@ const CoachesManagement = () => {
                         {/* Modal Header */}
                         <div className={`flex justify-between items-center p-6 sm:p-8 border-b border-slate-100 bg-slate-50/50 shrink-0 ${isRTL ? 'flex-row-reverse' : ''}`}>
                             <div>
-                                <h2 className="text-xl font-black text-slate-800 tracking-tight">{isRTL ? 'إضافة مدرب جديد' : 'Add New Coach'}</h2>
-                                <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">{isRTL ? 'أدخل بيانات المدرب' : 'Enter coach details'}</p>
+                                <h2 className="text-xl font-black text-slate-800 tracking-tight">{isEditMode ? (isRTL ? 'تحديث بيانات المدرب' : 'Edit Coach') : (isRTL ? 'إضافة مدرب جديد' : 'Add New Coach')}</h2>
+                                <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">{isEditMode ? (isRTL ? 'تعديل بيانات المدرب' : 'Update coach details') : (isRTL ? 'أدخل بيانات المدرب' : 'Enter coach details')}</p>
                             </div>
                             <button type="button" onClick={() => setIsAddModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-full border border-transparent transition-all">
                                 <X size={20} />
@@ -409,8 +453,8 @@ const CoachesManagement = () => {
                                 </button>
                                 <button type="submit" disabled={isSubmitting}
                                     className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-black rounded-2xl shadow-lg disabled:opacity-60 uppercase tracking-widest hover:-translate-y-0.5 transition-all">
-                                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
-                                    {isRTL ? 'إضافة المدرب' : 'Add Coach'}
+                                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : (isEditMode ? <Edit2 size={16} /> : <UserPlus size={16} />)}
+                                    {isEditMode ? (isRTL ? 'حفظ التعديلات' : 'Save Changes') : (isRTL ? 'إضافة المدرب' : 'Add Coach')}
                                 </button>
                             </div>
                         </form>
