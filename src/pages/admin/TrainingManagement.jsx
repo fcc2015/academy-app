@@ -1,3 +1,4 @@
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, Plus, Edit2, Trash2, X, CheckCircle, AlertTriangle, Search, ChevronDown, Users } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -30,7 +31,7 @@ const TrainingManagement = () => {
     const fetchAll = async () => {
         setIsLoading(true);
         try {
-            const [sRes, sqRes] = await Promise.all([fetch(`${API_URL}/training/`), fetch(`${API_URL}/squads/`)]);
+            const [sRes, sqRes] = await Promise.all([authFetch(`${API_URL}/training/`), authFetch(`${API_URL}/squads/`)]);
             if (sRes.ok) setSessions(await sRes.json());
             if (sqRes.ok) setSquads(await sqRes.json());
         } catch { showBanner('خطأ في التحميل', false); }
@@ -68,7 +69,7 @@ const TrainingManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
         try {
-            await fetch(`${API_URL}/training/${id}`, { method: 'DELETE' });
+            await authFetch(`${API_URL}/training/${id}`, { method: 'DELETE' });
             setSessions(p => p.filter(s => s.id !== id));
             showBanner('تم الحذف');
         } catch { showBanner('خطأ في الحذف', false); }

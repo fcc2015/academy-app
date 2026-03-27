@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { Star, Save, Users, PlusCircle, Trash2, X, Zap, TrendingUp } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -54,8 +55,8 @@ const CoachEvaluations = () => {
             const cachedPlayers = sessionStorage.getItem('all_players');
             
             const [squadsRes, playersRes] = await Promise.all([
-                fetch(`${API_URL}/squads/coach/${userId}`),
-                cachedPlayers ? Promise.resolve(null) : fetch(`${API_URL}/players/`)
+                authFetch(`${API_URL}/squads/coach/${userId}`),
+                cachedPlayers ? Promise.resolve(null) : authFetch(`${API_URL}/players/`)
             ]);
             
             if (squadsRes.ok) setSquads(await squadsRes.json());
@@ -74,7 +75,7 @@ const CoachEvaluations = () => {
 
     const fetchEvaluations = async () => {
         try {
-            const res = await fetch(`${API_URL}/evaluations/?player_id=${selectedPlayer}`);
+            const res = await authFetch(`${API_URL}/evaluations/?player_id=${selectedPlayer}`);
             if (res.ok) setEvaluations(await res.json());
         } catch (error) {
             console.error('Error fetching evaluations:', error);
@@ -92,7 +93,7 @@ const CoachEvaluations = () => {
                 ...form,
                 overall_rating: Math.round(overall * 10) / 10
             };
-            const res = await fetch(`${API_URL}/evaluations/`, {
+            const res = await authFetch(`${API_URL}/evaluations/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -112,7 +113,7 @@ const CoachEvaluations = () => {
     const handleDelete = async (evalId) => {
         if (!confirm('هل أنت متأكد من حذف هذا التقييم؟')) return;
         try {
-            await fetch(`${API_URL}/evaluations/${evalId}`, { method: 'DELETE' });
+            await authFetch(`${API_URL}/evaluations/${evalId}`, { method: 'DELETE' });
             fetchEvaluations();
         } catch (error) {
             console.error('Error deleting evaluation:', error);

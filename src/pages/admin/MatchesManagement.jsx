@@ -1,3 +1,4 @@
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     Trophy,
@@ -55,8 +56,8 @@ const MatchesManagement = () => {
         setIsLoading(true);
         try {
             const [matchesRes, squadsRes] = await Promise.all([
-                fetch(`${API_URL}/matches/`),
-                fetch(`${API_URL}/squads/`).catch(() => ({ ok: false })) // Silent catch if squads route not present
+                authFetch(`${API_URL}/matches/`),
+                authFetch(`${API_URL}/squads/`).catch(() => ({ ok: false })) // Silent catch if squads route not present
             ]);
             
             if (matchesRes.ok) {
@@ -162,7 +163,7 @@ const MatchesManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
         try {
-            const res = await fetch(`${API_URL}/matches/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/matches/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 setMatches(prev => prev.filter(m => m.id !== id));
                 showBanner('تم الحذف بنجاح', 'success');

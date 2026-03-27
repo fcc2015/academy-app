@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { User, Shield, MapPin, Calendar, Award, Trophy, Star, CalendarCheck, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -30,8 +31,8 @@ const ParentChildProfile = () => {
 
                 // 2. Parallel Fetches for core profile and squads
                 const [playerRes, squadsRes] = await Promise.all([
-                    fetch(`${API_URL}/players/${userId}`).catch(() => null),
-                    cachedSquads ? Promise.resolve(null) : fetch(`${API_URL}/squads/`).catch(() => null)
+                    authFetch(`${API_URL}/players/${userId}`).catch(() => null),
+                    cachedSquads ? Promise.resolve(null) : authFetch(`${API_URL}/squads/`).catch(() => null)
                 ]);
 
                 let currentPlayer = null;
@@ -41,7 +42,7 @@ const ParentChildProfile = () => {
 
                 // 3. Optimized Fallback (only if needed)
                 if (!currentPlayer || currentPlayer.detail) {
-                    const selfRes = await fetch(`${API_URL}/players/parent/${userId}`).catch(() => null);
+                    const selfRes = await authFetch(`${API_URL}/players/parent/${userId}`).catch(() => null);
                     if (selfRes?.ok) {
                         const parentsPlayers = await selfRes.json().catch(() => []);
                         if (Array.isArray(parentsPlayers) && parentsPlayers.length > 0) {
@@ -56,9 +57,9 @@ const ParentChildProfile = () => {
                     
                     // 4. Detailed Data (Matches, Eval, Attendance)
                     const [mRes, evalRes, attendRes] = await Promise.all([
-                        fetch(`${API_URL}/matches/player/${currentPlayer.user_id}`).catch(() => null),
-                        fetch(`${API_URL}/evaluations/?player_id=${currentPlayer.user_id}`).catch(() => null),
-                        fetch(`${API_URL}/attendance/player/${currentPlayer.user_id}`).catch(() => null)
+                        authFetch(`${API_URL}/matches/player/${currentPlayer.user_id}`).catch(() => null),
+                        authFetch(`${API_URL}/evaluations/?player_id=${currentPlayer.user_id}`).catch(() => null),
+                        authFetch(`${API_URL}/attendance/player/${currentPlayer.user_id}`).catch(() => null)
                     ]);
 
                     if (mRes?.ok) {

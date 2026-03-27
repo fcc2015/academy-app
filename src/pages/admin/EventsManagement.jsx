@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     Calendar,
@@ -44,7 +45,7 @@ const EventsManagement = () => {
     const fetchEvents = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/events/`);
+            const res = await authFetch(`${API_URL}/events/`);
             if (res.ok) {
                 const data = await res.json();
                 setEvents(data || []);
@@ -71,7 +72,7 @@ const EventsManagement = () => {
                 return;
             }
 
-            const res = await fetch(`${API_URL}/events/`, {
+            const res = await authFetch(`${API_URL}/events/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(finalData)
@@ -102,7 +103,7 @@ const EventsManagement = () => {
 
     const updateStatus = async (id, newStatus) => {
         try {
-            const res = await fetch(`${API_URL}/events/${id}`, {
+            const res = await authFetch(`${API_URL}/events/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
@@ -125,7 +126,7 @@ const EventsManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
         try {
-            const res = await fetch(`${API_URL}/events/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/events/${id}`, { method: 'DELETE' });
             if (res.ok) { showBanner('Event deleted successfully', 'success'); fetchEvents(); }
         } catch (error) {
             console.error('Error deleting event:', error);

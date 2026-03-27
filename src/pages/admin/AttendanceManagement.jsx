@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     Users,
@@ -54,7 +55,7 @@ const AttendanceManagement = () => {
 
     const fetchSquads = async () => {
         try {
-            const res = await fetch(`${API_URL}/squads/`);
+            const res = await authFetch(`${API_URL}/squads/`);
             if (res.ok) setSquads(await res.json());
         } catch (error) {
             console.error('Error fetching squads:', error);
@@ -63,7 +64,7 @@ const AttendanceManagement = () => {
 
     const fetchPlayers = async () => {
         try {
-            const res = await fetch(`${API_URL}/players/`);
+            const res = await authFetch(`${API_URL}/players/`);
             if (res.ok) setPlayers(await res.json());
         } catch (error) {
             console.error('Error fetching players:', error);
@@ -73,7 +74,7 @@ const AttendanceManagement = () => {
     const loadAttendance = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/attendance/?squad_id=${selectedSquad}&date=${selectedDate}`);
+            const res = await authFetch(`${API_URL}/attendance/?squad_id=${selectedSquad}&date=${selectedDate}`);
             if (res.ok) {
                 const existingRecords = await res.json();
                 const squadPlayers = players.filter(p => p.squad_id === selectedSquad);
@@ -103,7 +104,7 @@ const AttendanceManagement = () => {
                 notes: ''
             }));
             const payload = { squad_id: selectedSquad, date: selectedDate, records };
-            const res = await fetch(`${API_URL}/attendance/bulk`, {
+            const res = await authFetch(`${API_URL}/attendance/bulk`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

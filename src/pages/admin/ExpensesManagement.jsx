@@ -1,3 +1,4 @@
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Plus, Edit2, Trash2, X, CheckCircle, AlertTriangle, Search, TrendingDown, Receipt } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -27,7 +28,7 @@ const ExpensesManagement = () => {
     const fetchAll = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/expenses/`);
+            const res = await authFetch(`${API_URL}/expenses/`);
             if (res.ok) setExpenses(await res.json());
         } finally { setIsLoading(false); }
     };
@@ -53,7 +54,7 @@ const ExpensesManagement = () => {
     const confirmDelete = async () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
-        await fetch(`${API_URL}/expenses/${id}`, { method: 'DELETE' });
+        await authFetch(`${API_URL}/expenses/${id}`, { method: 'DELETE' });
         setExpenses(p => p.filter(ex => ex.id !== id)); showBanner('تم الحذف');
     };
 

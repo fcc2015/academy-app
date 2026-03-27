@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     CreditCard,
@@ -46,8 +47,8 @@ const SubscriptionsManagement = () => {
         try {
             // Fetch combined data from finances and players
             const [paymentsRes, playersRes] = await Promise.all([
-                fetch(`${API_URL}/finances/payments`),
-                fetch(`${API_URL}/players/`)
+                authFetch(`${API_URL}/finances/payments`),
+                authFetch(`${API_URL}/players/`)
             ]);
 
             if (paymentsRes.ok && playersRes.ok) {
@@ -88,7 +89,7 @@ const SubscriptionsManagement = () => {
             const payload = { ...payment, status: 'Completed', payment_date: new Date().toISOString() };
             // eslint-disable-next-line no-unused-vars
             const { users, players, ...cleanPayload } = payload;
-            const res = await fetch(`${API_URL}/finances/payments/${payment.id}`, {
+            const res = await authFetch(`${API_URL}/finances/payments/${payment.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(cleanPayload)

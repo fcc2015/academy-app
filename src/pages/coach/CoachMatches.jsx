@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     Calendar, MapPin, Users2, Trophy, Clock, Search, X, CheckCircle, AlertCircle, Plus, Edit2, Trash2
@@ -45,8 +46,8 @@ const CoachMatches = () => {
         setIsLoading(true);
         try {
             const [matchesRes, playersRes] = await Promise.all([
-                fetch(`${API_URL}/matches/coach/${userId}`),
-                fetch(`${API_URL}/players/`)
+                authFetch(`${API_URL}/matches/coach/${userId}`),
+                authFetch(`${API_URL}/players/`)
             ]);
 
             if (matchesRes.ok) setMatches(await matchesRes.json());
@@ -160,7 +161,7 @@ const CoachMatches = () => {
                     // We wrap this in a try-catch so it doesn't block the main success flow if it fails
                     try {
                         await Promise.all(formData.convoked_players.map(playerId => 
-                            fetch(`${API_URL}/notifications/`, {
+                            authFetch(`${API_URL}/notifications/`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
@@ -192,7 +193,7 @@ const CoachMatches = () => {
     const handleDelete = async (id) => {
         if (!window.confirm(isRTL ? 'هل أنت متأكد من حذف هذه المباراة؟' : 'Are you sure you want to delete this match?')) return;
         try {
-            const res = await fetch(`${API_URL}/matches/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/matches/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 showBanner(isRTL ? 'تم الحذف' : 'Match deleted', 'success');
                 fetchData();

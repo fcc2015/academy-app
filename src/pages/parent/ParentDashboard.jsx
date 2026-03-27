@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -58,7 +59,7 @@ const ParentDashboard = () => {
             }
 
             // 2. Fetch targeted player
-            const playersRes = await fetch(`${API_URL}/players/parent/${userId}`).catch(() => null);
+            const playersRes = await authFetch(`${API_URL}/players/parent/${userId}`).catch(() => null);
             let child = null;
             if (playersRes?.ok) {
                 const parentsPlayers = await playersRes.json().catch(() => []);
@@ -68,7 +69,7 @@ const ParentDashboard = () => {
                 
                 // DEV FALLBACK
                 if (!child) {
-                    const selfRes = await fetch(`${API_URL}/players/parent/${userId}`).catch(() => null);
+                    const selfRes = await authFetch(`${API_URL}/players/parent/${userId}`).catch(() => null);
                     if (selfRes?.ok) {
                         const all = await selfRes.json().catch(() => []);
                         if (Array.isArray(all)) {
@@ -83,12 +84,12 @@ const ParentDashboard = () => {
 
             if (child) {
                 const [attendRes, evalRes, payRes, eventsRes, subRes, matchRes] = await Promise.all([
-                    fetch(`${API_URL}/attendance/player/${child.user_id}`).catch(() => null),
-                    fetch(`${API_URL}/evaluations/?player_id=${child.user_id}`).catch(() => null),
-                    fetch(`${API_URL}/finances/payments/user/${userId}`).catch(() => null),
-                    fetch(`${API_URL}/events/`).catch(() => null),
-                    fetch(`${API_URL}/finances/subscriptions/player/${child.user_id}`).catch(() => null),
-                    fetch(`${API_URL}/matches/player/${child.user_id}`).catch(() => null)
+                    authFetch(`${API_URL}/attendance/player/${child.user_id}`).catch(() => null),
+                    authFetch(`${API_URL}/evaluations/?player_id=${child.user_id}`).catch(() => null),
+                    authFetch(`${API_URL}/finances/payments/user/${userId}`).catch(() => null),
+                    authFetch(`${API_URL}/events/`).catch(() => null),
+                    authFetch(`${API_URL}/finances/subscriptions/player/${child.user_id}`).catch(() => null),
+                    authFetch(`${API_URL}/matches/player/${child.user_id}`).catch(() => null)
                 ]);
 
                 let dashData = {
@@ -171,7 +172,7 @@ const ParentDashboard = () => {
     const handleSendTestNotif = async () => {
         setIsSendingTest(true);
         try {
-            const res = await fetch(`${API_URL}/finances/test-notification/${userId}`, { method: 'POST' });
+            const res = await authFetch(`${API_URL}/finances/test-notification/${userId}`, { method: 'POST' });
             if (res.ok) {
                 alert(isRTL ? 'تم إرسال تنبيه تجريبي! تحقق من أيقونة الجرس في الأعلى.' : 'Test notification sent! Check the bell icon.');
             }

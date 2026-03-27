@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -88,10 +89,10 @@ const FinancesManagement = () => {
         setIsLoading(true);
         try {
             const [paymentsRes, playersRes, settingsRes, expensesRes] = await Promise.all([
-                fetch(`${API_URL}/finances/payments`),
-                fetch(`${API_URL}/players/`),
-                fetch(`${API_URL}/settings/`),
-                fetch(`${API_URL}/finances/expenses`)
+                authFetch(`${API_URL}/finances/payments`),
+                authFetch(`${API_URL}/players/`),
+                authFetch(`${API_URL}/settings/`),
+                authFetch(`${API_URL}/finances/expenses`)
             ]);
             
             if (paymentsRes.ok) setPayments(await paymentsRes.json() || []);
@@ -173,7 +174,7 @@ const FinancesManagement = () => {
         if (!couponCodeInput.trim()) return;
         setCouponError('');
         try {
-            const res = await fetch(`${API_URL}/coupons/validate/${couponCodeInput.trim()}`);
+            const res = await authFetch(`${API_URL}/coupons/validate/${couponCodeInput.trim()}`);
             if (!res.ok) throw new Error('الرمز غير صالح');
             setAppliedCoupon(await res.json());
             setCouponCodeInput('');
@@ -211,7 +212,7 @@ const FinancesManagement = () => {
             const { users, players, ...cleanPayload } = payload;
             const _unusedUsers = users;
             const _unusedPlayers = players;
-            const res = await fetch(`${API_URL}/finances/payments/${payment.id}`, {
+            const res = await authFetch(`${API_URL}/finances/payments/${payment.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(cleanPayload)
@@ -251,7 +252,7 @@ const FinancesManagement = () => {
         const paymentId = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null, type: '' });
         try {
-            const res = await fetch(`${API_URL}/finances/payments/${paymentId}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/finances/payments/${paymentId}`, { method: 'DELETE' });
             if (res.ok) { setPayments(prev => prev.filter(p => p.id !== paymentId)); showBanner('تم الحذف بنجاح', 'success'); }
         } catch { showBanner('خطأ في الحذف', 'error'); }
     };
@@ -259,7 +260,7 @@ const FinancesManagement = () => {
     const runAlertCheck = async () => {
         setIsCheckingAlerts(true);
         try {
-            const res = await fetch(`${API_URL}/finances/alert-check`, { method: 'POST' });
+            const res = await authFetch(`${API_URL}/finances/alert-check`, { method: 'POST' });
             if (res.ok) {
                 const data = await res.json();
                 setAlertHistory(data.details || []);
@@ -312,7 +313,7 @@ const FinancesManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null, type: '' });
         try {
-            const res = await fetch(`${API_URL}/finances/expenses/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/finances/expenses/${id}`, { method: 'DELETE' });
             if (res.ok) { setExpenses(prev => prev.filter(e => e.id !== id)); showBanner('تم حذف المصروف بنجاح', 'success'); }
         } catch { showBanner('خطأ في الحذف', 'error'); }
     };

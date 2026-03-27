@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -59,10 +60,10 @@ const AdminDashboard = () => {
             }
 
             const [playersRes, paymentsRes, coachesRes, eventsRes] = await Promise.all([
-                fetch(`${API_URL}/players/`).catch(() => null),
-                fetch(`${API_URL}/finances/payments/`).catch(() => null),
-                fetch(`${API_URL}/coaches/`).catch(() => null),
-                fetch(`${API_URL}/events/`).catch(() => null)
+                authFetch(`${API_URL}/players/`).catch(() => null),
+                authFetch(`${API_URL}/finances/payments/`).catch(() => null),
+                authFetch(`${API_URL}/coaches/`).catch(() => null),
+                authFetch(`${API_URL}/events/`).catch(() => null)
             ]);
 
             const safePlayers = playersRes?.ok ? await playersRes.json().catch(() => []) : [];
@@ -123,7 +124,7 @@ const AdminDashboard = () => {
     const handleSendNotification = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/notifications/`, {
+            const res = await authFetch(`${API_URL}/notifications/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

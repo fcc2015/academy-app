@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import {
     Search, Send, ArrowLeft,
     Loader2, CheckCheck
@@ -108,13 +109,13 @@ export default function ParentChat() {
         try {
             // Get child info first to find their groups
             let uid = myUserId, role = 'player';
-            const r = await fetch(`${API_URL}/players/`);
+            const r = await authFetch(`${API_URL}/players/`);
             if (r.ok) {
                 const all = await r.json();
                 const child = all.find(p => p.user_id === myUserId || p.parent_id === myUserId) || all[0];
                 if (child) { uid = child.user_id; }
             }
-            const res = await fetch(`${API_URL}/chat/groups?user_id=${uid}&role=${role}`);
+            const res = await authFetch(`${API_URL}/chat/groups?user_id=${uid}&role=${role}`);
             if (res.ok) setGroups(await res.json());
         } catch { /* silent */ }
     }, [myUserId]);
@@ -126,7 +127,7 @@ export default function ParentChat() {
         if (!activeGroup) return;
         if (!silent) setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/chat/groups/${activeGroup.id}/messages?limit=100`);
+            const res = await authFetch(`${API_URL}/chat/groups/${activeGroup.id}/messages?limit=100`);
             if (res.ok) {
                 const data = await res.json();
                 setMessages(data);
@@ -141,7 +142,7 @@ export default function ParentChat() {
     const fetchTyping = useCallback(async () => {
         if (!activeGroup) return;
         try {
-            const res = await fetch(`${API_URL}/chat/groups/${activeGroup.id}/typing?exclude_user=${myUserId}`);
+            const res = await authFetch(`${API_URL}/chat/groups/${activeGroup.id}/typing?exclude_user=${myUserId}`);
             if (res.ok) setTyping(await res.json());
         } catch { /* silent */ }
     }, [activeGroup, myUserId]);
@@ -163,7 +164,7 @@ export default function ParentChat() {
     const openGroup = async (group) => {
         setActiveGroup(group);
         try {
-            await fetch(`${API_URL}/chat/groups/${group.id}/join`, {
+            await authFetch(`${API_URL}/chat/groups/${group.id}/join`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ group_id: group.id, user_id: myUserId, user_name: myName, user_role: myRole, is_moderator: false })
@@ -178,7 +179,7 @@ export default function ParentChat() {
         setInputMsg('');
         clearTyping();
         try {
-            const res = await fetch(`${API_URL}/chat/messages`, {
+            const res = await authFetch(`${API_URL}/chat/messages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ group_id: activeGroup.id, sender_id: myUserId, sender_name: myName, sender_role: myRole, content, message_type: 'text' })
@@ -194,7 +195,7 @@ export default function ParentChat() {
     // ── Typing
     const updateTyping = (isTyping) => {
         if (!activeGroup) return;
-        fetch(`${API_URL}/chat/typing`, {
+        authFetch(`${API_URL}/chat/typing`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ group_id: activeGroup.id, user_id: myUserId, user_name: myName, is_typing: isTyping })

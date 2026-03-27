@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     Star,
@@ -47,7 +48,7 @@ const Evaluations = () => {
     const fetchPlayers = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/players/`);
+            const res = await authFetch(`${API_URL}/players/`);
             if (res.ok) {
                 const data = await res.json();
                 setPlayers(data);
@@ -61,7 +62,7 @@ const Evaluations = () => {
 
     const fetchEvaluations = async (playerId) => {
         try {
-            const res = await fetch(`${API_URL}/evaluations/?player_id=${playerId}`);
+            const res = await authFetch(`${API_URL}/evaluations/?player_id=${playerId}`);
             if (res.ok) {
                 const data = await res.json();
                 setEvaluations(data);
@@ -84,7 +85,7 @@ const Evaluations = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/evaluations/`, {
+            const res = await authFetch(`${API_URL}/evaluations/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
@@ -116,7 +117,7 @@ const Evaluations = () => {
         const evalId = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
         try {
-            const res = await fetch(`${API_URL}/evaluations/${evalId}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/evaluations/${evalId}`, { method: 'DELETE' });
             if (res.ok) { fetchEvaluations(selectedPlayer.user_id); }
         } catch (error) {
             console.error('Error deleting evaluation:', error);

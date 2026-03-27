@@ -1,4 +1,5 @@
 import { API_URL } from '../config';
+import { authFetch } from '../api';
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, CheckCircle, Info, AlertCircle, Trash2, BellRing, CheckCheck, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -26,7 +27,7 @@ const NotificationsDropdown = () => {
         try {
             const role = localStorage.getItem('role') || '';
             const userId = localStorage.getItem('user_id') || '';
-            const res = await fetch(`${API_URL}/notifications/?role=${role}&user_id=${userId}`);
+            const res = await authFetch(`${API_URL}/notifications/?role=${role}&user_id=${userId}`);
             if (res.ok) {
                 const data = await res.json();
                 setNotifications(data || []);
@@ -45,7 +46,7 @@ const NotificationsDropdown = () => {
     const markAsRead = async (id, e) => {
         if (e) e.stopPropagation();
         try {
-            const res = await fetch(`${API_URL}/notifications/${id}/read`, { method: 'PATCH' });
+            const res = await authFetch(`${API_URL}/notifications/${id}/read`, { method: 'PATCH' });
             if (res.ok) {
                 setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
                 setUnreadCount(prev => Math.max(0, prev - 1));
@@ -60,7 +61,7 @@ const NotificationsDropdown = () => {
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         setUnreadCount(0);
         try {
-            await Promise.all(unreadIds.map(id => fetch(`${API_URL}/notifications/${id}/read`, { method: 'PATCH' })));
+            await Promise.all(unreadIds.map(id => authFetch(`${API_URL}/notifications/${id}/read`, { method: 'PATCH' })));
         } catch { fetchNotifications(); }
     };
 
@@ -70,7 +71,7 @@ const NotificationsDropdown = () => {
         setNotifications(prev => prev.filter(n => n.id !== id));
         if (notif && !notif.is_read) setUnreadCount(prev => Math.max(0, prev - 1));
         try {
-            await fetch(`${API_URL}/notifications/${id}`, { method: 'DELETE' });
+            await authFetch(`${API_URL}/notifications/${id}`, { method: 'DELETE' });
         } catch { fetchNotifications(); }
     };
 
@@ -80,7 +81,7 @@ const NotificationsDropdown = () => {
         setNotifications([]);
         setUnreadCount(0);
         try {
-            await Promise.all(ids.map(id => fetch(`${API_URL}/notifications/${id}`, { method: 'DELETE' })));
+            await Promise.all(ids.map(id => authFetch(`${API_URL}/notifications/${id}`, { method: 'DELETE' })));
         } catch { fetchNotifications(); }
     };
 

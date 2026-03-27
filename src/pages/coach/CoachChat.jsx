@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import {
     Search, Send, ArrowLeft, RefreshCw,
     Users, Loader2, X, CheckCheck
@@ -108,7 +109,7 @@ export default function CoachChat() {
     // ── Fetch groups (coach sees only their squads)
     const fetchGroups = useCallback(async () => {
         try {
-            const res = await fetch(`${API_URL}/chat/groups?user_id=${myUserId}&role=${myRole}`);
+            const res = await authFetch(`${API_URL}/chat/groups?user_id=${myUserId}&role=${myRole}`);
             if (res.ok) setGroups(await res.json());
         } catch { /* silent */ }
     }, [myUserId]);
@@ -120,7 +121,7 @@ export default function CoachChat() {
         if (!activeGroup) return;
         if (!silent) setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/chat/groups/${activeGroup.id}/messages?limit=100`);
+            const res = await authFetch(`${API_URL}/chat/groups/${activeGroup.id}/messages?limit=100`);
             if (res.ok) {
                 const data = await res.json();
                 setMessages(data);
@@ -135,7 +136,7 @@ export default function CoachChat() {
     const fetchMembers = useCallback(async () => {
         if (!activeGroup) return;
         try {
-            const res = await fetch(`${API_URL}/chat/groups/${activeGroup.id}/members`);
+            const res = await authFetch(`${API_URL}/chat/groups/${activeGroup.id}/members`);
             if (res.ok) setMembers(await res.json());
         } catch { /* silent */ }
     }, [activeGroup]);
@@ -143,7 +144,7 @@ export default function CoachChat() {
     const fetchTyping = useCallback(async () => {
         if (!activeGroup) return;
         try {
-            const res = await fetch(`${API_URL}/chat/groups/${activeGroup.id}/typing?exclude_user=${myUserId}`);
+            const res = await authFetch(`${API_URL}/chat/groups/${activeGroup.id}/typing?exclude_user=${myUserId}`);
             if (res.ok) setTyping(await res.json());
         } catch { /* silent */ }
     }, [activeGroup, myUserId]);
@@ -167,7 +168,7 @@ export default function CoachChat() {
         setActiveGroup(group);
         setShowMembers(false);
         try {
-            await fetch(`${API_URL}/chat/groups/${group.id}/join`, {
+            await authFetch(`${API_URL}/chat/groups/${group.id}/join`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ group_id: group.id, user_id: myUserId, user_name: myName, user_role: myRole, is_moderator: true })
@@ -182,7 +183,7 @@ export default function CoachChat() {
         setInputMsg('');
         clearTyping();
         try {
-            const res = await fetch(`${API_URL}/chat/messages`, {
+            const res = await authFetch(`${API_URL}/chat/messages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ group_id: activeGroup.id, sender_id: myUserId, sender_name: myName, sender_role: myRole, content, message_type: 'text' })
@@ -198,7 +199,7 @@ export default function CoachChat() {
     // ── Typing
     const updateTyping = (isTyping) => {
         if (!activeGroup) return;
-        fetch(`${API_URL}/chat/typing`, {
+        authFetch(`${API_URL}/chat/typing`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ group_id: activeGroup.id, user_id: myUserId, user_name: myName, is_typing: isTyping })
@@ -214,7 +215,7 @@ export default function CoachChat() {
 
     // ── Delete message (coach can moderate)
     const deleteMsg = async (id) => {
-        await fetch(`${API_URL}/chat/messages/${id}`, { method: 'DELETE' });
+        await authFetch(`${API_URL}/chat/messages/${id}`, { method: 'DELETE' });
         fetchMessages(true);
     };
 

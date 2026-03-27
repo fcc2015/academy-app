@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     Users2,
@@ -61,7 +62,7 @@ const SquadsManagement = () => {
 
     const fetchPlayers = async () => {
         try {
-            const res = await fetch(`${API_URL}/players/`);
+            const res = await authFetch(`${API_URL}/players/`);
             if (res.ok) setPlayers(await res.json());
         } catch (error) { console.error('Error fetching players:', error); }
     };
@@ -69,7 +70,7 @@ const SquadsManagement = () => {
     const fetchSquads = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/squads/`);
+            const res = await authFetch(`${API_URL}/squads/`);
             if (res.ok) {
                 const data = await res.json();
                 setSquads(data);
@@ -83,7 +84,7 @@ const SquadsManagement = () => {
 
     const fetchCoaches = async () => {
         try {
-            const res = await fetch(`${API_URL}/coaches/`);
+            const res = await authFetch(`${API_URL}/coaches/`);
             if (res.ok) {
                 const data = await res.json();
                 setCoaches(data);
@@ -138,7 +139,7 @@ const SquadsManagement = () => {
     const saveRoster = async () => {
         setIsSavingRoster(true);
         try {
-            const res = await fetch(`${API_URL}/squads/${currentRosterSquad.id}/roster`, {
+            const res = await authFetch(`${API_URL}/squads/${currentRosterSquad.id}/roster`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ player_ids: rosterData })
@@ -196,7 +197,7 @@ const SquadsManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
         try {
-            const res = await fetch(`${API_URL}/squads/${id}`, {
+            const res = await authFetch(`${API_URL}/squads/${id}`, {
                 method: 'DELETE'
             });
             if (res.ok) {

@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     UserPlus, Mail, Phone, Shield, Trash2, Search,
@@ -127,7 +128,7 @@ const CoachesManagement = () => {
     const fetchCoaches = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/coaches/`);
+            const res = await authFetch(`${API_URL}/coaches/`);
             if (res.ok) setCoaches(await res.json() || []);
             else showBanner(isRTL ? 'فشل تحميل المدربين' : 'Failed to fetch coaches', 'error');
         } catch { showBanner(isRTL ? 'تعذر الاتصال بالسيرفر' : 'Cannot connect to server', 'error'); }
@@ -143,7 +144,7 @@ const CoachesManagement = () => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            const res = await fetch(`${API_URL}/coaches/`, {
+            const res = await authFetch(`${API_URL}/coaches/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
@@ -201,7 +202,7 @@ const CoachesManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
         try {
-            const res = await fetch(`${API_URL}/coaches/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/coaches/${id}`, { method: 'DELETE' });
             if (res.ok) { await fetchCoaches(); showBanner(isRTL ? 'تم حذف المدرب' : 'Coach deleted', 'success'); }
         } catch { showBanner(isRTL ? 'فشل الحذف' : 'Delete failed', 'error'); }
     };

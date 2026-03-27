@@ -5,7 +5,6 @@ import {
     LogOut,
     Menu,
     X,
-    ClipboardList,
     Users,
     CalendarCheck,
     Star,
@@ -16,6 +15,13 @@ import NotificationsDropdown from '../../components/NotificationsDropdown';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { useLanguage } from '../../i18n/LanguageContext';
 
+function checkCoachAuth() {
+    const token = localStorage.getItem('token');
+    const role = localStorage.getItem('role');
+    const expires = parseInt(localStorage.getItem('token_expires') || '0');
+    return token && role === 'coach' && (expires === 0 || Date.now() < expires);
+}
+
 const CoachLayout = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -23,11 +29,7 @@ const CoachLayout = () => {
     const { t, isRTL, dir } = useLanguage();
     const coachName = localStorage.getItem('user_name') || localStorage.getItem('email') || 'Coach';
 
-    const token = localStorage.getItem('token');
-    const role = localStorage.getItem('role');
-    const expires = parseInt(localStorage.getItem('token_expires') || '0');
-
-    const isValid = token && role === 'coach' && (expires === 0 || Date.now() < expires);
+    const [isValid] = useState(checkCoachAuth);
 
     if (!isValid) {
         localStorage.removeItem('token');

@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { Users, UserCheck, Shield, ChevronRight } from 'lucide-react';
 
@@ -13,8 +14,8 @@ const CoachSquads = () => {
             try {
                 const userId = localStorage.getItem('user_id');
                 const [squadsRes, playersRes] = await Promise.all([
-                    fetch(`${API_URL}/squads/coach/${userId}`),
-                    fetch(`${API_URL}/players/`)
+                    authFetch(`${API_URL}/squads/coach/${userId}`),
+                    authFetch(`${API_URL}/players/`)
                 ]);
                 if (squadsRes.ok) setSquads(await squadsRes.json());
                 if (playersRes.ok) setPlayers(await playersRes.json());

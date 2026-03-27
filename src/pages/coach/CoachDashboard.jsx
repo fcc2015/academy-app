@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -35,11 +36,11 @@ const CoachDashboard = () => {
 
                 // 2. Optimized Parallel Fetches
                 const [squadsRes, eventsRes, playersRes, evalsRes] = await Promise.all([
-                    fetch(`${API_URL}/squads/coach/${userId}`).catch(() => null),
-                    fetch(`${API_URL}/events/`).catch(() => null),
+                    authFetch(`${API_URL}/squads/coach/${userId}`).catch(() => null),
+                    authFetch(`${API_URL}/events/`).catch(() => null),
                     // Use cached players if possible
-                    sessionStorage.getItem('all_players') ? Promise.resolve(null) : fetch(`${API_URL}/players/`).catch(() => null),
-                    fetch(`${API_URL}/evaluations/?limit=20`).catch(() => null)
+                    sessionStorage.getItem('all_players') ? Promise.resolve(null) : authFetch(`${API_URL}/players/`).catch(() => null),
+                    authFetch(`${API_URL}/evaluations/?limit=20`).catch(() => null)
                 ]);
 
                 const squadsData = squadsRes?.ok ? await squadsRes.json().catch(() => []) : [];

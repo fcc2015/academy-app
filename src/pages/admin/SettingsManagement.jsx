@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     Settings,
@@ -57,7 +58,7 @@ const SettingsManagement = () => {
 
     const fetchPlans = async () => {
         try {
-            const res = await fetch(`${API_URL}/plans/`);
+            const res = await authFetch(`${API_URL}/plans/`);
             if (res.ok) setPlans(await res.json());
         } catch (err) { console.error('Error fetching plans:', err); }
     };
@@ -70,7 +71,7 @@ const SettingsManagement = () => {
                 monthly_price: newPlanData.monthly_price ? parseFloat(newPlanData.monthly_price) : null,
                 annual_price: newPlanData.annual_price ? parseFloat(newPlanData.annual_price) : null,
             };
-            const res = await fetch(`${API_URL}/plans/`, {
+            const res = await authFetch(`${API_URL}/plans/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -90,7 +91,7 @@ const SettingsManagement = () => {
                 monthly_price: editingPlan.monthly_price !== '' ? parseFloat(editingPlan.monthly_price) || null : null,
                 annual_price: editingPlan.annual_price !== '' ? parseFloat(editingPlan.annual_price) || null : null,
             };
-            const res = await fetch(`${API_URL}/plans/${editingPlan.id}`, {
+            const res = await authFetch(`${API_URL}/plans/${editingPlan.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -101,7 +102,7 @@ const SettingsManagement = () => {
 
     const handleDeletePlan = async (id) => {
         try {
-            const res = await fetch(`${API_URL}/plans/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/plans/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 setConfirmDeletePlanId(null);
                 fetchPlans();
@@ -112,7 +113,7 @@ const SettingsManagement = () => {
     };
 
     const handleTogglePlan = async (plan) => {
-        await fetch(`${API_URL}/plans/${plan.id}`, {
+        await authFetch(`${API_URL}/plans/${plan.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ is_active: !plan.is_active })
@@ -141,7 +142,7 @@ const SettingsManagement = () => {
 
     const fetchCoupons = async () => {
         try {
-            const res = await fetch(`${API_URL}/coupons/`);
+            const res = await authFetch(`${API_URL}/coupons/`);
             if (res.ok) setCoupons(await res.json());
         } catch (error) {
             console.error('Error fetching coupons:', error);
@@ -151,7 +152,7 @@ const SettingsManagement = () => {
     const fetchSettings = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/settings/`);
+            const res = await authFetch(`${API_URL}/settings/`);
             if (res.ok) {
                 const data = await res.json();
                 setSettings(data);
@@ -196,7 +197,7 @@ const SettingsManagement = () => {
     const handleCreateCoupon = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${API_URL}/coupons/`, {
+            const res = await authFetch(`${API_URL}/coupons/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -225,7 +226,7 @@ const SettingsManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
         try {
-            await fetch(`${API_URL}/coupons/${id}`, { method: 'DELETE' });
+            await authFetch(`${API_URL}/coupons/${id}`, { method: 'DELETE' });
             fetchCoupons();
         } catch (error) {
             console.error('Error deleting coupon:', error);
@@ -234,7 +235,7 @@ const SettingsManagement = () => {
 
     const handleToggleCoupon = async (id, currentStatus) => {
         try {
-            await fetch(`${API_URL}/coupons/${id}/toggle?is_active=${!currentStatus}`, { method: 'PATCH' });
+            await authFetch(`${API_URL}/coupons/${id}/toggle?is_active=${!currentStatus}`, { method: 'PATCH' });
             fetchCoupons();
         } catch (error) {
             console.error('Error toggling coupon:', error);
@@ -251,7 +252,7 @@ const SettingsManagement = () => {
             if (!cleanedSettings.season_start) delete cleanedSettings.season_start;
             if (!cleanedSettings.season_end) delete cleanedSettings.season_end;
 
-            const res = await fetch(`${API_URL}/settings/${settings.id}`, {
+            const res = await authFetch(`${API_URL}/settings/${settings.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(cleanedSettings)
