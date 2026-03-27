@@ -1,3 +1,4 @@
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { Shirt, Plus, Edit2, Trash2, X, CheckCircle, AlertTriangle, Search, RotateCcw } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -28,7 +29,7 @@ const KitsManagement = () => {
     const fetchAll = async () => {
         setIsLoading(true);
         try {
-            const [kRes, pRes] = await Promise.all([fetch(`${API_URL}/kits/`), fetch(`${API_URL}/players/`)]);
+            const [kRes, pRes] = await Promise.all([authFetch(`${API_URL}/kits/`), authFetch(`${API_URL}/players/`)]);
             if (kRes.ok) setItems(await kRes.json());
             if (pRes.ok) setPlayers(await pRes.json());
         } catch{ /* ignore */ }
@@ -46,7 +47,7 @@ const KitsManagement = () => {
 
     const handleMarkReturned = async (item) => {
         try {
-            const res = await fetch(`${API_URL}/kits/${item.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Returned', returned_date: new Date().toISOString().slice(0,10) }) });
+            const res = await authFetch(`${API_URL}/kits/${item.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'Returned', returned_date: new Date().toISOString().slice(0,10) }) });
             if (!res.ok) throw new Error();
             fetchAll(); showBanner('تم تسجيل الإرجاع');
         } catch { showBanner('خطأ', false); }
@@ -71,7 +72,7 @@ const KitsManagement = () => {
     const confirmDelete = async () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
-        await fetch(`${API_URL}/kits/${id}`, { method: 'DELETE' });
+        await authFetch(`${API_URL}/kits/${id}`, { method: 'DELETE' });
         setItems(p => p.filter(i => i.id !== id)); showBanner('تم الحذف');
     };
 

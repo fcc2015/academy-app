@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import {
     Search, Send, Image, Users, ArrowLeft, RefreshCw,
     Shield, User, Loader2, X, MoreVertical, CheckCheck,
@@ -114,14 +115,14 @@ export default function ChatManagement() {
         try {
             let uid = myUserId, role = myRole;
             if (myRole === 'parent') {
-                const r = await fetch(`${API_URL}/players/`);
+                const r = await authFetch(`${API_URL}/players/`);
                 if (r.ok) {
                     const all = await r.json();
                     const child = all.find(p => p.user_id === myUserId || p.parent_id === myUserId) || all[0];
                     if (child) { uid = child.user_id; role = 'player'; }
                 }
             }
-            const res = await fetch(`${API_URL}/chat/groups?user_id=${uid}&role=${role}`);
+            const res = await authFetch(`${API_URL}/chat/groups?user_id=${uid}&role=${role}`);
             if (res.ok) {
                 const data = await res.json();
                 setGroups(data);
@@ -136,7 +137,7 @@ export default function ChatManagement() {
         if (!activeGroup) return;
         if (!silent) setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/chat/groups/${activeGroup.id}/messages?limit=100`);
+            const res = await authFetch(`${API_URL}/chat/groups/${activeGroup.id}/messages?limit=100`);
             if (res.ok) {
                 const data = await res.json();
                 setMessages(data);
@@ -151,7 +152,7 @@ export default function ChatManagement() {
     const fetchMembers = useCallback(async () => {
         if (!activeGroup) return;
         try {
-            const res = await fetch(`${API_URL}/chat/groups/${activeGroup.id}/members`);
+            const res = await authFetch(`${API_URL}/chat/groups/${activeGroup.id}/members`);
             if (res.ok) setMembers(await res.json());
         } catch { /* silent */ }
     }, [activeGroup]);
@@ -159,7 +160,7 @@ export default function ChatManagement() {
     const fetchTyping = useCallback(async () => {
         if (!activeGroup) return;
         try {
-            const res = await fetch(`${API_URL}/chat/groups/${activeGroup.id}/typing?exclude_user=${myUserId}`);
+            const res = await authFetch(`${API_URL}/chat/groups/${activeGroup.id}/typing?exclude_user=${myUserId}`);
             if (res.ok) setTyping(await res.json());
         } catch { /* silent */ }
     }, [activeGroup, myUserId]);
@@ -183,7 +184,7 @@ export default function ChatManagement() {
         setActiveGroup(group);
         setShowMembers(false);
         try {
-            await fetch(`${API_URL}/chat/groups/${group.id}/join`, {
+            await authFetch(`${API_URL}/chat/groups/${group.id}/join`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ group_id: group.id, user_id: myUserId, user_name: myName, user_role: myRole, is_moderator: canMod })
@@ -198,7 +199,7 @@ export default function ChatManagement() {
         setInputMsg('');
         clearTyping();
         try {
-            const res = await fetch(`${API_URL}/chat/messages`, {
+            const res = await authFetch(`${API_URL}/chat/messages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ group_id: activeGroup.id, sender_id: myUserId, sender_name: myName, sender_role: myRole, content, message_type: 'text' })
@@ -219,10 +220,10 @@ export default function ChatManagement() {
         fd.append('file', file);
         fd.append('sender_role', myRole);
         try {
-            const upRes = await fetch(`${API_URL}/chat/upload-image`, { method: 'POST', body: fd });
+            const upRes = await authFetch(`${API_URL}/chat/upload-image`, { method: 'POST', body: fd });
             if (!upRes.ok) throw new Error();
             const { url } = await upRes.json();
-            await fetch(`${API_URL}/chat/messages`, {
+            await authFetch(`${API_URL}/chat/messages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ group_id: activeGroup.id, sender_id: myUserId, sender_name: myName, sender_role: myRole, image_url: url, message_type: 'image' })
@@ -235,7 +236,7 @@ export default function ChatManagement() {
     // ── Typing
     const updateTyping = (isTyping) => {
         if (!activeGroup) return;
-        fetch(`${API_URL}/chat/typing`, {
+        authFetch(`${API_URL}/chat/typing`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ group_id: activeGroup.id, user_id: myUserId, user_name: myName, is_typing: isTyping })
@@ -253,7 +254,7 @@ export default function ChatManagement() {
     const syncGroups = async () => {
         setSyncing(true);
         try {
-            const res = await fetch(`${API_URL}/chat/sync-groups`, { method: 'POST' });
+            const res = await authFetch(`${API_URL}/chat/sync-groups`, { method: 'POST' });
             if (res.ok) {
                 const data = await res.json();
                 setError(`✅ ${data.groups_created} groupes créés, ${data.groups_updated} mis à jour`);
@@ -267,7 +268,7 @@ export default function ChatManagement() {
     // ── Delete message
     const deleteMsg = async (id) => {
         if (!canMod) return;
-        await fetch(`${API_URL}/chat/messages/${id}`, { method: 'DELETE' });
+        await authFetch(`${API_URL}/chat/messages/${id}`, { method: 'DELETE' });
         fetchMessages(true);
     };
 

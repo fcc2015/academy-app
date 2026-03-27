@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     Users,
@@ -31,7 +32,7 @@ const PlayerMatchesModal = ({ isOpen, onClose, player, isRTL, dir }) => {
 
     useEffect(() => {
         if (isOpen && player) {
-            fetch(`${API_URL}/matches/player/${player.user_id}`)
+            authFetch(`${API_URL}/matches/player/${player.user_id}`)
                 .then(res => res.json())
                 .then(data => { setMatches(data || []); setIsLoading(false); })
                 .catch(() => setIsLoading(false));
@@ -309,7 +310,7 @@ const PlayersManagement = () => {
 
         // Players (critical)
         try {
-            const res = await fetch(`${API_URL}/players/`);
+            const res = await authFetch(`${API_URL}/players/`);
             if (res.ok) {
                 const data = await res.json();
                 setPlayers(Array.isArray(data) ? data : []);
@@ -322,19 +323,19 @@ const PlayersManagement = () => {
 
         // Plans (non-critical)
         try {
-            const res = await fetch(`${API_URL}/plans/`);
+            const res = await authFetch(`${API_URL}/plans/`);
             if (res.ok) setSubscriptionPlans(await res.json());
         } catch { /* ignore */ }
 
         // Pending requests (non-critical)
         try {
-            const res = await fetch(`${API_URL}/public/admin/requests?request_status=active`);
+            const res = await authFetch(`${API_URL}/public/admin/requests?request_status=active`);
             if (res.ok) setPendingRequests(await res.json() || []);
         } catch { /* ignore */ }
 
         // Settings (non-critical)
         try {
-            const res = await fetch(`${API_URL}/settings/`);
+            const res = await authFetch(`${API_URL}/settings/`);
             if (res.ok) setSettings(await res.json());
         } catch { /* ignore */ }
 
@@ -354,7 +355,7 @@ const PlayersManagement = () => {
         const userId = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null, type: '' });
         try {
-            const res = await fetch(`${API_URL}/players/${userId}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/players/${userId}`, { method: 'DELETE' });
             if (res.ok) setPlayers(players.filter(p => p.user_id !== userId));
         } catch (err) { showBanner(err.message, 'error'); }
     };
@@ -433,7 +434,7 @@ const PlayersManagement = () => {
                 allergies: formData.allergies || null,
                 emergency_contact: formData.emergency_contact || null
             };
-            const res = await fetch(`${API_URL}/players/`, {
+            const res = await authFetch(`${API_URL}/players/`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
             });
             if (res.ok) {
@@ -459,7 +460,7 @@ const PlayersManagement = () => {
 
                 if (resolvingRequestId) {
                     try {
-                        await fetch(`${API_URL}/public/admin/requests/${resolvingRequestId}`,
+                        await authFetch(`${API_URL}/public/admin/requests/${resolvingRequestId}`,
                             { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'approved' }) });
                         setPendingRequests(prev => prev.filter(r => r.id !== resolvingRequestId));
                     } catch { setPendingRequests(prev => prev.filter(r => r.id !== resolvingRequestId)); }
@@ -490,7 +491,7 @@ const PlayersManagement = () => {
                 allergies: formData.allergies || null,
                 emergency_contact: formData.emergency_contact || null
             };
-            const res = await fetch(`${API_URL}/players/${currentPlayer.user_id}`, {
+            const res = await authFetch(`${API_URL}/players/${currentPlayer.user_id}`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
             });
             if (res.ok) {
@@ -512,7 +513,7 @@ const PlayersManagement = () => {
 
     const updateRequestStatus = async (id, newStatus) => {
         try {
-            const res = await fetch(`${API_URL}/public/admin/requests/${id}`, {
+            const res = await authFetch(`${API_URL}/public/admin/requests/${id}`, {
                 method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus })
             });
             if (res.ok) {
@@ -532,7 +533,7 @@ const PlayersManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null, type: '' });
         try {
-            const res = await fetch(`${API_URL}/public/admin/requests/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/public/admin/requests/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 setPendingRequests(prev => prev.filter(r => r.id !== id));
                 showBanner(isRTL ? 'تم الحذف بنجاح' : 'Deleted successfully', 'success');

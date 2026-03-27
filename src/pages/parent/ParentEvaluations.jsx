@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { Star, TrendingUp, Award, Download, XCircle, IdCard } from 'lucide-react';
 import FUTCard from '../../components/FUTCard';
@@ -21,28 +22,28 @@ const ParentEvaluations = () => {
     useEffect(() => {
         const fetchEvaluations = async () => {
             try {
-                const parentsPlayersRes = await fetch(`${API_URL}/players/parent/${userId}`);
+                const parentsPlayersRes = await authFetch(`${API_URL}/players/parent/${userId}`);
                 if (parentsPlayersRes.ok) {
                     const parentsPlayers = await parentsPlayersRes.json();
                     let child = parentsPlayers[0];
                     
                     // DEV FALLBACK: If no child found directly, try finding self as player
                     if (!child) {
-                        const allRes = await fetch(`${API_URL}/players/`);
+                        const allRes = await authFetch(`${API_URL}/players/`);
                         const all = await allRes.json();
                         child = all.find(p => p.user_id === userId);
                     }
 
                     if (child) {
                         setChildInfo(child);
-                        const evalRes = await fetch(`${API_URL}/evaluations/?player_id=${child.user_id}`);
+                        const evalRes = await authFetch(`${API_URL}/evaluations/?player_id=${child.user_id}`);
                         if (evalRes.ok) {
                             let data = await evalRes.json();
                             
                             // If specifically John Doe and we got nothing, but he has evals, 
                             // maybe there's a filtering mismatch. Let's try fetching all if empty.
                             if (data.length === 0) {
-                                const allEvalsRes = await fetch(`${API_URL}/evaluations/`);
+                                const allEvalsRes = await authFetch(`${API_URL}/evaluations/`);
                                 if (allEvalsRes.ok) {
                                     const allEvals = await allEvalsRes.json();
                                     data = allEvals.filter(e => e.player_id === child.user_id);

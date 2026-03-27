@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import {
     Users,
@@ -38,8 +39,8 @@ const CoachAttendance = () => {
 
                 // 2. Parallel Fetches
                 const [squadsRes, playersRes] = await Promise.all([
-                    fetch(`${API_URL}/squads/coach/${userId}`).catch(() => null),
-                    cachedPlayers ? Promise.resolve(null) : fetch(`${API_URL}/players/`).catch(() => null)
+                    authFetch(`${API_URL}/squads/coach/${userId}`).catch(() => null),
+                    cachedPlayers ? Promise.resolve(null) : authFetch(`${API_URL}/players/`).catch(() => null)
                 ]);
 
                 if (squadsRes?.ok) {
@@ -69,7 +70,7 @@ const CoachAttendance = () => {
     const loadAttendance = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/attendance/?squad_id=${selectedSquad}&date=${selectedDate}`);
+            const res = await authFetch(`${API_URL}/attendance/?squad_id=${selectedSquad}&date=${selectedDate}`);
             if (res.ok) {
                 const existingRecords = await res.json().catch(() => []);
                 const safeRecords = Array.isArray(existingRecords) ? existingRecords : [];
@@ -104,7 +105,7 @@ const CoachAttendance = () => {
             const records = Object.entries(attendanceData).map(([player_id, status]) => ({
                 player_id, status, notes: ''
             }));
-            const res = await fetch(`${API_URL}/attendance/bulk`, {
+            const res = await authFetch(`${API_URL}/attendance/bulk`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ squad_id: selectedSquad, date: selectedDate, records })

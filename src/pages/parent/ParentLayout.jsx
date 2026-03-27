@@ -16,17 +16,20 @@ import NotificationsDropdown from '../../components/NotificationsDropdown';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { useLanguage } from '../../i18n/LanguageContext';
 
+function checkParentAuth() {
+    const token = localStorage.getItem('token');
+    const role = localStorage.getItem('role');
+    const expires = parseInt(localStorage.getItem('token_expires') || '0');
+    return token && role === 'parent' && (expires === 0 || Date.now() < expires);
+}
+
 const ParentLayout = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const { t } = useLanguage();
 
-    const token = localStorage.getItem('token');
-    const role = localStorage.getItem('role');
-    const expires = parseInt(localStorage.getItem('token_expires') || '0');
-
-    const isValid = token && role === 'parent' && (expires === 0 || Date.now() < expires);
+    const [isValid] = useState(checkParentAuth);
 
     if (!isValid) {
         localStorage.removeItem('token');

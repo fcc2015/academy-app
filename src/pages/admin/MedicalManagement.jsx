@@ -1,3 +1,4 @@
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { Heart, Plus, Edit2, Trash2, X, CheckCircle, AlertTriangle, Search, Phone, Shield } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -26,7 +27,7 @@ const MedicalManagement = () => {
     const fetchAll = async () => {
         setIsLoading(true);
         try {
-            const [rRes, pRes] = await Promise.all([fetch(`${API_URL}/medical/`), fetch(`${API_URL}/players/`)]);
+            const [rRes, pRes] = await Promise.all([authFetch(`${API_URL}/medical/`), authFetch(`${API_URL}/players/`)]);
             if (rRes.ok) setRecords(await rRes.json());
             if (pRes.ok) setPlayers(await pRes.json());
         } finally { setIsLoading(false); }
@@ -60,7 +61,7 @@ const MedicalManagement = () => {
     const confirmDelete = async () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
-        await fetch(`${API_URL}/medical/${id}`, { method: 'DELETE' });
+        await authFetch(`${API_URL}/medical/${id}`, { method: 'DELETE' });
         setRecords(p => p.filter(r => r.id !== id)); showBanner('تم الحذف');
     };
 

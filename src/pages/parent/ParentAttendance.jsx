@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { CalendarCheck, CheckCircle2, XCircle, Clock, ShieldAlert, Filter } from 'lucide-react';
 
@@ -10,12 +11,12 @@ const ParentAttendance = () => {
             try {
                 // For demo, we'll try to get all attendance and filter client-side
                 const userId = localStorage.getItem('user_id');
-                const res = await fetch(`${API_URL}/players/`);
+                const res = await authFetch(`${API_URL}/players/`);
                 if (res.ok) {
                     const players = await res.json();
                     const child = players.find(p => p.user_id === userId || p.parent_id === userId) || players[0];
                     if (child?.user_id) {
-                        const attRes = await fetch(`${API_URL}/attendance/player/${child.user_id}`);
+                        const attRes = await authFetch(`${API_URL}/attendance/player/${child.user_id}`);
                         if (attRes.ok) {
                             const records = await attRes.json();
                             setAttendance(records.sort((a, b) => new Date(b.date) - new Date(a.date)));

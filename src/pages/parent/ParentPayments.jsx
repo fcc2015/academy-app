@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { CreditCard, CheckCircle2, Clock, AlertTriangle, TrendingUp, Upload, X, Camera, Send } from 'lucide-react';
 
@@ -21,7 +22,7 @@ const ParentPayments = () => {
     const fetchPayments = React.useCallback(async () => {
         try {
             let childUserId = null;
-            const playersRes = await fetch(`${API_URL}/players/`);
+            const playersRes = await authFetch(`${API_URL}/players/`);
             if (playersRes.ok) {
                 const players = await playersRes.json();
                 const child = players.find(p => p.user_id === userId || p.parent_id === userId) || players[0];
@@ -31,7 +32,7 @@ const ParentPayments = () => {
                 }
             }
 
-            const res = await fetch(`${API_URL}/finances/payments`);
+            const res = await authFetch(`${API_URL}/finances/payments`);
             if (res.ok) {
                 const allPayments = await res.json();
                 const filtered = allPayments.filter(p => p.user_id === childUserId || p.user_id === userId);
@@ -65,7 +66,7 @@ const ParentPayments = () => {
                 payment_date: new Date().toISOString()
             };
 
-            const res = await fetch(`${API_URL}/finances/payments`, {
+            const res = await authFetch(`${API_URL}/finances/payments`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

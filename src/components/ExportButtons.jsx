@@ -10,7 +10,7 @@ import { API_URL } from '../config';
  *   <ExportButtons type="attendance" squadId="xxx" />
  */
 export default function ExportButtons({ type = 'players', squadId = null }) {
-    const handleExport = async (format) => {
+    const handleExport = async () => {
         try {
             let url = `${API_URL}/exports/${type}/csv`;
             if (squadId) url += `?squad_id=${squadId}`;

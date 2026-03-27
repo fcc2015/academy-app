@@ -1,4 +1,5 @@
 import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { Shield, Plus, Edit2, Trash2, Search, X, CheckCircle2, ShieldAlert, Copy, Check, UserCog, Calculator, Briefcase, ChevronDown } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -38,7 +39,7 @@ const AdminsManagement = () => {
     const fetchAdmins = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/admins/`);
+            const res = await authFetch(`${API_URL}/admins/`);
             if (res.ok) setAdmins(await res.json());
         } catch (error) { console.error('Error fetching admins:', error); }
         finally { setIsLoading(false); }
@@ -125,7 +126,7 @@ const AdminsManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
         try {
-            const res = await fetch(`${API_URL}/admins/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/admins/${id}`, { method: 'DELETE' });
             if (res.ok) { showFeedback('تم الحذف بنجاح'); fetchAdmins(); }
             else showFeedback('فشل الحذف', 'error');
         } catch { showFeedback('خطأ في الاتصال', 'error'); }

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { authFetch } from '../../api';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Package,
     AlertTriangle,
@@ -37,15 +38,10 @@ const InventoryManagement = () => {
         condition: 'Good'
     });
 
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        fetchInventory();
-    }, []);
-
-    const fetchInventory = async () => {
+    const fetchInventory = useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/inventory/`);
+            const res = await authFetch(`${API_URL}/inventory/`);
             if (res.ok) {
                 const data = await res.json();
                 setItems(data || []);
@@ -56,7 +52,11 @@ const InventoryManagement = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchInventory();
+    }, [fetchInventory]);
 
     const showBanner = (message, type = 'success') => {
         setStatusBanner({ show: true, message, type });
@@ -126,7 +126,7 @@ const InventoryManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
         try {
-            const res = await fetch(`${API_URL}/inventory/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_URL}/inventory/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 setItems(prev => prev.filter(i => i.id !== id));
                 showBanner('تم الحذف بنجاح', 'success');
