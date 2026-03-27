@@ -7,6 +7,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import AdminLogin from './pages/admin/AdminLogin';
 import AuthCallback from './pages/AuthCallback';
+import DownloadPage from './pages/DownloadPage';
 import NotFound from './pages/NotFound';
 
 // Admin
@@ -57,6 +58,7 @@ function App() {
         <Routes>
           {/* Public */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/download" element={<DownloadPage />} />
           <Route path="/login" element={<AdminLogin />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
 
