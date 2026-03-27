@@ -126,12 +126,21 @@ const AdminLogin = () => {
 
             {/* Card */}
             <div className="relative w-full max-w-md mx-4 animate-fade-in-scale">
-                {/* Top Branding */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-[18px] mb-4 relative"
+                {/* Top Branding (Logo) */}
+                <div className="text-center mb-8 flex flex-col items-center">
+                    <img 
+                        src="/logo.png" 
+                        alt="FC Casablanca Logo" 
+                        className="h-28 object-contain mb-4 animate-glow-pulse drop-shadow-2xl"
+                        onError={(e) => {
+                            // Fallback if logo.png isn't placed yet
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                        }}
+                    />
+                    <div className="hidden items-center justify-center w-16 h-16 rounded-[18px] mb-4 relative"
                         style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 8px 32px rgba(79,70,229,0.5)' }}>
                         <Shield size={28} className="text-white" />
-                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-[#302b63] animate-glow-pulse" />
                     </div>
                     <h1 className="text-2xl font-black text-white tracking-tight">
                         {t('auth.adminLogin')}

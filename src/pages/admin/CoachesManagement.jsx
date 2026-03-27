@@ -184,7 +184,7 @@ const CoachesManagement = () => {
                 // Parse specific Supabase errors to be more user-friendly
                 let errorMsg = err.detail || 'Failed to save coach';
                 if (errorMsg.includes('409 Conflict') || errorMsg.includes('duplicate key')) {
-                    errorMsg = isRTL ? 'هذا البريد الإلكتروني مستخدم بالفعل لمدرب آخر' : 'This email is already registered to another coach.';
+                    errorMsg = 'HADA HISSAB DEJA MOSSAJAL';
                 }
                 
                 showBanner(errorMsg, 'error');
