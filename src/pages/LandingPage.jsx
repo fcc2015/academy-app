@@ -20,7 +20,7 @@ const LandingPage = () => {
     const [contactStatus, setContactStatus] = useState(null);
 
     // Registration Form State
-    const [regForm, setRegForm] = useState({ name: '', player_name: '', phone: '', birth_date: '', address: '', plan_name: '' });
+    const [regForm, setRegForm] = useState({ name: '', email: '', player_name: '', phone: '', birth_date: '', address: '', plan_name: '' });
     const [regStatus, setRegStatus] = useState(null);
     const [regError, setRegError] = useState(null);
     const [googleLoading, setGoogleLoading] = useState(false);
@@ -100,7 +100,7 @@ const LandingPage = () => {
             });
             if (res.ok) {
                 setRegStatus('success');
-                setRegForm({ name: '', player_name: '', phone: '', birth_date: '', address: '', plan_name: '' });
+                setRegForm({ name: '', email: '', player_name: '', phone: '', birth_date: '', address: '', plan_name: '' });
                 setTimeout(() => { setRegStatus(null); setIsRegModalOpen(false); }, 5000);
             } else {
                 setRegStatus('error');
@@ -670,34 +670,58 @@ const LandingPage = () => {
                                     style={{ background: 'rgba(16,185,129,0.1)' }}>
                                     <Check size={32} style={{ color: '#10b981' }} />
                                 </div>
-                                <h4 className="text-lg font-black text-slate-900 mb-2">{t('landing.regSuccess')}</h4>
-                                <p className="text-sm text-slate-500 font-medium">{t('landing.regSuccessDesc')}</p>
+                                <h4 className="text-lg font-black text-slate-900 mb-2">{isRTL ? 'تم استلام طلبك بنجاح' : 'Registration Request Sent'}</h4>
+                                <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                                    {isRTL 
+                                        ? 'شكراً لك! سيتواصل معك فريق الإدارة قريباً عبر الهاتف أو البريد الإلكتروني لتأكيد التسجيل وإنشاء حسابك الخاص للولوج إلى التطبيق.' 
+                                        : 'Thank you! Our management team will contact you shortly to confirm the registration and set up your application account.'}
+                                </p>
                             </div>
                         ) : (
-                            <form onSubmit={handleRegSubmit} className="space-y-4">
-                                {[
-                                    { key: 'name',        label: t('landing.parentLabel'), type: 'text',  placeholder: '' },
-                                    { key: 'player_name', label: t('landing.playerLabel'), type: 'text',  placeholder: '' },
-                                    { key: 'phone',       label: t('landing.phoneLabel'),  type: 'tel',   placeholder: '' },
-                                    { key: 'birth_date',  label: t('landing.birthLabel'),  type: 'date',  placeholder: '' },
-                                    { key: 'address',     label: t('landing.addressLabel'), type: 'text', placeholder: '' },
-                                ].map(field => (
-                                    <div key={field.key}>
-                                        <label className={`block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 ${isRTL ? 'text-right' : 'text-left'}`}>
-                                            {field.label}
-                                        </label>
-                                        <input
-                                            type={field.type}
-                                            required
-                                            value={regForm[field.key]}
-                                            onChange={e => setRegForm({ ...regForm, [field.key]: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all"
-                                            style={{ background: '#f8fafc', border: '1.5px solid rgba(148,163,184,0.2)', color: '#0f172a' }}
-                                            onFocus={e => e.target.style.borderColor = '#6366f1'}
-                                            onBlur={e => e.target.style.borderColor = 'rgba(148,163,184,0.2)'}
-                                        />
+                            <form onSubmit={handleRegSubmit} className="space-y-5">
+                                <div className="space-y-4">
+                                    <div className={`p-4 rounded-2xl ${isRTL ? 'text-right' : 'text-left'}`} style={{ background: '#f8fafc', border: '1px solid rgba(148,163,184,0.1)' }}>
+                                        <h4 className="font-black text-xs text-indigo-600 uppercase tracking-widest mb-3">{isRTL ? 'بيانات ولي الأمر' : 'Parent Details'}</h4>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <input type="text" required value={regForm.name} onChange={e => setRegForm({ ...regForm, name: e.target.value })}
+                                                    placeholder={isRTL ? 'الاسم الكامل لولي الأمر' : 'Parent Full Name'}
+                                                    className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <input type="email" required value={regForm.email} onChange={e => setRegForm({ ...regForm, email: e.target.value })}
+                                                    placeholder={isRTL ? 'البريد الإلكتروني' : 'Email Address'}
+                                                    className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                                                <input type="tel" required value={regForm.phone} onChange={e => setRegForm({ ...regForm, phone: e.target.value })}
+                                                    placeholder={isRTL ? 'الهاتف (+212...)' : 'Phone Number'}
+                                                    className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                                            </div>
+                                            <div>
+                                                <input type="text" required value={regForm.address} onChange={e => setRegForm({ ...regForm, address: e.target.value })}
+                                                    placeholder={isRTL ? 'العنوان الشخصي' : 'Home Address'}
+                                                    className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                                            </div>
+                                        </div>
                                     </div>
-                                ))}
+
+                                    <div className={`p-4 rounded-2xl ${isRTL ? 'text-right' : 'text-left'}`} style={{ background: '#f8fafc', border: '1px solid rgba(148,163,184,0.1)' }}>
+                                        <h4 className="font-black text-xs text-indigo-600 uppercase tracking-widest mb-3">{isRTL ? 'بيانات اللاعب' : 'Player Details'}</h4>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <input type="text" required value={regForm.player_name} onChange={e => setRegForm({ ...regForm, player_name: e.target.value })}
+                                                    placeholder={isRTL ? 'الاسم الكامل للاعب' : 'Player Full Name'}
+                                                    className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                                            </div>
+                                            <div>
+                                                <label className={`block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 ${isRTL ? 'text-right' : 'text-left'}`}>
+                                                    {isRTL ? 'تاريخ ميلاد اللاعب' : 'Player Birth Date'}
+                                                </label>
+                                                <input type="date" required value={regForm.birth_date} onChange={e => setRegForm({ ...regForm, birth_date: e.target.value })}
+                                                    className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
                                 {regStatus === 'error' && (
                                     <div className="p-3 rounded-xl text-sm font-semibold animate-fade-in"
