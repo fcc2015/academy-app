@@ -100,6 +100,23 @@ class SupabaseHttpClient:
             res.raise_for_status()
             return res.json()
 
+    async def admin_create_user(self, email, password, role="admin", full_name=None, academy_id=None):
+        """Use the Supabase Auth Admin API to create a user server-side (requires service_role key)"""
+        user_metadata = {"role": role, "is_academy_owner": True}
+        if full_name:
+            user_metadata["full_name"] = full_name
+        if academy_id:
+            user_metadata["academy_id"] = academy_id
+
+        payload = {
+            "email": email,
+            "password": password,
+            "email_confirm": True,  # Bypass email verification
+            "user_metadata": user_metadata
+        }
+        res = await self._post("/auth/v1/admin/users", payload)
+        return res
+
     async def get_players(self):
         return await self._get("/rest/v1/players?select=*&order=created_at.desc")
 
