@@ -48,7 +48,7 @@ const MedicalManagement = () => {
             const url = isEdit ? `${API_URL}/medical/${editingId}` : `${API_URL}/medical/`;
             const payload = { ...form };
             if (!payload.last_medical_checkup) delete payload.last_medical_checkup;
-            const res = await fetch(url, { method: isEdit ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const res = await authFetch(url, { method: isEdit ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             if (!res.ok) throw new Error();
             setIsModalOpen(false); fetchAll(); showBanner(isEdit ? 'تم التحديث' : 'تمت الإضافة');
         } catch { showBanner('خطأ في الحفظ', false); }

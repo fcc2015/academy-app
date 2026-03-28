@@ -54,7 +54,7 @@ const TrainingManagement = () => {
         try {
             const url = isEdit ? `${API_URL}/training/${editingId}` : `${API_URL}/training/`;
             const method = isEdit ? 'PATCH' : 'POST';
-            const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, session_date: new Date(form.session_date).toISOString() }) });
+            const res = await authFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, session_date: new Date(form.session_date).toISOString() }) });
             if (!res.ok) throw new Error();
             setIsModalOpen(false); fetchAll();
             showBanner(isEdit ? 'تم تحديث الحصة بنجاح' : 'تمت إضافة الحصة بنجاح');

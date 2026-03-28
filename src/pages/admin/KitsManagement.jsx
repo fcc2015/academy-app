@@ -59,7 +59,7 @@ const KitsManagement = () => {
             const url = isEdit ? `${API_URL}/kits/${editingId}` : `${API_URL}/kits/`;
             const payload = { ...form };
             if (!payload.returned_date) delete payload.returned_date;
-            const res = await fetch(url, { method: isEdit ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const res = await authFetch(url, { method: isEdit ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             if (!res.ok) throw new Error();
             setIsModalOpen(false); fetchAll(); showBanner(isEdit ? 'تم التحديث' : 'تمت الإضافة');
         } catch { showBanner('خطأ في الحفظ', false); }

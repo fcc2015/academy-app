@@ -169,7 +169,7 @@ const SquadsManagement = () => {
         if (!payload.coach_id) payload.coach_id = null;
 
         try {
-            const res = await fetch(url, {
+            const res = await authFetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

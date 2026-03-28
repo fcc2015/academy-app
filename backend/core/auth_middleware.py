@@ -6,6 +6,7 @@ import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from core.config import settings
+from core.context import academy_id_ctx, user_id_ctx, role_ctx
 
 security = HTTPBearer()
 
@@ -33,10 +34,35 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
                 )
 
             user = res.json()
+            user_id = user.get("id")
+
+            # Fetch academy_id from the public.users table
+            db_res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/users?user_id=eq.{user_id}&select=academy_id",
+                headers={
+                    "apikey": settings.SUPABASE_KEY,
+                    "Authorization": f"Bearer {token}",
+                }
+            )
+            
+            academy_id = None
+            if db_res.status_code == 200:
+                db_data = db_res.json()
+                if db_data and len(db_data) > 0:
+                    academy_id = db_data[0].get("academy_id")
+
+            role = user.get("user_metadata", {}).get("role", "player")
+
+            # Set Global Context for downstream injection
+            academy_id_ctx.set(academy_id)
+            user_id_ctx.set(user_id)
+            role_ctx.set(role)
+
             return {
-                "user_id": user.get("id"),
+                "user_id": user_id,
                 "email": user.get("email"),
-                "role": user.get("user_metadata", {}).get("role", "player"),
+                "role": role,
+                "academy_id": academy_id
             }
     except httpx.RequestError:
         raise HTTPException(

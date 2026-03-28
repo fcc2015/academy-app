@@ -1,5 +1,6 @@
 import { Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { API_URL } from '../config';
+import { authFetch } from '../api';
 
 /**
  * Reusable export buttons component for CSV downloads.
@@ -15,7 +16,7 @@ export default function ExportButtons({ type = 'players', squadId = null }) {
             let url = `${API_URL}/exports/${type}/csv`;
             if (squadId) url += `?squad_id=${squadId}`;
 
-            const res = await fetch(url);
+            const res = await authFetch(url);
             if (!res.ok) throw new Error('Export failed');
 
             const blob = await res.blob();

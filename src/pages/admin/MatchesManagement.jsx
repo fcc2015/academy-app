@@ -140,7 +140,7 @@ const MatchesManagement = () => {
                 match_date: new Date(formData.match_date).toISOString()
             };
 
-            const res = await fetch(url, {
+            const res = await authFetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

@@ -232,7 +232,7 @@ const FinancesManagement = () => {
                 status: formData.status,
                 notes: formData.notes
             };
-            const res = await fetch(isEditMode ? `${API_URL}/finances/payments/${editingId}` : `${API_URL}/finances/payments`, {
+            const res = await authFetch(isEditMode ? `${API_URL}/finances/payments/${editingId}` : `${API_URL}/finances/payments`, {
                 method: isEditMode ? 'PATCH' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -293,7 +293,7 @@ const FinancesManagement = () => {
     const handleSubmitExpense = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(editingExpenseId ? `${API_URL}/finances/expenses/${editingExpenseId}` : `${API_URL}/finances/expenses`, {
+            const res = await authFetch(editingExpenseId ? `${API_URL}/finances/expenses/${editingExpenseId}` : `${API_URL}/finances/expenses`, {
                 method: editingExpenseId ? 'PATCH' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...expenseFormData, amount: parseFloat(expenseFormData.amount) })

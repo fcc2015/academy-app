@@ -41,7 +41,7 @@ const ExpensesManagement = () => {
         e.preventDefault();
         try {
             const url = isEdit ? `${API_URL}/expenses/${editingId}` : `${API_URL}/expenses/`;
-            const res = await fetch(url, { method: isEdit ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, amount: parseFloat(form.amount) }) });
+            const res = await authFetch(url, { method: isEdit ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, amount: parseFloat(form.amount) }) });
             if (!res.ok) throw new Error();
             setIsModalOpen(false); fetchAll(); showBanner(isEdit ? 'تم التحديث' : 'تمت الإضافة');
         } catch { showBanner('خطأ في الحفظ', false); }

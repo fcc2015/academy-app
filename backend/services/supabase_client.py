@@ -1,6 +1,55 @@
 import httpx
 import asyncio
 from core.config import settings
+from core.context import academy_id_ctx
+
+class InjectClient:
+    def __init__(self, client):
+        self.client = client
+
+    def _inject(self, url):
+        from core.context import academy_id_ctx
+        academy_id = academy_id_ctx.get(None)
+        url_str = str(url)
+        if not academy_id or "/rpc/" in url_str or "/auth/v1/" in url_str or "/storage/v1/" in url_str:
+            return url_str
+        separator = "&" if "?" in url_str else "?"
+        return f"{url_str}{separator}academy_id=eq.{academy_id}"
+
+    async def get(self, url, **kwargs):
+        return await self.client.get(self._inject(url), **kwargs)
+
+    async def delete(self, url, **kwargs):
+        return await self.client.delete(self._inject(url), **kwargs)
+
+    async def patch(self, url, **kwargs):
+        import copy
+        json_data = kwargs.get("json")
+        from core.context import academy_id_ctx
+        academy_id = academy_id_ctx.get(None)
+        if academy_id and json_data and isinstance(json_data, dict) and "academy_id" not in json_data:
+            kwargs["json"] = copy.deepcopy(json_data)
+            kwargs["json"]["academy_id"] = academy_id
+        return await self.client.patch(self._inject(url), **kwargs)
+
+    async def post(self, url, **kwargs):
+        from core.context import academy_id_ctx
+        import copy
+        academy_id = academy_id_ctx.get(None)
+        url_str = str(url)
+        if academy_id and "/rpc/" not in url_str and "/auth/v1/" not in url_str and "/storage/v1/" not in url_str:
+            data = kwargs.get("json")
+            if isinstance(data, dict) and "academy_id" not in data:
+                kwargs["json"] = copy.deepcopy(data)
+                kwargs["json"]["academy_id"] = academy_id
+            elif isinstance(data, list):
+                new_data = copy.deepcopy(data)
+                for item in new_data:
+                    if isinstance(item, dict) and "academy_id" not in item:
+                        item["academy_id"] = academy_id
+                kwargs["json"] = new_data
+        # Note: we do NOT inject academy_id in the URL query string for POST
+        return await self.client.post(url, **kwargs)
 
 class SupabaseHttpClient:
     """Async HTTP client for Supabase"""
@@ -14,8 +63,7 @@ class SupabaseHttpClient:
             "Prefer": "return=representation",
             "x-backend-secret": "my_super_secret_backend_token_123"
         }
-        self.client = httpx.AsyncClient(timeout=30.0, headers=self.headers)
-        
+        self.client = InjectClient(httpx.AsyncClient(timeout=30.0, headers=self.headers))
     async def _get(self, endpoint: str):
         res = await self.client.get(f"{self.url}{endpoint}")
         res.raise_for_status()
