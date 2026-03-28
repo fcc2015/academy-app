@@ -8,7 +8,14 @@ import LandingPage from './pages/LandingPage';
 import AdminLogin from './pages/admin/AdminLogin';
 import AuthCallback from './pages/AuthCallback';
 import DownloadPage from './pages/DownloadPage';
+import React from 'react';
 import NotFound from './pages/NotFound';
+
+// SaaS Root
+import SaasLogin from './pages/saas/SaasLogin';
+import SaasLayout from './pages/saas/SaasLayout';
+import SaasDashboard from './pages/saas/SaasDashboard';
+import SaasAcademies from './pages/saas/SaasAcademies';
 
 // Admin
 import AdminLayout from './pages/admin/AdminLayout';
@@ -60,7 +67,15 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/download" element={<DownloadPage />} />
           <Route path="/login" element={<AdminLogin />} />
+          <Route path="/saas/login" element={<SaasLogin />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+
+          {/* SaaS Root */}
+          <Route path="/saas" element={<SaasLayout />}>
+            <Route index element={<Navigate to="/saas/dashboard" replace />} />
+            <Route path="dashboard" element={<SaasDashboard />} />
+            <Route path="academies" element={<SaasAcademies />} />
+          </Route>
 
           {/* Admin */}
           <Route path="/admin" element={<AdminLayout />}>

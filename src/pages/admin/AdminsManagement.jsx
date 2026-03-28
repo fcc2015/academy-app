@@ -91,7 +91,7 @@ const AdminsManagement = () => {
         try {
             const url = editingAdmin ? `${API_URL}/admins/${editingAdmin.id}` : `${API_URL}/admins/`;
             const method = editingAdmin ? 'PUT' : 'POST';
-            const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+            const res = await authFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
 
             if (res.ok) {
                 const data = await res.json();
