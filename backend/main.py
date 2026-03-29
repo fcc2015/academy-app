@@ -8,7 +8,7 @@ app = FastAPI(
     description="Backend API for Football Academy SaaS using Supabase"
 )
 
-# CORS configuration to allow the Vite React frontend
+# CORS configuration — supports local dev + production + multi-tenant subdomains
 origins = [
     "http://localhost:5173",
     "http://localhost:5174",
@@ -21,6 +21,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.netlify\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

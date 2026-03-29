@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from core.auth_middleware import verify_token
 from typing import List
 from schemas.coaches import CoachCreate, CoachResponse
 from services.supabase_client import supabase
@@ -6,7 +7,7 @@ import secrets
 import string
 import uuid as uuid_lib
 
-router = APIRouter(prefix="/coaches", tags=["Coaches"])
+router = APIRouter(prefix="/coaches", tags=["Coaches"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[CoachResponse])
 async def get_all_coaches():

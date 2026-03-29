@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from core.auth_middleware import verify_token
 from schemas.settings import AcademySettingsUpdate, AcademySettingsResponse
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/settings", tags=["Settings"])
+router = APIRouter(prefix="/settings", tags=["Settings"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=AcademySettingsResponse)
 async def get_settings():

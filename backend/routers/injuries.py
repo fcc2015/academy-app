@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from core.auth_middleware import verify_token
 from typing import List
 from schemas.injuries import InjuryCreate, InjuryUpdate, InjuryResponse
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/injuries", tags=["Injuries"])
+router = APIRouter(prefix="/injuries", tags=["Injuries"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[InjuryResponse])
 async def get_all_injuries():

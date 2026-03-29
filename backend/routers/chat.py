@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Header, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
+from core.auth_middleware import verify_token
 from pydantic import BaseModel
 from typing import Optional, List
 from services.supabase_client import supabase
 from datetime import datetime, timedelta
 
-router = APIRouter(prefix="/chat", tags=["Chat"])
+router = APIRouter(prefix="/chat", tags=["Chat"], dependencies=[Depends(verify_token)])
 
 
 # ─────────────────────────────────────────────

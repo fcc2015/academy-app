@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from core.auth_middleware import verify_token
 from typing import List, Optional
 from schemas.evaluations import EvaluationCreate, EvaluationResponse
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/evaluations", tags=["Evaluations"])
+router = APIRouter(prefix="/evaluations", tags=["Evaluations"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[EvaluationResponse])
 async def get_evaluations(player_id: Optional[str] = Query(None)):

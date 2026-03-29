@@ -1,11 +1,12 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from core.auth_middleware import verify_token
 from typing import List
 from schemas.admins import AdminCreate, AdminResponse
 from services.supabase_client import supabase
 import secrets
 import string
 
-router = APIRouter(prefix="/admins", tags=["Admins"])
+router = APIRouter(prefix="/admins", tags=["Admins"], dependencies=[Depends(verify_token)])
 
 def generate_temp_password(length=10):
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*"

@@ -166,6 +166,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
                 { to: '/admin/events',       icon: Calendar,       labelKey: 'sidebar.events' },
                 { to: '/admin/evaluations',  icon: Star,           labelKey: 'sidebar.evaluations' },
                 { to: '/admin/matches',      icon: Trophy,         labelKey: 'sidebar.matches' },
+                { to: '/admin/tactics',      icon: Users,          labelKey: 'sidebar.tactics' },
                 { to: '/admin/training',     icon: Calendar,       labelKey: 'sidebar.training' },
                 { to: '/admin/inventory',    icon: Package,        labelKey: 'sidebar.inventory' },
                 { to: '/admin/kits',         icon: Shirt,          labelKey: 'sidebar.kits' },

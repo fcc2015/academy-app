@@ -3,7 +3,7 @@ import { API_URL } from './config';
 /**
  * Authenticated fetch wrapper.
  * Automatically attaches JWT token from localStorage to every request.
- * Falls back to normal fetch if no token is stored (public endpoints).
+ * Handles 401 responses by redirecting to login.
  */
 export function authFetch(url, options = {}) {
   const token = localStorage.getItem('token');
@@ -20,7 +20,17 @@ export function authFetch(url, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
-  return fetch(url, { ...options, headers });
+  return fetch(url, { ...options, headers }).then(res => {
+    // Auto-logout on 401 (expired/invalid token)
+    if (res.status === 401) {
+      const currentPath = window.location.pathname;
+      // Don't redirect if already on login page or on a public route
+      if (!currentPath.includes('/login') && currentPath !== '/') {
+        logout();
+      }
+    }
+    return res;
+  });
 }
 
 /**
@@ -30,18 +40,30 @@ export function authFetch(url, options = {}) {
 export function isAuthenticated() {
   const token = localStorage.getItem('token');
   const expires = parseInt(localStorage.getItem('token_expires') || '0');
-  return token && (expires === 0 || Date.now() < expires);
+  if (!token) return false;
+  if (expires > 0 && Date.now() >= expires) {
+    // Token expired — clean up
+    logout();
+    return false;
+  }
+  return true;
 }
 
 /**
  * Clear all auth data and redirect to login.
  */
 export function logout() {
+  const role = localStorage.getItem('role');
   localStorage.removeItem('token');
   localStorage.removeItem('role');
   localStorage.removeItem('user_id');
   localStorage.removeItem('token_expires');
-  window.location.href = '/login';
+  // Redirect to appropriate login based on previous role
+  if (role === 'super_admin') {
+    window.location.href = '/saas/login';
+  } else {
+    window.location.href = '/login';
+  }
 }
 
 // Legacy export

@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from core.auth_middleware import verify_token
 from typing import Optional
 from pydantic import BaseModel
 from datetime import date
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/medical", tags=["Medical"])
+router = APIRouter(prefix="/medical", tags=["Medical"], dependencies=[Depends(verify_token)])
 
 class MedicalRecordBase(BaseModel):
     player_id: str

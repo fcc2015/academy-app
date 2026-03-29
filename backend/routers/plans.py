@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from core.auth_middleware import verify_token
 from services.supabase_client import supabase
 from schemas.plans import SubscriptionPlanCreate, SubscriptionPlanUpdate
 
-router = APIRouter(prefix="/plans", tags=["Subscription Plans"])
+router = APIRouter(prefix="/plans", tags=["Subscription Plans"], dependencies=[Depends(verify_token)])
 
 
 @router.get("/")

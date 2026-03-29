@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from core.auth_middleware import verify_token
 from typing import List
 from schemas.coupons import CouponCreate, CouponResponse
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/coupons", tags=["Coupons"])
+router = APIRouter(prefix="/coupons", tags=["Coupons"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[CouponResponse])
 async def get_all_coupons():

@@ -1,16 +1,25 @@
 import httpx
 import asyncio
+from datetime import datetime, timezone
 from core.config import settings
 from core.context import academy_id_ctx
 
 class InjectClient:
-    def __init__(self, client):
+    def __init__(self, client, base_url=""):
         self.client = client
+        self.base_url = base_url
+
+    def _resolve(self, url):
+        """Ensure URL is absolute by prepending base_url if needed."""
+        url_str = str(url)
+        if not url_str.startswith("http"):
+            return f"{self.base_url}{url_str}"
+        return url_str
 
     def _inject(self, url):
         from core.context import academy_id_ctx
         academy_id = academy_id_ctx.get(None)
-        url_str = str(url)
+        url_str = self._resolve(url)
         if not academy_id or "/rpc/" in url_str or "/auth/v1/" in url_str or "/storage/v1/" in url_str:
             return url_str
         separator = "&" if "?" in url_str else "?"
@@ -36,7 +45,7 @@ class InjectClient:
         from core.context import academy_id_ctx
         import copy
         academy_id = academy_id_ctx.get(None)
-        url_str = str(url)
+        url_str = self._resolve(url)
         if academy_id and "/rpc/" not in url_str and "/auth/v1/" not in url_str and "/storage/v1/" not in url_str:
             data = kwargs.get("json")
             if isinstance(data, dict) and "academy_id" not in data:
@@ -49,21 +58,28 @@ class InjectClient:
                         item["academy_id"] = academy_id
                 kwargs["json"] = new_data
         # Note: we do NOT inject academy_id in the URL query string for POST
-        return await self.client.post(url, **kwargs)
+        return await self.client.post(url_str, **kwargs)
 
 class SupabaseHttpClient:
     """Async HTTP client for Supabase"""
-    def __init__(self, url: str, key: str):
+    def __init__(self, url: str, key: str, service_role_key: str = None):
         self.url = url
         self.key = key
+        self.service_role_key = service_role_key
         self.headers = {
             "apikey": self.key,
             "Authorization": f"Bearer {self.key}",
             "Content-Type": "application/json",
             "Prefer": "return=representation",
-            "x-backend-secret": "my_super_secret_backend_token_123"
         }
-        self.client = InjectClient(httpx.AsyncClient(timeout=30.0, headers=self.headers))
+        # Admin headers use service_role key for privileged operations
+        self.admin_headers = {
+            "apikey": self.service_role_key or self.key,
+            "Authorization": f"Bearer {self.service_role_key or self.key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        }
+        self.client = InjectClient(httpx.AsyncClient(timeout=30.0, headers=self.headers), base_url=self.url)
     async def _get(self, endpoint: str):
         res = await self.client.get(f"{self.url}{endpoint}")
         res.raise_for_status()
@@ -114,8 +130,15 @@ class SupabaseHttpClient:
             "email_confirm": True,  # Bypass email verification
             "user_metadata": user_metadata
         }
-        res = await self._post("/auth/v1/admin/users", payload)
-        return res
+        # Must use admin (service_role) headers for /auth/v1/admin/* endpoints
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.post(
+                f"{self.url}/auth/v1/admin/users",
+                json=payload,
+                headers=self.admin_headers
+            )
+            res.raise_for_status()
+            return res.json()
 
     async def get_players(self):
         return await self._get("/rest/v1/players?select=*&order=created_at.desc")
@@ -138,9 +161,9 @@ class SupabaseHttpClient:
         return await self._post("/rest/v1/players", player_data)
 
     async def delete_player(self, user_id):
-        res = await self.client.delete(f"/rest/v1/players?user_id=eq.{user_id}")
+        res = await self.client.delete(f"{self.url}/rest/v1/players?user_id=eq.{user_id}")
         res.raise_for_status()
-        return res.status_code == 204
+        return {"success": True}
 
     async def update_player(self, user_id, player_data):
         res = await self.client.patch(f"/rest/v1/players?user_id=eq.{user_id}", json=player_data)
@@ -194,10 +217,10 @@ class SupabaseHttpClient:
     async def get_dashboard_stats(self):
         # Parallel fetching using persistent client
         tasks = [
-            self.client.get("/rest/v1/players?select=id"),
-            self.client.get("/rest/v1/payments?select=amount"),
-            self.client.get("/rest/v1/coaches?select=id&status=eq.Active"),
-            self.client.get("/rest/v1/events?select=id&status=eq.Scheduled")
+            self.client.get(f"{self.url}/rest/v1/players?select=id"),
+            self.client.get(f"{self.url}/rest/v1/payments?select=amount"),
+            self.client.get(f"{self.url}/rest/v1/coaches?select=id&status=eq.Active"),
+            self.client.get(f"{self.url}/rest/v1/events?select=id&status=eq.Scheduled")
         ]
         responses = await asyncio.gather(*tasks)
         
@@ -216,9 +239,9 @@ class SupabaseHttpClient:
 
     async def get_recent_activity(self):
         tasks = [
-            self.client.get("/rest/v1/players?select=full_name,category,created_at&order=created_at.desc&limit=3"),
-            self.client.get("/rest/v1/payments?select=amount,users(full_name),created_at&order=created_at.desc&limit=3"),
-            self.client.get("/rest/v1/events?select=title,event_date,created_at&order=created_at.desc&limit=3")
+            self.client.get(f"{self.url}/rest/v1/players?select=full_name,category,created_at&order=created_at.desc&limit=3"),
+            self.client.get(f"{self.url}/rest/v1/payments?select=amount,users(full_name),created_at&order=created_at.desc&limit=3"),
+            self.client.get(f"{self.url}/rest/v1/events?select=title,event_date,created_at&order=created_at.desc&limit=3")
         ]
         responses = await asyncio.gather(*tasks)
         
@@ -242,32 +265,19 @@ class SupabaseHttpClient:
         return data[0] if data else None
 
     async def update_academy_settings(self, settings_id, settings_data):
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            res = await client.patch(
-                f"{self.url}/rest/v1/academy_settings?id=eq.{settings_id}",
-                json=settings_data,
-                headers=self.headers
-            )
-            res.raise_for_status()
-            return res.json()
+        res = await self.client.patch(f"{self.url}/rest/v1/academy_settings?id=eq.{settings_id}", json=settings_data)
+        res.raise_for_status()
+        return res.json()
 
     # Squads Management
     async def get_squads(self):
         return await self._get("/rest/v1/squads?select=*,coaches(full_name)")
 
     async def get_squads_for_coach(self, user_id: str):
-        # DEV BYPASS: If using the dummy coach auth
-        if user_id == "00000000-0000-0000-0000-000000000001":
-            coaches_list = await self._get("/rest/v1/coaches?status=eq.Active&select=id&limit=1")
-            if not coaches_list:
-                return []
-            coach_id = coaches_list[0].get('id')
-        else:
-            coaches = await self._get(f"/rest/v1/coaches?user_id=eq.{user_id}&select=id")
-            if not coaches:
-                return []
-            coach_id = coaches[0].get('id')
-        
+        coaches = await self._get(f"/rest/v1/coaches?user_id=eq.{user_id}&select=id")
+        if not coaches:
+            return []
+        coach_id = coaches[0].get('id')
         return await self._get(f"/rest/v1/squads?coach_id=eq.{coach_id}&select=*,coaches(full_name)")
 
     async def insert_squad(self, squad_data: dict):
@@ -439,14 +449,9 @@ class SupabaseHttpClient:
 
     # Update Coach
     async def update_coach(self, coach_id: str, coach_data: dict):
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            res = await client.patch(
-                f"{self.url}/rest/v1/coaches?id=eq.{coach_id}",
-                json=coach_data,
-                headers=self.headers
-            )
-            res.raise_for_status()
-            return res.json()
+        res = await self.client.patch(f"{self.url}/rest/v1/coaches?id=eq.{coach_id}", json=coach_data)
+        res.raise_for_status()
+        return res.json()
 
     # Delete Payment
     # This method was duplicated, keeping the first async version.
@@ -531,10 +536,9 @@ class SupabaseHttpClient:
         return result[0] if isinstance(result, list) and result else result
 
     async def update_subscription_alert_status(self, sub_id: str, alert_status: str):
-        from datetime import datetime
         await self.client.patch(
-            f"/rest/v1/subscriptions?id=eq.{sub_id}",
-            json={"alert_status": alert_status, "last_alert_sent_at": datetime.utcnow().isoformat()}
+            f"{self.url}/rest/v1/subscriptions?id=eq.{sub_id}",
+            json={"alert_status": alert_status, "last_alert_sent_at": datetime.now(timezone.utc).isoformat()}
         )
         return {"success": True}
 
@@ -748,4 +752,8 @@ class SupabaseHttpClient:
         return {"success": True}
 
 
-supabase = SupabaseHttpClient(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+supabase = SupabaseHttpClient(
+    settings.SUPABASE_URL,
+    settings.SUPABASE_KEY,
+    service_role_key=settings.SUPABASE_SERVICE_ROLE_KEY
+)

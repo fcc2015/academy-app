@@ -1,14 +1,15 @@
 """
 Export router — CSV and PDF exports for players, finances, attendance.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from core.auth_middleware import verify_token
 from fastapi.responses import StreamingResponse
 from services.supabase_client import supabase
 import csv
 import io
 from datetime import datetime
 
-router = APIRouter(prefix="/exports", tags=["Exports"])
+router = APIRouter(prefix="/exports", tags=["Exports"], dependencies=[Depends(verify_token)])
 
 
 @router.get("/players/csv")

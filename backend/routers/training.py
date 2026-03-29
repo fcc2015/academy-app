@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from core.auth_middleware import verify_token
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, date
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/training", tags=["Training"])
+router = APIRouter(prefix="/training", tags=["Training"], dependencies=[Depends(verify_token)])
 
 class TrainingSessionBase(BaseModel):
     title: str

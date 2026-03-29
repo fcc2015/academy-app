@@ -5,8 +5,8 @@ import { Shield, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, Sparkles } from 
 import { useLanguage } from '../../i18n/LanguageContext';
 import { isAuthenticated } from '../../api';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://kbhnqntteexatihidhkn.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiaG5xbnR0ZWV4YXRpaGlkaGtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NDk2MDksImV4cCI6MjA4ODMyNTYwOX0.dwF2cxTuH7tCjDQv_IXsQNzWQmol6FbvWV17hBSyl94';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
 
 // Rate-limiting store (in-memory, reset on refresh)
 const loginAttempts = { count: 0, lockedUntil: null };
@@ -151,7 +151,7 @@ const SaasLogin = () => {
                         {t('auth.SaasLogin')}
                     </h1>
                     <p className="text-sm text-indigo-300/70 mt-1 font-medium">
-                        {isRTL ? 'بوابة الإدارة المحمية' : isRTL ? '' : 'Portail d\'administration sécurisé'}
+                        {isRTL ? 'بوابة الإدارة المحمية' : 'Portail d\'administration sécurisé'}
                     </p>
                 </div>
 
