@@ -102,29 +102,46 @@ async def update_academy(academy_id: str, data: AcademyStatusUpdate):
 async def get_saas_stats():
     """Get global SaaS platform stats with real data."""
     import asyncio
-    tasks = [
-        supabase.client.get(f"{supabase.url}/rest/v1/academies?select=id,status"),
-        supabase.client.get(f"{supabase.url}/rest/v1/users?select=id"),
-        supabase.client.get(f"{supabase.url}/rest/v1/payments?select=amount"),
-        supabase.client.get(f"{supabase.url}/rest/v1/players?select=id"),
-    ]
-    responses = await asyncio.gather(*tasks)
-    
-    academies_data = responses[0].json() if responses[0].status_code == 200 else []
-    total_academies = len(academies_data)
-    active_academies = len([a for a in academies_data if a.get("status") != "suspended"])
-    
-    total_users = len(responses[1].json()) if responses[1].status_code == 200 else 0
-    
-    payments = responses[2].json() if responses[2].status_code == 200 else []
-    total_mrr = sum(p.get("amount", 0) for p in payments)
-    
-    total_players = len(responses[3].json()) if responses[3].status_code == 200 else 0
-    
-    return {
-        "total_academies": total_academies,
-        "active_academies": active_academies,
-        "total_users": total_users,
-        "total_mrr": total_mrr,
-        "total_players": total_players
-    }
+    try:
+        tasks = [
+            supabase.client.get(f"{supabase.url}/rest/v1/academies?select=id,status"),
+            supabase.client.get(f"{supabase.url}/rest/v1/users?select=id"),
+            supabase.client.get(f"{supabase.url}/rest/v1/payments?select=amount"),
+            supabase.client.get(f"{supabase.url}/rest/v1/players?select=id"),
+        ]
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        academies_data = []
+        if not isinstance(responses[0], Exception) and responses[0].status_code == 200:
+            academies_data = responses[0].json()
+        total_academies = len(academies_data)
+        active_academies = len([a for a in academies_data if a.get("status") != "suspended"])
+        
+        total_users = 0
+        if not isinstance(responses[1], Exception) and responses[1].status_code == 200:
+            total_users = len(responses[1].json())
+        
+        total_mrr = 0
+        if not isinstance(responses[2], Exception) and responses[2].status_code == 200:
+            payments = responses[2].json()
+            total_mrr = sum(p.get("amount", 0) for p in payments)
+        
+        total_players = 0
+        if not isinstance(responses[3], Exception) and responses[3].status_code == 200:
+            total_players = len(responses[3].json())
+        
+        return {
+            "total_academies": total_academies,
+            "active_academies": active_academies,
+            "total_users": total_users,
+            "total_mrr": total_mrr,
+            "total_players": total_players
+        }
+    except Exception as e:
+        return {
+            "total_academies": 0,
+            "active_academies": 0,
+            "total_users": 0,
+            "total_mrr": 0,
+            "total_players": 0
+        }
