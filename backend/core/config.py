@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     SUPABASE_URL: str
     SUPABASE_KEY: str
+    SUPABASE_SERVICE_ROLE_KEY: str = None  # Required for admin operations (user provisioning)
 
     # DEV_MODE=true في .env يفعّل الـ bypass للتطوير المحلي فقط
     # في الإنتاج يجب أن يكون DEV_MODE=false أو غير موجود

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from core.auth_middleware import verify_token
 from typing import List
 from schemas.inventory import InventoryCreate, InventoryUpdate, InventoryResponse
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/inventory", tags=["Inventory"])
+router = APIRouter(prefix="/inventory", tags=["Inventory"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[InventoryResponse])
 async def get_all_inventory():

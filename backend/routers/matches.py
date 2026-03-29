@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from core.auth_middleware import verify_token
 from typing import List
 from schemas.matches import MatchCreate, MatchUpdate, MatchResponse
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/matches", tags=["Matches"])
+router = APIRouter(prefix="/matches", tags=["Matches"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[MatchResponse])
 async def get_all_matches():

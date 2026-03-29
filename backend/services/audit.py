@@ -3,7 +3,7 @@ Audit logging service — tracks all important actions.
 Call log_action() from routers after CRUD operations.
 """
 from services.supabase_client import supabase
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 async def log_action(
@@ -30,7 +30,7 @@ async def log_action(
             "entity": entity,
             "entity_id": entity_id,
             "details": details or {},
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         # Use Supabase REST API directly
         await supabase._post("/rest/v1/audit_logs", log_entry)

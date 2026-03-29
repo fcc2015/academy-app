@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from core.auth_middleware import verify_token
 from typing import List, Optional
 from pydantic import BaseModel
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/notifications", tags=["Notifications"])
+router = APIRouter(prefix="/notifications", tags=["Notifications"], dependencies=[Depends(verify_token)])
 
 class NotificationCreate(BaseModel):
     user_id: Optional[str] = None

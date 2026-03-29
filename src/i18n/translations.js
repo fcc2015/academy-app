@@ -39,6 +39,7 @@ const translations = {
         adminLogin: { ar: 'دخول الإدارة', en: 'Admin Login', fr: 'Connexion Admin' },
         coachLogin: { ar: 'دخول المدرب', en: 'Coach Login', fr: 'Connexion Coach' },
         parentLogin: { ar: 'دخول ولي الأمر', en: 'Parent Login', fr: 'Connexion Parent' },
+        SaasLogin: { ar: 'دخول الإدارة العامة (SaaS)', en: 'SaaS Master Login', fr: 'Connexion Master SaaS' },
     },
 
     // ========== ADMIN SIDEBAR ==========
@@ -55,6 +56,7 @@ const translations = {
         admins: { ar: 'الإداريون', en: 'Admins', fr: 'Administrateurs' },
         settings: { ar: 'الإعدادات', en: 'Settings', fr: 'Paramètres' },
         matches: { ar: 'المباريات', en: 'Matches', fr: 'Matchs' },
+        tactics: { ar: 'الخطط', en: 'Tactics', fr: 'Tactiques' },
         inventory: { ar: 'المخزون', en: 'Inventory', fr: 'Inventaire' },
         training: { ar: 'جدول التداريب', en: 'Training', fr: 'Entraînements' },
         kits: { ar: 'الألبسة والمعدات', en: 'Kits & Equipment', fr: 'Équipements' },

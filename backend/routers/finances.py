@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from core.auth_middleware import verify_token
 from typing import List
-from datetime import date
+from datetime import date, timedelta
 from schemas.finances import PaymentCreate, PaymentResponse, SubscriptionCreate, SubscriptionResponse
 from services.supabase_client import supabase
 from services.billing_engine import (
@@ -11,7 +12,7 @@ from services.billing_engine import (
     generate_invoice_number
 )
 
-router = APIRouter(prefix="/finances", tags=["Finances"])
+router = APIRouter(prefix="/finances", tags=["Finances"], dependencies=[Depends(verify_token)])
 
 
 # =========================================================
@@ -38,15 +39,12 @@ async def get_payments_by_player(player_id: str):
 async def get_payments_by_user(user_id: str):
     """Returns payments where user_id matches (parent or player directly)"""
     try:
-        import httpx
         from core.config import settings
-        async with httpx.AsyncClient() as client:
-            res = await client.get(
-                f"{settings.SUPABASE_URL}/rest/v1/payments?user_id=eq.{user_id}&select=*&order=payment_date.desc",
-                headers=supabase.headers
-            )
-            res.raise_for_status()
-            return res.json()
+        res = await supabase.client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/payments?user_id=eq.{user_id}&select=*&order=payment_date.desc"
+        )
+        res.raise_for_status()
+        return res.json()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching user payments: {str(e)}")
 
@@ -200,7 +198,7 @@ async def create_subscription(sub: SubscriptionCreate):
                     "payment_method": "Cash",
                     "due_date": next_due.isoformat(),
                     "period_start": start.isoformat(),
-                    "period_end": (next_due - __import__('datetime').timedelta(days=1)).isoformat(),
+                    "period_end": (next_due - timedelta(days=1)).isoformat(),
                     "invoice_number": invoice_number,
                     "notes": f"Prorata {prorata_days} jours"
                 })

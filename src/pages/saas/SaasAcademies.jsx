@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { API_URL } from '../../config';
-import { Loader2, Plus, Settings, X } from 'lucide-react';
+import { authFetch } from '../../api';
+import { Loader2, Plus, Ban, CheckCircle2, X } from 'lucide-react';
 
 export default function SaasAcademies() {
     const { dir } = useLanguage();
@@ -19,13 +20,11 @@ export default function SaasAcademies() {
         admin_password: ''
     });
     const [error, setError] = useState('');
+    const [actionLoading, setActionLoading] = useState(null);
 
     const fetchAcademies = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/saas/academies`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await authFetch(`${API_URL}/saas/academies`);
             if (res.ok) {
                 const data = await res.json();
                 setAcademies(data);
@@ -50,13 +49,9 @@ export default function SaasAcademies() {
         setError('');
         setCreating(true);
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/saas/academies`, {
+            const res = await authFetch(`${API_URL}/saas/academies`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
             const data = await res.json();
@@ -72,6 +67,26 @@ export default function SaasAcademies() {
             setError('Network error occurred.');
         } finally {
             setCreating(false);
+        }
+    };
+
+    const toggleStatus = async (id, currentStatus) => {
+        setActionLoading(id);
+        const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+        try {
+            const res = await authFetch(`${API_URL}/saas/academies/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+
+            if (res.ok) {
+                setAcademies(academies.map(acc => acc.id === id ? { ...acc, status: newStatus } : acc));
+            }
+        } catch (err) {
+            console.error("Toggle status error:", err);
+        } finally {
+            setActionLoading(null);
         }
     };
 
@@ -112,11 +127,33 @@ export default function SaasAcademies() {
                                         <td className="py-4 px-6 font-semibold text-slate-200">{acc.name || 'Unnamed Academy'}</td>
                                         <td className="py-4 px-6 text-slate-400">{new Date(acc.created_at).toLocaleDateString()}</td>
                                         <td className="py-4 px-6">
-                                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
+                                            {acc.status === 'suspended' ? (
+                                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1.5 w-max">
+                                                    <Ban className="w-3.5 h-3.5" /> Suspended
+                                                </span>
+                                            ) : (
+                                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5 w-max">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" /> Active
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="py-4 px-6 text-right">
-                                            <button className="p-2 bg-slate-800 text-slate-300 hover:text-emerald-400 rounded-lg transition-colors">
-                                                <Settings size={18} />
+                                            <button 
+                                                onClick={() => toggleStatus(acc.id, acc.status || 'active')}
+                                                disabled={actionLoading === acc.id}
+                                                className={`p-2 rounded-lg transition-colors text-sm font-semibold flex items-center justify-center gap-2 ml-auto ${
+                                                    acc.status === 'suspended' 
+                                                    ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' 
+                                                    : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'
+                                                }`}
+                                            >
+                                                {actionLoading === acc.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : acc.status === 'suspended' ? (
+                                                    <>Activate</>
+                                                ) : (
+                                                    <>Suspend</>
+                                                )}
                                             </button>
                                         </td>
                                     </tr>
@@ -126,6 +163,7 @@ export default function SaasAcademies() {
                     </table>
                 </div>
             )}
+
             {/* Create Academy Modal */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

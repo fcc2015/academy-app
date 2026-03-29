@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from core.auth_middleware import verify_token
 from typing import List
 from schemas.users import PlayerCreate, PlayerResponse, UserBase
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/players", tags=["Players Engine"])
+router = APIRouter(prefix="/players", tags=["Players Engine"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[PlayerResponse])
 async def get_all_players():
@@ -97,24 +98,18 @@ async def delete_player(user_id: str):
 async def get_players_by_parent(parent_id: str):
     """Returns players linked to a specific parent_id"""
     try:
-        # We reuse get_players but filter by parent_id in the service or here
-        # For efficiency, we'll use the new get_player_by_user_id logic but for parent_id
-        # Actually, let's just use the supabase client to filter
-        import httpx
         from core.config import settings
-        async with httpx.AsyncClient() as client:
-            res = await client.get(
-                f"{settings.SUPABASE_URL}/rest/v1/players?parent_id=eq.{parent_id}&select=*,users(full_name)",
-                headers=supabase.headers
-            )
-            res.raise_for_status()
-            data = res.json()
-            for p in data:
-                if 'users' in p and p['users']:
-                    p['full_name'] = p['users'].get('full_name', 'Unknown')
-                else:
-                    p['full_name'] = 'Unknown'
-            return data
+        res = await supabase.client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/players?parent_id=eq.{parent_id}&select=*,users(full_name)"
+        )
+        res.raise_for_status()
+        data = res.json()
+        for p in data:
+            if 'users' in p and p['users']:
+                p['full_name'] = p['users'].get('full_name', 'Unknown')
+            else:
+                p['full_name'] = 'Unknown'
+        return data
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

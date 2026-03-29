@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from core.auth_middleware import verify_token
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import date
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/kits", tags=["Kits"])
+router = APIRouter(prefix="/kits", tags=["Kits"], dependencies=[Depends(verify_token)])
 
 class KitAssignmentBase(BaseModel):
     player_id: Optional[str] = None

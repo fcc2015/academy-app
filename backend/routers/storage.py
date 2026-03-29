@@ -2,12 +2,13 @@
 Storage router for file uploads via Supabase Storage API.
 Handles profile pictures and document uploads.
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
+from core.auth_middleware import verify_token
 from services.supabase_client import supabase
 import uuid
 import base64
 
-router = APIRouter(prefix="/storage", tags=["Storage"])
+router = APIRouter(prefix="/storage", tags=["Storage"], dependencies=[Depends(verify_token)])
 
 ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
 ALLOWED_DOC_TYPES = ["application/pdf", "image/jpeg", "image/png", "application/msword",

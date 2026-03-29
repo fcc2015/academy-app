@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from core.auth_middleware import verify_token
 from typing import List
 from schemas.events import EventCreate, EventResponse, EventUpdate
 from services.supabase_client import supabase
 
-router = APIRouter(prefix="/events", tags=["Events"])
+router = APIRouter(prefix="/events", tags=["Events"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[EventResponse])
 async def get_all_events():
