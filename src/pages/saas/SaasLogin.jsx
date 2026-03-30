@@ -28,7 +28,8 @@ const SaasLogin = () => {
         // Redirect if already authenticated
         if (isAuthenticated()) {
             const role = localStorage.getItem('role');
-            if (role === 'admin') { navigate('/admin/dashboard', { replace: true }); return; }
+            if (role === 'super_admin') { navigate('/saas/dashboard', { replace: true }); return; }
+            else if (role === 'admin') { navigate('/admin/dashboard', { replace: true }); return; }
             else if (role === 'coach') { navigate('/coach/dashboard', { replace: true }); return; }
             else if (role === 'parent') { navigate('/parent/dashboard', { replace: true }); return; }
         }

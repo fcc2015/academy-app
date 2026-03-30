@@ -8,7 +8,9 @@ app = FastAPI(
     description="Backend API for Football Academy SaaS using Supabase"
 )
 
-# CORS configuration — supports local dev + production + multi-tenant subdomains
+# CORS configuration — supports local dev + production + custom domains
+# For multi-tenant SaaS with custom domains, we allow all origins
+# and rely on JWT authentication for security (industry standard).
 origins = [
     "http://localhost:5173",
     "http://localhost:5174",
@@ -20,11 +22,11 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=r"https://.*\.netlify\.app",
-    allow_credentials=True,
+    allow_origins=["*"],  # Custom domains need open CORS; JWT handles auth
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include Routers
