@@ -19,6 +19,7 @@ const SaasLayout = lazy(() => import('./pages/saas/SaasLayout'));
 const SaasDashboard = lazy(() => import('./pages/saas/SaasDashboard'));
 const SaasAcademies = lazy(() => import('./pages/saas/SaasAcademies'));
 const SaasSubscriptions = lazy(() => import('./pages/saas/SaasSubscriptions'));
+const SaasDomains = lazy(() => import('./pages/saas/SaasDomains'));
 const SaasSettings = lazy(() => import('./pages/saas/SaasSettings'));
 
 // Admin
@@ -91,6 +92,7 @@ function App() {
             <Route index element={<Navigate to="/saas/dashboard" replace />} />
             <Route path="dashboard" element={<SaasDashboard />} />
             <Route path="academies" element={<SaasAcademies />} />
+            <Route path="domains" element={<SaasDomains />} />
             <Route path="subscriptions" element={<SaasSubscriptions />} />
             <Route path="settings" element={<SaasSettings />} />
           </Route>
