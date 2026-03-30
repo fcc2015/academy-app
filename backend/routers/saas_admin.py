@@ -24,6 +24,9 @@ class AcademyStatusUpdate(BaseModel):
 class DomainAssignment(BaseModel):
     custom_domain: str
 
+class PlanAssignment(BaseModel):
+    plan_id: str
+
 # ── Academy CRUD ──
 
 @router.get("/academies")
@@ -254,3 +257,94 @@ async def get_saas_stats():
             "domains_configured": 0,
             "domains_verified": 0
         }
+
+# ── Plan Assignment ──
+
+@router.patch("/academies/{academy_id}/plan")
+async def assign_plan(academy_id: str, data: PlanAssignment):
+    """Assign a subscription plan to an academy."""
+    import httpx
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        res = await client.patch(
+            f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+            json={"plan_id": data.plan_id, "subscription_status": "active"},
+            headers=supabase.admin_headers
+        )
+        res.raise_for_status()
+        return res.json()
+
+# ── SaaS Settings ──
+
+DEFAULT_SETTINGS = {
+    "platform_name": "Academy SaaS Platform",
+    "support_email": "support@academy.com",
+    "default_trial_days": 14,
+    "max_players_starter": 50,
+    "max_players_pro": 200,
+    "max_coaches_starter": 2,
+    "max_coaches_pro": 10,
+    "auto_provision": True,
+    "email_notifications": True,
+    "auto_backup": True,
+    "maintenance_mode": False,
+    "paypal_sandbox": True,
+}
+
+@router.get("/settings")
+async def get_saas_settings():
+    """Get SaaS platform settings."""
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.get(
+                f"{supabase.url}/rest/v1/saas_settings?select=*&limit=1",
+                headers=supabase.admin_headers
+            )
+            if res.status_code == 200:
+                data = res.json()
+                if data:
+                    # First row is the settings
+                    row = data[0]
+                    # Remove DB metadata fields
+                    row.pop("id", None)
+                    row.pop("created_at", None)
+                    row.pop("updated_at", None)
+                    return row
+        return DEFAULT_SETTINGS
+    except Exception:
+        return DEFAULT_SETTINGS
+
+@router.put("/settings")
+async def update_saas_settings(request: dict):
+    """Update SaaS platform settings (upsert)."""
+    import httpx
+    try:
+        # Check if settings row exists
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            check = await client.get(
+                f"{supabase.url}/rest/v1/saas_settings?select=id&limit=1",
+                headers=supabase.admin_headers
+            )
+            existing = check.json() if check.status_code == 200 else []
+
+            if existing:
+                # Update
+                settings_id = existing[0]["id"]
+                res = await client.patch(
+                    f"{supabase.url}/rest/v1/saas_settings?id=eq.{settings_id}",
+                    json=request,
+                    headers=supabase.admin_headers
+                )
+                res.raise_for_status()
+                return {"success": True, "action": "updated"}
+            else:
+                # Insert
+                res = await client.post(
+                    f"{supabase.url}/rest/v1/saas_settings",
+                    json=request,
+                    headers=supabase.admin_headers
+                )
+                res.raise_for_status()
+                return {"success": True, "action": "created"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save settings: {str(e)}")
