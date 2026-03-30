@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
-from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin
+from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin, payments_gateway
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -56,6 +56,7 @@ app.include_router(expenses.router)
 app.include_router(storage.router)
 app.include_router(exports.router)
 app.include_router(saas_admin.router)
+app.include_router(payments_gateway.router)
 
 @app.get("/")
 def read_root():

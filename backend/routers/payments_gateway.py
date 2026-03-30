@@ -1,0 +1,252 @@
+"""
+PayPal Payment Gateway integration for Academy SaaS.
+Handles subscription payments from client academies.
+"""
+from fastapi import APIRouter, HTTPException, Request, status
+from pydantic import BaseModel
+from core.auth_middleware import require_role
+from core.config import settings
+from services.supabase_client import supabase
+import httpx
+import base64
+from datetime import datetime, timezone
+
+router = APIRouter(
+    prefix="/payments/gateway",
+    tags=["Payment Gateway"],
+)
+
+
+# ── Schemas ──
+
+class CreateOrderRequest(BaseModel):
+    academy_id: str
+    plan_id: str
+    amount: float
+    currency: str = "USD"
+    description: str = "Academy SaaS Subscription"
+
+
+class CaptureOrderRequest(BaseModel):
+    order_id: str
+    academy_id: str
+    plan_id: str | None = None
+
+
+# ── PayPal Auth Helper ──
+
+async def get_paypal_access_token() -> str:
+    """Get a PayPal OAuth2 access token using client credentials."""
+    client_id = settings.PAYPAL_CLIENT_ID
+    client_secret = settings.PAYPAL_CLIENT_SECRET
+
+    if not client_id or not client_secret:
+        raise HTTPException(
+            status_code=500,
+            detail="PayPal credentials not configured. Add PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET to .env"
+        )
+
+    # PayPal base URL (sandbox vs live)
+    base_url = "https://api-m.sandbox.paypal.com" if settings.PAYPAL_SANDBOX else "https://api-m.paypal.com"
+
+    auth = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        res = await client.post(
+            f"{base_url}/v1/oauth2/token",
+            headers={
+                "Authorization": f"Basic {auth}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data="grant_type=client_credentials"
+        )
+        if res.status_code != 200:
+            raise HTTPException(status_code=502, detail="Failed to authenticate with PayPal")
+        return res.json()["access_token"]
+
+
+def get_paypal_base_url() -> str:
+    return "https://api-m.sandbox.paypal.com" if settings.PAYPAL_SANDBOX else "https://api-m.paypal.com"
+
+
+# ── Create PayPal Order ──
+
+@router.post("/create-order", dependencies=[])
+async def create_paypal_order(req: CreateOrderRequest):
+    """Create a PayPal order for academy subscription payment."""
+    token = await get_paypal_access_token()
+    base_url = get_paypal_base_url()
+
+    order_payload = {
+        "intent": "CAPTURE",
+        "purchase_units": [{
+            "reference_id": f"academy_{req.academy_id}",
+            "description": req.description,
+            "amount": {
+                "currency_code": req.currency,
+                "value": f"{req.amount:.2f}"
+            },
+            "custom_id": f"{req.academy_id}|{req.plan_id}"
+        }],
+        "application_context": {
+            "brand_name": "Academy SaaS Platform",
+            "landing_page": "NO_PREFERENCE",
+            "user_action": "PAY_NOW",
+            "return_url": f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success",
+            "cancel_url": f"{settings.FRONTEND_URL}/saas/subscriptions?payment=cancelled",
+        }
+    }
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        res = await client.post(
+            f"{base_url}/v2/checkout/orders",
+            json=order_payload,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+        )
+
+        if res.status_code not in [200, 201]:
+            raise HTTPException(status_code=502, detail=f"PayPal order creation failed: {res.text}")
+
+        order = res.json()
+
+        # Save pending payment record in DB
+        try:
+            await supabase._post("/rest/v1/payment_transactions", {
+                "paypal_order_id": order["id"],
+                "academy_id": req.academy_id,
+                "plan_id": req.plan_id,
+                "amount": req.amount,
+                "currency": req.currency,
+                "status": "pending",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+        except Exception as e:
+            print(f"⚠️ Failed to save transaction record: {e}")
+
+        # Return the approval URL for frontend redirect
+        approve_link = next(
+            (link["href"] for link in order.get("links", []) if link["rel"] == "approve"),
+            None
+        )
+
+        return {
+            "order_id": order["id"],
+            "status": order["status"],
+            "approve_url": approve_link
+        }
+
+
+# ── Capture PayPal Order (after user approves) ──
+
+@router.post("/capture-order")
+async def capture_paypal_order(req: CaptureOrderRequest):
+    """Capture a PayPal order after the user has approved it."""
+    token = await get_paypal_access_token()
+    base_url = get_paypal_base_url()
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        res = await client.post(
+            f"{base_url}/v2/checkout/orders/{req.order_id}/capture",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+        )
+
+        if res.status_code not in [200, 201]:
+            raise HTTPException(status_code=502, detail=f"PayPal capture failed: {res.text}")
+
+        capture_data = res.json()
+        capture_status = capture_data.get("status", "UNKNOWN")
+
+        # Update transaction in DB
+        try:
+            import httpx as httpx_mod
+            async with httpx_mod.AsyncClient(timeout=30.0) as db_client:
+                await db_client.patch(
+                    f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{req.order_id}",
+                    json={
+                        "status": "completed" if capture_status == "COMPLETED" else "failed",
+                        "paypal_capture_id": capture_data.get("purchase_units", [{}])[0]
+                            .get("payments", {}).get("captures", [{}])[0].get("id", ""),
+                        "completed_at": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers=supabase.admin_headers
+                )
+        except Exception as e:
+            print(f"⚠️ Failed to update transaction: {e}")
+
+        # If successful, update academy subscription status
+        if capture_status == "COMPLETED":
+            try:
+                import httpx as httpx_mod
+                async with httpx_mod.AsyncClient(timeout=30.0) as db_client:
+                    await db_client.patch(
+                        f"{supabase.url}/rest/v1/academies?id=eq.{req.academy_id}",
+                        json={
+                            "subscription_status": "active",
+                            "last_payment_at": datetime.now(timezone.utc).isoformat()
+                        },
+                        headers=supabase.admin_headers
+                    )
+            except Exception as e:
+                print(f"⚠️ Failed to update academy subscription: {e}")
+
+        return {
+            "success": capture_status == "COMPLETED",
+            "status": capture_status,
+            "order_id": req.order_id,
+            "details": capture_data
+        }
+
+
+# ── Get Payment History ──
+
+@router.get("/transactions/{academy_id}", dependencies=[])
+async def get_payment_transactions(academy_id: str):
+    """Get payment transaction history for an academy."""
+    try:
+        import httpx as httpx_mod
+        async with httpx_mod.AsyncClient(timeout=30.0) as client:
+            res = await client.get(
+                f"{supabase.url}/rest/v1/payment_transactions?academy_id=eq.{academy_id}&order=created_at.desc",
+                headers=supabase.admin_headers
+            )
+            if res.status_code == 200:
+                return res.json()
+            return []
+    except Exception:
+        return []
+
+
+# ── PayPal Webhook (optional, for async notifications) ──
+
+@router.post("/webhook")
+async def paypal_webhook(request: Request):
+    """Handle PayPal webhook events (IPN-style notifications)."""
+    body = await request.json()
+    event_type = body.get("event_type", "")
+
+    if event_type == "PAYMENT.CAPTURE.COMPLETED":
+        resource = body.get("resource", {})
+        custom_id = resource.get("custom_id", "")
+        if "|" in custom_id:
+            academy_id, plan_id = custom_id.split("|", 1)
+            try:
+                import httpx as httpx_mod
+                async with httpx_mod.AsyncClient(timeout=30.0) as client:
+                    await client.patch(
+                        f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+                        json={
+                            "subscription_status": "active",
+                            "last_payment_at": datetime.now(timezone.utc).isoformat()
+                        },
+                        headers=supabase.admin_headers
+                    )
+            except Exception as e:
+                print(f"⚠️ Webhook handler error: {e}")
+
+    return {"status": "ok"}
