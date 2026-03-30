@@ -111,10 +111,10 @@ async def create_paypal_order(req: CreateOrderRequest):
 
         order = res.json()
 
-        # Save pending payment record in DB (using admin headers)
+        # Save pending payment record in DB (using admin/service_role headers)
         try:
             async with httpx.AsyncClient(timeout=30.0) as db_client:
-                await db_client.post(
+                save_res = await db_client.post(
                     f"{supabase.url}/rest/v1/payment_transactions",
                     json={
                         "paypal_order_id": order["id"],
@@ -127,6 +127,8 @@ async def create_paypal_order(req: CreateOrderRequest):
                     },
                     headers=supabase.admin_headers
                 )
+                if save_res.status_code not in [200, 201]:
+                    print(f"⚠️ DB save response: {save_res.status_code} - {save_res.text}")
         except Exception as e:
             print(f"⚠️ Failed to save transaction record: {e}")
 
@@ -193,13 +195,18 @@ async def capture_paypal_order(req: CaptureOrderRequest):
         # If successful, update academy subscription status
         if capture_status == "COMPLETED":
             try:
+                update_data = {
+                    "subscription_status": "active",
+                    "last_payment_at": datetime.now(timezone.utc).isoformat()
+                }
+                # Also assign the plan if provided
+                if req.plan_id:
+                    update_data["plan_id"] = req.plan_id
+
                 async with httpx.AsyncClient(timeout=30.0) as db_client:
                     await db_client.patch(
                         f"{supabase.url}/rest/v1/academies?id=eq.{req.academy_id}",
-                        json={
-                            "subscription_status": "active",
-                            "last_payment_at": datetime.now(timezone.utc).isoformat()
-                        },
+                        json=update_data,
                         headers=supabase.admin_headers
                     )
             except Exception as e:
@@ -250,6 +257,7 @@ async def paypal_webhook(request: Request):
                         f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
                         json={
                             "subscription_status": "active",
+                            "plan_id": plan_id,
                             "last_payment_at": datetime.now(timezone.utc).isoformat()
                         },
                         headers=supabase.admin_headers
