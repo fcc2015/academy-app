@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Football Academy API"
@@ -6,7 +7,7 @@ class Settings(BaseSettings):
 
     SUPABASE_URL: str
     SUPABASE_KEY: str
-    SUPABASE_SERVICE_ROLE_KEY: str = None  # Required for admin operations (user provisioning)
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None  # Required for admin operations (user provisioning)
 
     # PayPal Gateway
     PAYPAL_CLIENT_ID: str = None

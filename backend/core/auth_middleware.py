@@ -38,7 +38,7 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
 
             # Fetch academy_id from the public.users table
             db_res = await client.get(
-                f"{settings.SUPABASE_URL}/rest/v1/users?user_id=eq.{user_id}&select=academy_id",
+                f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=academy_id",
                 headers={
                     "apikey": settings.SUPABASE_KEY,
                     "Authorization": f"Bearer {token}",
