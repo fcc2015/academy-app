@@ -3,6 +3,7 @@ from core.auth_middleware import verify_token
 from typing import List
 from schemas.admins import AdminCreate, AdminResponse
 from services.supabase_client import supabase
+from urllib.parse import quote
 import secrets
 import string
 
@@ -29,6 +30,14 @@ async def create_admin(admin: AdminCreate):
         admin_dict = admin.model_dump()
         email = admin_dict.get("email")
         full_name = admin_dict.get("full_name")
+
+        # --- Duplicate Check: Email ---
+        existing = await supabase._get(f"/rest/v1/admins?email=eq.{quote(email)}&select=id")
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"This email is already used by another admin. | هاد الإيميل ديجا مستعمل من طرف أدمين آخر: {email}"
+            )
         
         # 1. Generate temp password
         temp_password = generate_temp_password()
@@ -56,10 +65,18 @@ async def create_admin(admin: AdminCreate):
         created_admin["temp_password"] = temp_password
         
         return created_admin
+    except HTTPException:
+        raise
     except Exception as e:
+        error_msg = str(e)
+        if "duplicate" in error_msg.lower() or "23505" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"This email already exists. | هاد الإيميل ديجا كاين: {email}"
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating admin: {str(e)}"
+            detail=f"Error creating admin: {error_msg}"
         )
 
 @router.put("/{admin_id}")

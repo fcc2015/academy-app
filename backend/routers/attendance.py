@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from core.auth_middleware import verify_token
 from typing import List
 from schemas.attendance import AttendanceResponse, AttendanceBulkCreate
@@ -7,7 +7,7 @@ from services.supabase_client import supabase
 router = APIRouter(prefix="/attendance", tags=["Attendance"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[AttendanceResponse])
-async def get_attendance(squad_id: str, date: str):
+async def get_attendance(squad_id: str = Query(...), date: str = Query(...)):
     try:
         return await supabase.get_attendance(squad_id, date)
     except Exception as e:
