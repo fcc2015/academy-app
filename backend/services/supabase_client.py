@@ -355,7 +355,15 @@ class SupabaseHttpClient:
 
     # Public Requests
     async def insert_public_request(self, data: dict):
-        return await self._post("/rest/v1/public_requests", data)
+        import httpx
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.post(
+                f"{self.url}/rest/v1/public_requests",
+                json=data,
+                headers={**self.admin_headers, "Prefer": "return=representation"}
+            )
+            res.raise_for_status()
+            return res.json()
 
     async def get_public_requests(self, status: str = "new"):
         # If status is "active", fetch both 'new' and 'processing'
@@ -750,6 +758,54 @@ class SupabaseHttpClient:
             if res.status_code not in [200, 204]:
                 res.raise_for_status()
         return {"success": True}
+
+    # =========================================================
+    # Tournaments & Tryouts Management
+    # =========================================================
+    async def get_tournaments(self):
+        return await self._get("/rest/v1/tournaments?select=*&order=created_at.desc")
+
+    async def insert_tournament(self, data: dict):
+        return await self._post("/rest/v1/tournaments", data)
+
+    async def get_tournament_teams(self, tournament_id: str):
+        return await self._get(f"/rest/v1/tournament_teams?tournament_id=eq.{tournament_id}&select=*&order=points.desc,goals_for.desc")
+
+    async def insert_tournament_team(self, data: dict):
+        return await self._post("/rest/v1/tournament_teams", data)
+
+    async def get_tournament_matches(self, tournament_id: str):
+        return await self._get(f"/rest/v1/tournament_matches?tournament_id=eq.{tournament_id}&select=*,team_a:tournament_teams!team_a_id(name),team_b:tournament_teams!team_b_id(name)&order=match_date.asc")
+
+    async def insert_tournament_match(self, data: dict):
+        return await self._post("/rest/v1/tournament_matches", data)
+
+    async def update_tournament_match(self, match_id: str, data: dict):
+        res = await self.client.patch(f"/rest/v1/tournament_matches?id=eq.{match_id}", json=data)
+        res.raise_for_status()
+        return res.json()
+
+    async def update_tournament_team(self, team_id: str, data: dict):
+        res = await self.client.patch(f"/rest/v1/tournament_teams?id=eq.{team_id}", json=data)
+        res.raise_for_status()
+        return res.json()
+
+    async def get_tryouts(self):
+        return await self._get("/rest/v1/tryouts?select=*&order=created_at.desc")
+
+    async def insert_tryout(self, data: dict):
+        return await self._post("/rest/v1/tryouts", data)
+
+    async def get_tryout_candidates(self, tryout_id: str):
+        return await self._get(f"/rest/v1/tryout_candidates?tryout_id=eq.{tryout_id}&select=*&order=full_name.asc")
+
+    async def insert_tryout_candidate(self, data: dict):
+        return await self._post("/rest/v1/tryout_candidates", data)
+
+    async def update_tryout_candidate(self, candidate_id: str, data: dict):
+        res = await self.client.patch(f"/rest/v1/tryout_candidates?id=eq.{candidate_id}", json=data)
+        res.raise_for_status()
+        return res.json()
 
 
 supabase = SupabaseHttpClient(
