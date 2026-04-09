@@ -64,6 +64,9 @@ export default function SaasLanding() {
     const [paypalLoading, setPaypalLoading] = useState(null);
     const [activeTab, setActiveTab] = useState(null); // 'privacy' | 'refund' | null
     const [yearlyMode, setYearlyMode] = useState(false);
+    const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
+    const [paymentMethodForm, setPaymentMethodForm] = useState({ type: 'bank_transfer', bank_name: '', iban: '', holder_name: '', notes: '' });
+    const [paymentMethodStatus, setPaymentMethodStatus] = useState(null);
 
     // Free academy registration modal
     const [showRegModal, setShowRegModal] = useState(false);
@@ -253,10 +256,16 @@ export default function SaasLanding() {
                                 <h3 style={{ fontSize: 22, fontWeight: 700, color: '#10b981' }}>Paiement Réussi! 🎉</h3>
                                 <p style={{ color: '#64748b', marginTop: 8 }}>Votre abonnement a été activé avec succès.</p>
                                 <p style={{ color: '#94a3b8', marginTop: 4, fontSize: 14 }}>Vous recevrez un email de confirmation.</p>
-                                <button onClick={() => setPaymentResult(null)}
-                                    style={{ marginTop: 24, padding: '12px 32px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 600, cursor: 'pointer', fontSize: 15 }}>
-                                    Continuer
-                                </button>
+                                <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    <button onClick={() => setPaymentResult(null)}
+                                        style={{ padding: '12px 32px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 600, cursor: 'pointer', fontSize: 15 }}>
+                                        Continuer
+                                    </button>
+                                    <button onClick={() => { setPaymentResult(null); setShowPaymentMethodModal(true); }}
+                                        style={{ padding: '12px 32px', background: 'transparent', color: '#6366f1', border: '2px solid #6366f1', borderRadius: 12, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+                                        + Ajouter un moyen de paiement
+                                    </button>
+                                </div>
                             </>
                         )}
                         {paymentResult === 'error' && (
@@ -281,6 +290,68 @@ export default function SaasLanding() {
                                 </button>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ─── PAYMENT METHOD MODAL ─── */}
+            {showPaymentMethodModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: 20, padding: '36px 28px', maxWidth: 460, width: '90%', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
+                        <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>Ajouter un moyen de paiement</h3>
+                        <p style={{ color: '#64748b', fontSize: 14, marginBottom: 20 }}>Ajoutez un virement bancaire ou autre méthode.</p>
+
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                            {['bank_transfer', 'cash', 'check'].map(t => (
+                                <button key={t} onClick={() => setPaymentMethodForm({ ...paymentMethodForm, type: t })}
+                                    style={{ flex: 1, padding: '8px 4px', borderRadius: 10, border: paymentMethodForm.type === t ? '2px solid #6366f1' : '2px solid #e2e8f0', background: paymentMethodForm.type === t ? '#ede9fe' : '#f8fafc', color: paymentMethodForm.type === t ? '#6366f1' : '#64748b', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>
+                                    {t === 'bank_transfer' ? '🏦 Virement' : t === 'cash' ? '💵 Cash' : '📄 Chèque'}
+                                </button>
+                            ))}
+                        </div>
+
+                        {paymentMethodForm.type === 'bank_transfer' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <input placeholder="Nom de la banque" value={paymentMethodForm.bank_name}
+                                    onChange={e => setPaymentMethodForm({ ...paymentMethodForm, bank_name: e.target.value })}
+                                    style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, outline: 'none' }} />
+                                <input placeholder="IBAN / RIB" value={paymentMethodForm.iban}
+                                    onChange={e => setPaymentMethodForm({ ...paymentMethodForm, iban: e.target.value })}
+                                    style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, outline: 'none' }} />
+                                <input placeholder="Nom du titulaire" value={paymentMethodForm.holder_name}
+                                    onChange={e => setPaymentMethodForm({ ...paymentMethodForm, holder_name: e.target.value })}
+                                    style={{ padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, outline: 'none' }} />
+                            </div>
+                        )}
+                        <textarea placeholder="Notes (optionnel)" value={paymentMethodForm.notes}
+                            onChange={e => setPaymentMethodForm({ ...paymentMethodForm, notes: e.target.value })}
+                            style={{ width: '100%', marginTop: 10, padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, outline: 'none', resize: 'vertical', minHeight: 70, boxSizing: 'border-box' }} />
+
+                        {paymentMethodStatus === 'success' && (
+                            <p style={{ color: '#10b981', fontWeight: 600, marginTop: 10 }}>✅ Moyen de paiement enregistré!</p>
+                        )}
+
+                        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                            <button onClick={() => { setShowPaymentMethodModal(false); setPaymentMethodStatus(null); }}
+                                style={{ flex: 1, padding: '11px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: 600, cursor: 'pointer' }}>
+                                Annuler
+                            </button>
+                            <button onClick={async () => {
+                                setPaymentMethodStatus('loading');
+                                try {
+                                    await fetch(`${API_URL}/public/requests`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ type: 'payment_method', name: paymentMethodForm.holder_name || 'N/A', message: JSON.stringify(paymentMethodForm) })
+                                    });
+                                    setPaymentMethodStatus('success');
+                                    setTimeout(() => { setShowPaymentMethodModal(false); setPaymentMethodStatus(null); }, 2000);
+                                } catch { setPaymentMethodStatus('error'); }
+                            }}
+                                style={{ flex: 1, padding: '11px', borderRadius: 10, background: '#6366f1', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}>
+                                {paymentMethodStatus === 'loading' ? '...' : 'Enregistrer'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
