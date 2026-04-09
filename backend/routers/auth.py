@@ -27,25 +27,41 @@ async def login(credentials: UserLogin):
             detail="Invalid email or password."
         )
 
-@router.get("/role", dependencies=[Depends(verify_token)])
+@router.get("/role")
 async def get_user_role(token_data: dict = Depends(verify_token)):
     """Get role of authenticated user from DB (used after OAuth login)."""
+    import httpx
+    user_id = token_data.get("user_id")
     try:
-        user_id = token_data.get("sub") or token_data.get("user_id")
-        # Check admins table
-        admin = await supabase._get(f"/rest/v1/admins?user_id=eq.{user_id}&select=user_id,status")
-        if admin:
-            return {"role": "admin"}
-        # Check coaches table
-        coach = await supabase._get(f"/rest/v1/coaches?user_id=eq.{user_id}&select=user_id")
-        if coach:
-            return {"role": "coach"}
-        # Check users table for super_admin
-        user = await supabase._get(f"/rest/v1/users?id=eq.{user_id}&select=role")
-        if user and user[0].get("role") == "super_admin":
-            return {"role": "super_admin"}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Check admins table using service role to bypass RLS
+            admin_res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/admins?user_id=eq.{user_id}&select=user_id",
+                headers=supabase.admin_headers
+            )
+            if admin_res.status_code == 200 and admin_res.json():
+                return {"role": "admin"}
+
+            # Check coaches table
+            coach_res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/coaches?user_id=eq.{user_id}&select=user_id",
+                headers=supabase.admin_headers
+            )
+            if coach_res.status_code == 200 and coach_res.json():
+                return {"role": "coach"}
+
+            # Check users table for super_admin
+            user_res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=role",
+                headers=supabase.admin_headers
+            )
+            if user_res.status_code == 200 and user_res.json():
+                db_role = user_res.json()[0].get("role")
+                if db_role == "super_admin":
+                    return {"role": "super_admin"}
+
         return {"role": "parent"}
-    except Exception as e:
+    except Exception:
         return {"role": "parent"}
 
 
