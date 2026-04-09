@@ -137,7 +137,13 @@ class SupabaseHttpClient:
                 json=payload,
                 headers=self.admin_headers
             )
-            res.raise_for_status()
+            if not res.is_success:
+                try:
+                    body = res.json()
+                    msg = body.get("msg", body.get("message", body.get("error", res.text)))
+                except Exception:
+                    msg = res.text
+                raise Exception(f"Supabase auth error {res.status_code}: {msg}")
             return res.json()
 
     async def get_players(self):
