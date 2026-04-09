@@ -1,10 +1,11 @@
 """
 Export router — CSV and PDF exports for players, finances, attendance.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from core.auth_middleware import verify_token
 from fastapi.responses import StreamingResponse
 from services.supabase_client import supabase
+from typing import Optional
 import csv
 import io
 from datetime import datetime
@@ -79,7 +80,7 @@ async def export_payments_csv():
 
 
 @router.get("/attendance/csv")
-async def export_attendance_csv(squad_id: str = None):
+async def export_attendance_csv(squad_id: Optional[str] = Query(None)):
     """Export attendance records as CSV."""
     try:
         # For now, return all attendance; can be filtered by squad

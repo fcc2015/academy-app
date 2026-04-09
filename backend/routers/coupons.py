@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from core.auth_middleware import verify_token
 from typing import List
 from schemas.coupons import CouponCreate, CouponResponse
@@ -44,7 +44,7 @@ async def validate_coupon(code: str):
         )
 
 @router.patch("/{coupon_id}/toggle", response_model=CouponResponse)
-async def toggle_coupon(coupon_id: str, is_active: bool):
+async def toggle_coupon(coupon_id: str, is_active: bool = Query(...)):
     try:
         response = await supabase.update_coupon_status(coupon_id, is_active)
         return response[0]

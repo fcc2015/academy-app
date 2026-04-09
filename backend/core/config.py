@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None  # Required for admin operations (user provisioning)
 
     # PayPal Gateway
-    PAYPAL_CLIENT_ID: str = None
-    PAYPAL_CLIENT_SECRET: str = None
+    PAYPAL_CLIENT_ID: Optional[str] = None
+    PAYPAL_CLIENT_SECRET: Optional[str] = None
     PAYPAL_SANDBOX: bool = True  # True = sandbox, False = live
     FRONTEND_URL: str = "https://jolly-kangaroo-3c3d92.netlify.app"
 

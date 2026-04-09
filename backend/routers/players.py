@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from core.auth_middleware import verify_token
+from core.auth_middleware import verify_token, require_role
 from typing import List
 from schemas.users import PlayerCreate, PlayerResponse, UserBase
 from services.supabase_client import supabase
+from urllib.parse import quote
 
 router = APIRouter(prefix="/players", tags=["Players Engine"], dependencies=[Depends(verify_token)])
 
@@ -21,9 +22,19 @@ async def get_all_players():
             detail=f"Error fetching players: {str(e)}"
         )
 
-@router.post("/", response_model=PlayerResponse)
+@router.post("/", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
 async def create_player(player: PlayerCreate):
     try:
+        # --- Duplicate Check: Player Name ---
+        existing = await supabase._get(
+            f"/rest/v1/players?full_name=eq.{quote(player.full_name)}&select=user_id"
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"A player with this name already exists. | واحد اللاعب بهاد الاسم ديجا كاين: {player.full_name}"
+            )
+
         # 1. Insert into users table first (required by FK constraint players_user_id_fkey)
         user_data = {
             "id": player.user_id,
@@ -55,16 +66,23 @@ async def create_player(player: PlayerCreate):
         result = response[0]
         result["full_name"] = player.full_name
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         error_msg = str(e)
         print(f"DEBUG ERROR creating player: {error_msg}")
+        if "duplicate" in error_msg.lower() or "23505" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"This player already exists. | هاد اللاعب ديجا كاين: {player.full_name}"
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error creating player: {error_msg}"
         )
 
 
-@router.put("/{user_id}", response_model=PlayerResponse)
+@router.put("/{user_id}", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
 async def update_player(user_id: str, player: PlayerCreate):
     try:
         player_dict = player.model_dump(exclude={"user_id", "full_name"}, mode='json')
@@ -83,7 +101,7 @@ async def update_player(user_id: str, player: PlayerCreate):
             detail=f"Error updating player: {str(e)}"
         )
 
-@router.delete("/{user_id}")
+@router.delete("/{user_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
 async def delete_player(user_id: str):
     try:
         await supabase.delete_player(user_id)

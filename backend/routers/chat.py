@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from services.supabase_client import supabase
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 router = APIRouter(prefix="/chat", tags=["Chat"], dependencies=[Depends(verify_token)])
 
@@ -462,7 +463,7 @@ async def get_typing(group_id: str, exclude_user: Optional[str] = None):
     # Only fetch recent typing (last 5 seconds)
     url = f"{settings.SUPABASE_URL}/rest/v1/chat_typing?group_id=eq.{group_id}&is_typing=eq.true&select=user_name,user_id,updated_at"
     if exclude_user:
-        url += f"&user_id=neq.{exclude_user}"
+        url += f"&user_id=neq.{quote(exclude_user)}"
 
     async with httpx.AsyncClient() as client:
         res = await client.get(url, headers=supabase.headers)

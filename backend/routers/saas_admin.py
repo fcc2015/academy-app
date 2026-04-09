@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
+import httpx
 from core.auth_middleware import require_role
 from services.supabase_client import supabase
+from urllib.parse import quote
 
 router = APIRouter(
     prefix="/saas",
@@ -31,13 +33,34 @@ class PlanAssignment(BaseModel):
 
 @router.get("/academies")
 async def get_academies():
-    """Get all academies for SaaS management."""
-    res = await supabase._get("/rest/v1/academies?select=*&order=created_at.desc")
-    return res
+    """Get all academies for SaaS management (uses service_role to bypass RLS)."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        res = await client.get(
+            f"{supabase.url}/rest/v1/academies?select=*&order=created_at.desc",
+            headers=supabase.admin_headers
+        )
+        res.raise_for_status()
+        return res.json()
 
 @router.post("/academies")
 async def create_academy(req: AcademyProvisionRequest):
     """Provision a new client academy and its root admin."""
+    # --- Duplicate Check: Academy Name ---
+    existing_name = await supabase._get(f"/rest/v1/academies?name=eq.{quote(req.name)}&select=id")
+    if existing_name:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"An academy with this name already exists. | واحد الأكاديمية بهاد الاسم ديجا كاينة: {req.name}"
+        )
+    
+    # --- Duplicate Check: Admin Email ---
+    existing_email = await supabase._get(f"/rest/v1/admins?email=eq.{quote(str(req.admin_email))}&select=id")
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"This email is already used by another admin. | هاد الإيميل ديجا مستعمل من طرف أدمين آخر: {req.admin_email}"
+        )
+    
     # 1. Create the Academy record
     academy_data = {
         "name": req.name,
@@ -46,7 +69,16 @@ async def create_academy(req: AcademyProvisionRequest):
         "status": "active"
     }
     
-    res_academy = await supabase._post("/rest/v1/academies?select=id", academy_data)
+    try:
+        res_academy = await supabase._post("/rest/v1/academies?select=id", academy_data)
+    except Exception as e:
+        if "duplicate" in str(e).lower() or "23505" in str(e):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"An academy with this name already exists. | واحد الأكاديمية بهاد الاسم ديجا كاينة: {req.name}"
+            )
+        raise
+    
     academy_row = res_academy[0] if isinstance(res_academy, list) else res_academy
     new_academy_id = academy_row["id"]
 
@@ -62,11 +94,10 @@ async def create_academy(req: AcademyProvisionRequest):
         
         admin_user_id = auth_res.get("id")
         
-        # 3. Create the public.users record
+        # 3. Create the public.users record (trigger may already handle this)
         try:
             await supabase._post("/rest/v1/users", {
                 "id": admin_user_id,
-                "user_id": admin_user_id,
                 "full_name": req.admin_name,
                 "role": "admin",
                 "academy_id": new_academy_id
@@ -91,15 +122,20 @@ async def create_academy(req: AcademyProvisionRequest):
             "message": "Academy and admin user provisioned successfully."
         }
     except Exception as e:
+        error_msg = str(e)
+        if "duplicate" in error_msg.lower() or "23505" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"This email already exists. | هاد الإيميل ديجا كاين: {req.admin_email}"
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Academy created, but failed to provision admin user: {str(e)}"
+            detail=f"Academy created, but failed to provision admin user: {error_msg}"
         )
 
 @router.patch("/academies/{academy_id}")
 async def update_academy(academy_id: str, data: AcademyStatusUpdate):
     """Update academy status (activate/suspend)."""
-    import httpx
     async with httpx.AsyncClient(timeout=30.0) as client:
         res = await client.patch(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
@@ -114,14 +150,13 @@ async def update_academy(academy_id: str, data: AcademyStatusUpdate):
 @router.patch("/academies/{academy_id}/domain")
 async def assign_domain(academy_id: str, data: DomainAssignment):
     """Assign a custom domain to an academy."""
-    import httpx
     # Validate domain format
     domain = data.custom_domain.strip().lower()
     if not domain or '.' not in domain:
         raise HTTPException(status_code=400, detail="Invalid domain format.")
     
     # Check if domain is already used by another academy
-    existing = await supabase._get(f"/rest/v1/academies?custom_domain=eq.{domain}&select=id")
+    existing = await supabase._get(f"/rest/v1/academies?custom_domain=eq.{quote(domain)}&select=id")
     if existing:
         existing_id = existing[0].get("id", "")
         if str(existing_id) != str(academy_id):
@@ -139,7 +174,6 @@ async def assign_domain(academy_id: str, data: DomainAssignment):
 @router.delete("/academies/{academy_id}/domain")
 async def remove_domain(academy_id: str):
     """Remove a custom domain from an academy."""
-    import httpx
     async with httpx.AsyncClient(timeout=30.0) as client:
         res = await client.patch(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
@@ -152,7 +186,7 @@ async def remove_domain(academy_id: str):
 @router.post("/academies/{academy_id}/domain/verify")
 async def verify_domain(academy_id: str):
     """Verify DNS configuration for a custom domain."""
-    import httpx, socket
+    import socket
     # Get the academy's custom domain
     academies = await supabase._get(f"/rest/v1/academies?id=eq.{academy_id}&select=custom_domain")
     if not academies or not academies[0].get("custom_domain"):
@@ -206,7 +240,7 @@ async def verify_domain(academy_id: str):
 @router.get("/stats")
 async def get_saas_stats():
     """Get global SaaS platform stats with real data (uses service_role for cross-tenant access)."""
-    import asyncio, httpx
+    import asyncio
     try:
         async with httpx.AsyncClient(timeout=30.0, headers=supabase.admin_headers) as client:
             tasks = [
@@ -263,7 +297,6 @@ async def get_saas_stats():
 @router.patch("/academies/{academy_id}/plan")
 async def assign_plan(academy_id: str, data: PlanAssignment):
     """Assign a subscription plan to an academy."""
-    import httpx
     async with httpx.AsyncClient(timeout=30.0) as client:
         res = await client.patch(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
@@ -294,7 +327,6 @@ DEFAULT_SETTINGS = {
 async def get_saas_settings():
     """Get SaaS platform settings."""
     try:
-        import httpx
         async with httpx.AsyncClient(timeout=30.0) as client:
             res = await client.get(
                 f"{supabase.url}/rest/v1/saas_settings?select=*&limit=1",
@@ -317,7 +349,6 @@ async def get_saas_settings():
 @router.put("/settings")
 async def update_saas_settings(request: dict):
     """Update SaaS platform settings (upsert)."""
-    import httpx
     try:
         # Check if settings row exists
         async with httpx.AsyncClient(timeout=30.0) as client:
