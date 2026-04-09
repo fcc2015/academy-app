@@ -35,8 +35,26 @@ const AuthCallback = () => {
                 if (!res.ok) throw new Error('Failed to fetch user info');
                 const user = await res.json();
 
-                const role = user.user_metadata?.role || 'parent';
                 const user_id = user.id;
+                let role = user.user_metadata?.role;
+
+                // If role not in metadata, look it up from the database
+                if (!role) {
+                    try {
+                        const roleRes = await fetch(`${API_URL}/auth/role`, {
+                            headers: { Authorization: `Bearer ${access_token}` }
+                        });
+                        if (roleRes.ok) {
+                            const roleData = await roleRes.json();
+                            role = roleData.role;
+                        }
+                    } catch (e) {
+                        console.warn('Could not fetch role from API, using fallback');
+                    }
+                }
+
+                // Final fallback
+                if (!role) role = 'parent';
 
                 // Store in localStorage
                 localStorage.setItem('token', access_token);
@@ -48,7 +66,8 @@ const AuthCallback = () => {
 
                 // Redirect based on role
                 setTimeout(() => {
-                    if (role === 'admin') navigate('/admin/dashboard');
+                    if (role === 'super_admin') navigate('/saas/dashboard');
+                    else if (role === 'admin') navigate('/admin/dashboard');
                     else if (role === 'coach') navigate('/coach/dashboard');
                     else navigate('/parent/dashboard');
                 }, 800);

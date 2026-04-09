@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from schemas.auth import UserLogin, UserCreate, TokenResponse
 from services.supabase_client import supabase
+from core.auth_middleware import verify_token
 from core.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -25,6 +26,28 @@ async def login(credentials: UserLogin):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password."
         )
+
+@router.get("/role", dependencies=[Depends(verify_token)])
+async def get_user_role(token_data: dict = Depends(verify_token)):
+    """Get role of authenticated user from DB (used after OAuth login)."""
+    try:
+        user_id = token_data.get("sub") or token_data.get("user_id")
+        # Check admins table
+        admin = await supabase._get(f"/rest/v1/admins?user_id=eq.{user_id}&select=user_id,status")
+        if admin:
+            return {"role": "admin"}
+        # Check coaches table
+        coach = await supabase._get(f"/rest/v1/coaches?user_id=eq.{user_id}&select=user_id")
+        if coach:
+            return {"role": "coach"}
+        # Check users table for super_admin
+        user = await supabase._get(f"/rest/v1/users?id=eq.{user_id}&select=role")
+        if user and user[0].get("role") == "super_admin":
+            return {"role": "super_admin"}
+        return {"role": "parent"}
+    except Exception as e:
+        return {"role": "parent"}
+
 
 @router.post("/register")
 async def register(user: UserCreate):
