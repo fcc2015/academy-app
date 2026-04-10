@@ -8,18 +8,50 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
+    import httpx
     try:
         # Authenticate user with Supabase
         response = await supabase.sign_in_with_password(
             credentials.email.strip(),
             credentials.password.strip()
         )
+        user_id = response["user"]["id"]
+
+        # Read role from DB (reliable) — fallback to user_metadata
+        role = response["user"].get("user_metadata", {}).get("role", "parent")
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # Check super_admin first
+                u_res = await client.get(
+                    f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=role",
+                    headers=supabase.admin_headers
+                )
+                if u_res.status_code == 200 and u_res.json():
+                    db_role = u_res.json()[0].get("role")
+                    if db_role == "super_admin":
+                        role = "super_admin"
+                    elif db_role == "admin":
+                        role = "admin"
+                    elif db_role == "coach":
+                        role = "coach"
+                    else:
+                        # Check admins table
+                        a_res = await client.get(
+                            f"{settings.SUPABASE_URL}/rest/v1/admins?user_id=eq.{user_id}&select=user_id",
+                            headers=supabase.admin_headers
+                        )
+                        if a_res.status_code == 200 and a_res.json():
+                            role = "admin"
+                        else:
+                            role = db_role or "parent"
+        except Exception:
+            pass
 
         return {
             "access_token": response["access_token"],
             "token_type": "Bearer",
-            "user_id": response["user"]["id"],
-            "role": response["user"].get("user_metadata", {}).get("role", "player")
+            "user_id": user_id,
+            "role": role
         }
     except Exception as e:
         raise HTTPException(
