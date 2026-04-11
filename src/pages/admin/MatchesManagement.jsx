@@ -17,6 +17,7 @@ import {
 
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../components/Toast';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -31,9 +32,8 @@ const MatchesManagement = () => {
     const [editingId, setEditingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     
-    // Status Banner
-    const [statusBanner, setStatusBanner] = useState({ show: false, message: '', type: 'success' });
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null });
+    const toast = useToast();
 
     const [formData, setFormData] = useState({
         squad_id: '',
@@ -84,8 +84,8 @@ const MatchesManagement = () => {
     };
 
     const showBanner = (message, type = 'success') => {
-        setStatusBanner({ show: true, message, type });
-        setTimeout(() => setStatusBanner({ show: false, message: '', type: 'success' }), 3000);
+        if (type === 'error') toast.error(message);
+        else toast.success(message);
     };
 
     const handleInputChange = (e) => {
@@ -205,15 +205,7 @@ const MatchesManagement = () => {
 
     return (
         <div className={`animate-fade-in pb-10 ${isRTL ? 'text-right' : 'text-left'}`} dir={dir}>
-            {/* Status Banner */}
-            <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[150] transition-all duration-500 transform ${statusBanner.show ? 'translate-y-0 opacity-100' : '-translate-y-24 opacity-0'}`}>
-                <div className={`px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 ${
-                    statusBanner.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
-                }`}>
-                    {statusBanner.type === 'success' ? <CheckCircle size={24} /> : <AlertTriangle size={24} />}
-                    <span className="font-extrabold pb-1">{statusBanner.message}</span>
-                </div>
-            </div>
+            {/* Toast handled by global provider */}
 
             <div className={`flex flex-col md:flex-row justify-between items-center mb-8 gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
                 <div>
