@@ -17,6 +17,7 @@ import {
     Trophy,
     Download
 } from 'lucide-react';
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
 import FUTCard from '../../components/FUTCard';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -244,6 +245,37 @@ const Evaluations = () => {
                                 </div>
                             </div>
 
+                            {/* Radar Chart — latest evaluation */}
+                            {evaluations.length > 0 && (() => {
+                                const latest = evaluations[0];
+                                const radarData = [
+                                    { subject: isRTL ? 'تقني' : 'Technical', value: latest.technical_score, fullMark: 10 },
+                                    { subject: isRTL ? 'تكتيكي' : 'Tactical', value: latest.tactical_score, fullMark: 10 },
+                                    { subject: isRTL ? 'بدني' : 'Physical', value: latest.physical_score, fullMark: 10 },
+                                    { subject: isRTL ? 'ذهني' : 'Mental', value: latest.mental_score, fullMark: 10 },
+                                ];
+                                const avg = ((latest.technical_score + latest.tactical_score + latest.physical_score + latest.mental_score) / 4).toFixed(1);
+                                return (
+                                    <div className="bg-white rounded-3xl border border-slate-200 premium-shadow p-6">
+                                        <div className={`flex items-center justify-between mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                            <h3 className={`font-black text-slate-800 uppercase tracking-widest text-xs flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                <TrendingUp size={16} className="text-indigo-600" /> {isRTL ? 'آخر تقييم' : 'Latest Evaluation'}
+                                            </h3>
+                                            <span className={`text-2xl font-black ${avg >= 8 ? 'text-emerald-600' : avg >= 5 ? 'text-amber-600' : 'text-red-600'}`}>{avg}<span className="text-sm text-slate-400 font-bold">/10</span></span>
+                                        </div>
+                                        <div style={{ height: 240 }}>
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
+                                                    <PolarGrid stroke="#e2e8f0" />
+                                                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12, fontWeight: 700, fill: '#64748b' }} />
+                                                    <Radar name="Score" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} strokeWidth={2} dot={{ r: 4, fill: '#6366f1' }} />
+                                                </RadarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
                             <div className="space-y-4">
                                 <h3 className={`font-black text-slate-800 uppercase tracking-widest text-xs flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                                     <Activity size={16} className="text-indigo-600" /> {isRTL ? 'سجل التطور' : 'Progress Timeline'}
@@ -403,7 +435,7 @@ const Evaluations = () => {
                         <button 
                             className="mt-12 flex items-center gap-3 bg-gradient-to-r from-white to-slate-200 text-slate-900 px-8 py-4 rounded-full font-black uppercase tracking-[0.2em] hover:scale-105 transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)]"
                             onClick={() => {
-                                alert("Card Download feature is mocked. Implement canvas capture later!");
+                                // TODO: implement canvas capture for card download
                             }}
                         >
                             <Download size={20} /> Download Card
