@@ -27,7 +27,7 @@ const ParentLayout = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const { t } = useLanguage();
+    const { t, isRTL, dir } = useLanguage();
 
     const [isValid] = useState(checkParentAuth);
 
@@ -68,11 +68,11 @@ const ParentLayout = () => {
             {/* Sidebar */}
             <aside
                 className={`
-                    fixed lg:static inset-y-0 left-0 z-50
-                    bg-white border-r border-slate-200 
-                    transition-all duration-300 ease-in-out
+                    fixed lg:static inset-y-0 z-50
+                    bg-white transition-all duration-300 ease-in-out
                     flex flex-col shrink-0 overflow-hidden
-                    ${isSidebarOpen ? 'w-72 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-20'}
+                    ${isRTL ? 'right-0 border-l border-slate-200' : 'left-0 border-r border-slate-200'}
+                    ${isSidebarOpen ? 'w-72 translate-x-0' : isRTL ? 'w-0 translate-x-full lg:translate-x-0 lg:w-20' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-20'}
                 `}
             >
                 <div className="w-72 h-full flex flex-col">
@@ -83,8 +83,8 @@ const ParentLayout = () => {
                                 <GraduationCap className="text-white -rotate-3" size={22} />
                             </div>
                             <div>
-                                <span className="text-xl font-extrabold text-slate-800 tracking-tight block leading-tight">Parent</span>
-                                <span className="text-[11px] font-bold text-sky-600 tracking-wider uppercase">Portal</span>
+                                <span className="text-xl font-extrabold text-slate-800 tracking-tight block leading-tight">{isRTL ? 'ولي الأمر' : 'Parent'}</span>
+                                <span className="text-[11px] font-bold text-sky-600 tracking-wider uppercase">{isRTL ? 'بوابة' : 'Portal'}</span>
                             </div>
                         </div>
                         <button
@@ -104,7 +104,7 @@ const ParentLayout = () => {
                             <button
                                 key={item.path}
                                 onClick={() => navigate(item.path)}
-                                className={`nav-item w-full ${isActive ? 'active' : ''}`}
+                                className={`nav-item w-full ${isActive ? 'active' : ''} ${isRTL ? 'flex-row-reverse text-right' : ''}`}
                             >
                                 <Icon size={20} className={isActive ? 'text-surface-900' : 'text-surface-400'} />
                                 <span className={isActive ? 'font-semibold' : 'font-medium'}>{item.name}</span>
@@ -141,8 +141,8 @@ const ParentLayout = () => {
                         <NotificationsDropdown />
                         <div className="h-8 w-px bg-slate-200 mx-2 hidden sm:block"></div>
                         <div className="hidden sm:flex flex-col items-end">
-                            <span className="text-sm font-bold text-slate-800">Parent Account</span>
-                            <span className="text-[11px] font-medium text-sky-600 uppercase tracking-widest">Active</span>
+                            <span className="text-sm font-bold text-slate-800">{isRTL ? 'حساب ولي الأمر' : 'Parent Account'}</span>
+                            <span className="text-[11px] font-medium text-sky-600 uppercase tracking-widest">{isRTL ? 'نشط' : 'Active'}</span>
                         </div>
                         <div className="w-11 h-11 bg-slate-100 rounded-full border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
                             <img src="https://ui-avatars.com/api/?name=Parent&background=0ea5e9&color=fff" alt="Parent" className="w-full h-full object-cover" />
@@ -151,7 +151,7 @@ const ParentLayout = () => {
                 </header>
 
                 {location.pathname.includes('/chat') ? (
-                    <div className="flex-1 overflow-hidden">
+                    <div className="flex-1 overflow-hidden" dir={dir}>
                         <Outlet />
                     </div>
                 ) : (

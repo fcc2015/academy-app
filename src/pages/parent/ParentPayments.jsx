@@ -4,9 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, CheckCircle2, Clock, AlertTriangle, TrendingUp, Upload, X, Camera, Send } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 import { SkeletonDashboard } from '../../components/Skeleton';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const ParentPayments = () => {
     const toast = useToast();
+    const { isRTL, dir } = useLanguage();
     const [payments, setPayments] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [childInfo, setChildInfo] = useState(null);
@@ -64,7 +66,7 @@ const ParentPayments = () => {
                 amount: parseFloat(uploadData.amount),
                 status: 'Pending',
                 payment_method: uploadData.payment_method,
-                notes: `تم رفع إيصال: ${uploadData.notes}`,
+                notes: `${isRTL ? 'تم رفع إيصال' : 'Receipt uploaded'}: ${uploadData.notes}`,
                 billing_type: 'monthly',
                 payment_date: new Date().toISOString()
             };
@@ -76,16 +78,16 @@ const ParentPayments = () => {
             });
 
             if (res.ok) {
-                toast.success('تم إرسال وصل الدفع للإدارة بنجاح ليتم مراجعته.');
+                toast.success(isRTL ? 'تم إرسال وصل الدفع للإدارة بنجاح ليتم مراجعته.' : 'Payment receipt sent successfully for review.');
                 setIsUploadModalOpen(false);
                 setUploadData({ amount: '', payment_method: 'Bank Transfer', notes: '' });
                 fetchPayments(); // Refresh list
             } else {
-                toast.error('حدث خطأ أثناء الإرسال');
+                toast.error(isRTL ? 'حدث خطأ أثناء الإرسال' : 'Submission error');
             }
         } catch (error) {
             console.error('Submit error:', error);
-            toast.error('خطأ في الاتصال');
+            toast.error(isRTL ? 'خطأ في الاتصال' : 'Connection error');
         } finally {
             setIsUploading(false);
         }
@@ -101,20 +103,20 @@ const ParentPayments = () => {
     const pendingCount = payments.filter(p => p.status === 'Pending' || p.status === 'pending').length;
 
     return (
-        <div className="animate-fade-in space-y-8 text-right" dir="rtl">
+        <div className={`animate-fade-in space-y-8 ${isRTL ? 'text-right' : 'text-left'}`} dir={dir}>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-1">
-                        الوضعية <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-emerald-600">المالية</span>
+                        {isRTL ? 'الوضعية' : 'Financial'} <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-emerald-600">{isRTL ? 'المالية' : 'Status'}</span>
                     </h1>
-                    <p className="text-[15px] font-medium text-slate-500">متابعة رسوم الانخراط والدفعات السابقة</p>
+                    <p className="text-[15px] font-medium text-slate-500">{isRTL ? 'متابعة رسوم الانخراط والدفعات السابقة' : 'Track subscription fees and past payments'}</p>
                 </div>
                 <button
                     onClick={() => setIsUploadModalOpen(true)}
-                    className="flex items-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 text-white px-5 py-2.5 rounded-xl font-black transition-all shadow-lg hover:shadow-sky-500/30 hover:scale-105"
+                    className={`flex items-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 text-white px-5 py-2.5 rounded-xl font-black transition-all shadow-lg hover:shadow-sky-500/30 hover:scale-105 ${isRTL ? 'flex-row-reverse' : ''}`}
                 >
                     <Upload size={20} />
-                    إرسال إثبات الدفع
+                    {isRTL ? 'إرسال إثبات الدفع' : 'Send Payment Proof'}
                 </button>
             </div>
 
@@ -128,7 +130,7 @@ const ParentPayments = () => {
                         </div>
                     </div>
                     <h4 className="text-3xl font-black text-slate-800 relative z-10" dir="ltr">{totalPaid} <span className="text-base text-slate-400">MAD</span></h4>
-                    <p className="text-sm font-bold text-slate-500 mt-1 relative z-10">إجمالي المدفوعات</p>
+                    <p className="text-sm font-bold text-slate-500 mt-1 relative z-10">{isRTL ? 'إجمالي المدفوعات' : 'Total Paid'}</p>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-slate-200 premium-shadow p-6 relative overflow-hidden group hover:border-amber-200 transition-colors">
@@ -139,7 +141,7 @@ const ParentPayments = () => {
                         </div>
                     </div>
                     <h4 className="text-3xl font-black text-slate-800 relative z-10" dir="ltr">{totalPending} <span className="text-base text-slate-400">MAD</span></h4>
-                    <p className="text-sm font-bold text-slate-500 mt-1 relative z-10">قيد المراجعة</p>
+                    <p className="text-sm font-bold text-slate-500 mt-1 relative z-10">{isRTL ? 'قيد المراجعة' : 'Under Review'}</p>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-slate-200 premium-shadow p-6 relative">
@@ -149,7 +151,7 @@ const ParentPayments = () => {
                         </div>
                     </div>
                     <h4 className="text-3xl font-black text-slate-800">{paidCount}</h4>
-                    <p className="text-sm font-bold text-slate-500 mt-1">اشتبراكات مؤكدة</p>
+                    <p className="text-sm font-bold text-slate-500 mt-1">{isRTL ? 'اشتراكات مؤكدة' : 'Confirmed'}</p>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-slate-200 premium-shadow p-6 relative">
@@ -159,7 +161,7 @@ const ParentPayments = () => {
                         </div>
                     </div>
                     <h4 className="text-3xl font-black text-slate-800">{pendingCount}</h4>
-                    <p className="text-sm font-bold text-slate-500 mt-1">يُرجى التحقق منها</p>
+                    <p className="text-sm font-bold text-slate-500 mt-1">{isRTL ? 'يُرجى التحقق منها' : 'Needs Verification'}</p>
                 </div>
             </div>
 
@@ -168,26 +170,26 @@ const ParentPayments = () => {
                 <div className="px-6 py-5 rounded-3xl bg-slate-50 flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                         <CreditCard size={20} className="text-indigo-600" />
-                        <h3 className="font-extrabold text-slate-800 text-lg">كل العمليات</h3>
+                        <h3 className="font-extrabold text-slate-800 text-lg">{isRTL ? 'كل العمليات' : 'All Transactions'}</h3>
                     </div>
-                    <span className="text-xs font-black text-slate-400 bg-white px-3 py-1.5 rounded-xl border border-slate-100">{payments.length} عملية</span>
+                    <span className="text-xs font-black text-slate-400 bg-white px-3 py-1.5 rounded-xl border border-slate-100">{payments.length} {isRTL ? 'عملية' : 'records'}</span>
                 </div>
 
                 {payments.length === 0 ? (
                     <div className="p-12 text-center text-slate-500 bg-slate-50/50 rounded-3xl mx-2 mb-2">
                         <CreditCard className="mx-auto mb-4 opacity-50" size={48} />
-                        <h4 className="font-bold text-slate-700 mb-2">لا توجد عمليات</h4>
-                        <p className="text-sm">لم تقم بأي عملية دفع حتى الآن.</p>
+                        <h4 className="font-bold text-slate-700 mb-2">{isRTL ? 'لا توجد عمليات' : 'No Transactions'}</h4>
+                        <p className="text-sm">{isRTL ? 'لم تقم بأي عملية دفع حتى الآن.' : 'No payments have been made yet.'}</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-right">
                             <thead className="bg-transparent border-b border-slate-100">
                                 <tr className="text-[11px] font-black uppercase text-slate-400">
-                                    <th className="px-6 py-4">تاريخ الدفع</th>
-                                    <th className="px-6 py-4">المبلغ</th>
-                                    <th className="px-6 py-4">طريقة الدفع</th>
-                                    <th className="px-6 py-4 text-center">الحالة</th>
+                                    <th className="px-6 py-4">{isRTL ? 'تاريخ الدفع' : 'Payment Date'}</th>
+                                    <th className="px-6 py-4">{isRTL ? 'المبلغ' : 'Amount'}</th>
+                                    <th className="px-6 py-4">{isRTL ? 'طريقة الدفع' : 'Method'}</th>
+                                    <th className="px-6 py-4 text-center">{isRTL ? 'الحالة' : 'Status'}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50/80">
@@ -205,10 +207,12 @@ const ParentPayments = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm font-medium text-slate-600">
-                                            {payment.payment_method === 'Cash' ? 'نقداً (Cash)' :
-                                             payment.payment_method === 'Bank Transfer' ? 'تحويل بنكي' :
-                                             payment.payment_method === 'Wafacash' ? 'وفاكاش' :
-                                             payment.payment_method}
+                                            {isRTL ? (
+                                                payment.payment_method === 'Cash' ? 'نقداً (Cash)' :
+                                                payment.payment_method === 'Bank Transfer' ? 'تحويل بنكي' :
+                                                payment.payment_method === 'Wafacash' ? 'وفاكاش' :
+                                                payment.payment_method
+                                            ) : payment.payment_method}
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black ${
@@ -221,8 +225,8 @@ const ParentPayments = () => {
                                                 {payment.status === 'Completed' || payment.status === 'paid' ? <CheckCircle2 size={14} /> : 
                                                  payment.status === 'Overdue' ? <AlertTriangle size={14} /> : <Clock size={14} />}
                                                 
-                                                {payment.status === 'Completed' || payment.status === 'paid' ? 'تم الدفع' : 
-                                                 payment.status === 'Overdue' ? 'متأخر' : 'قيد المراجعة'}
+                                                {payment.status === 'Completed' || payment.status === 'paid' ? (isRTL ? 'تم الدفع' : 'Paid') : 
+                                                 payment.status === 'Overdue' ? (isRTL ? 'متأخر' : 'Overdue') : (isRTL ? 'قيد المراجعة' : 'Pending')}
                                             </span>
                                         </td>
                                     </tr>
@@ -245,13 +249,13 @@ const ParentPayments = () => {
                         </button>
 
                         <h2 className="text-2xl font-black text-slate-800 mb-2 flex items-center gap-2">
-                            <Camera className="text-sky-600" /> إرسال إثبات دفع
+                            <Camera className="text-sky-600" /> {isRTL ? 'إرسال إثبات دفع' : 'Send Payment Proof'}
                         </h2>
-                        <p className="text-slate-500 text-sm font-medium mb-6 leading-relaxed">قم بتعبئة معلومات الدفع وإرفاق صورة التوصيل البنكي أو وفاكاش.</p>
+                        <p className="text-slate-500 text-sm font-medium mb-6 leading-relaxed">{isRTL ? 'قم بتعبئة معلومات الدفع وإرفاق صورة التوصيل البنكي أو وفاكاش.' : 'Fill in payment details and attach a bank or Wafacash receipt image.'}</p>
 
                         <form onSubmit={handleUploadSubmit} className="space-y-5">
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">المبلغ المالي (درهم)</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{isRTL ? 'المبلغ المالي (درهم)' : 'Amount (MAD)'}</label>
                                 <div className="relative">
                                     <input
                                         type="number"
@@ -267,36 +271,36 @@ const ParentPayments = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">طريقة الدفع</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{isRTL ? 'طريقة الدفع' : 'Payment Method'}</label>
                                 <select
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50 focus:bg-white font-bold text-slate-700"
                                     value={uploadData.payment_method}
                                     onChange={(e) => setUploadData({...uploadData, payment_method: e.target.value})}
                                 >
-                                    <option value="Bank Transfer">تحويل بنكي (Virement)</option>
-                                    <option value="Wafacash">وكالة Wafacash</option>
-                                    <option value="Cash">نقداً في الأكاديمية</option>
+                                    <option value="Bank Transfer">{isRTL ? 'تحويل بنكي (Virement)' : 'Bank Transfer'}</option>
+                                    <option value="Wafacash">{isRTL ? 'وكالة Wafacash' : 'Wafacash'}</option>
+                                    <option value="Cash">{isRTL ? 'نقداً في الأكاديمية' : 'Cash at Academy'}</option>
                                 </select>
                             </div>
 
                             {/* Simulated Upload Box */}
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">صورة الوصل (اختياري حالياً)</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{isRTL ? 'صورة الوصل (اختياري حالياً)' : 'Receipt Image (optional)'}</label>
                                 <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center bg-slate-50 hover:bg-sky-50 hover:border-sky-300 transition-colors cursor-pointer group">
                                     <Camera className="mx-auto text-slate-400 group-hover:text-sky-500 mb-2 transition-colors" size={28} />
-                                    <span className="text-sm font-bold text-slate-600 group-hover:text-sky-700">اضغط لالتقاط أو اختيار صورة</span>
-                                    <p className="text-[10px] text-slate-400 mt-1">يُدعم صور PNG و JPG (ميزة تجريبية)</p>
+                                    <span className="text-sm font-bold text-slate-600 group-hover:text-sky-700">{isRTL ? 'اضغط لالتقاط أو اختيار صورة' : 'Click to capture or select image'}</span>
+                                    <p className="text-[10px] text-slate-400 mt-1">{isRTL ? 'يُدعم صور PNG و JPG (ميزة تجريبية)' : 'Supports PNG & JPG (beta feature)'}</p>
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">ملاحظة (رقم الحوالة مثلاً)</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{isRTL ? 'ملاحظة (رقم الحوالة مثلاً)' : 'Note (e.g. transfer number)'}</label>
                                 <input
                                     type="text"
                                     value={uploadData.notes}
                                     onChange={(e) => setUploadData({...uploadData, notes: e.target.value})}
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50 focus:bg-white"
-                                    placeholder="اختياري..."
+                                    placeholder={isRTL ? 'اختياري...' : 'Optional...'}
                                 />
                             </div>
 
@@ -305,9 +309,9 @@ const ParentPayments = () => {
                                 disabled={isUploading}
                                 className="w-full py-3.5 rounded-xl font-black bg-gradient-to-r from-sky-600 to-indigo-600 text-white flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-sky-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
                             >
-                                {isUploading ? 'جاري الإرسال...' : (
+                                {isUploading ? (isRTL ? 'جاري الإرسال...' : 'Sending...') : (
                                     <>
-                                        <Send size={20} /> تأكيد وإرسال
+                                        <Send size={20} /> {isRTL ? 'تأكيد وإرسال' : 'Confirm & Send'}
                                     </>
                                 )}
                             </button>
