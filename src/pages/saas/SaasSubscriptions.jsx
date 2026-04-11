@@ -210,105 +210,129 @@ export default function SaasSubscriptions() {
     const formatLimit = (v) => v === -1 ? '∞' : v;
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8 animate-fade-in">
             <div className="flex justify-between items-end">
                 <div>
-                    <h2 className="text-3xl font-black text-slate-100 tracking-tight">Subscriptions & Billing</h2>
-                    <p className="text-slate-400 mt-1">Manage billing, plans, and payments for all client academies.</p>
+                    <h2 className="text-3xl font-black text-surface-900 tracking-tight">Subscriptions <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">&amp; Billing</span></h2>
+                    <p className="text-surface-500 mt-1 font-medium">Manage billing, plans, and payments for all client academies.</p>
                 </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 mt-6">
-                <div className="border border-slate-800 bg-[#1e293b]/50 backdrop-blur rounded-2xl p-5 flex items-center gap-4">
-                    <div className="p-3 rounded-2xl bg-emerald-500/10"><CreditCard className="w-7 h-7 text-emerald-400" /></div>
-                    <div>
-                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Active Plans</p>
-                        <p className="text-2xl font-black text-slate-100 mt-0.5">{activeCount}</p>
+            {/* Stats Cards — Premium Gradient */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 stagger-children">
+                <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 text-white shadow-xl shadow-emerald-500/20 hover-lift">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl"></div>
+                    <div className="flex items-center gap-3 mb-3 relative z-10">
+                        <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-sm"><CreditCard className="w-5 h-5" /></div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-100">Active Plans</p>
                     </div>
+                    <p className="text-4xl font-black relative z-10 tabular-nums">{activeCount}</p>
                 </div>
-                <div className="border border-slate-800 bg-[#1e293b]/50 backdrop-blur rounded-2xl p-5 flex items-center gap-4">
-                    <div className="p-3 rounded-2xl bg-blue-500/10"><DollarSign className="w-7 h-7 text-blue-400" /></div>
-                    <div>
-                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Monthly MRR</p>
-                        <p className="text-2xl font-black text-slate-100 mt-0.5">{mrr.toLocaleString()} MAD</p>
+                <div className="relative overflow-hidden bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-6 text-white shadow-xl shadow-violet-500/20 hover-lift">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl"></div>
+                    <div className="flex items-center gap-3 mb-3 relative z-10">
+                        <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-sm"><DollarSign className="w-5 h-5" /></div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-violet-100">Monthly MRR</p>
                     </div>
+                    <p className="text-4xl font-black relative z-10 tabular-nums">{mrr.toLocaleString()} <span className="text-lg font-bold text-violet-200">MAD</span></p>
                 </div>
-                <div className="border border-slate-800 bg-[#1e293b]/50 backdrop-blur rounded-2xl p-5 flex items-center gap-4">
-                    <div className="p-3 rounded-2xl bg-violet-500/10"><History className="w-7 h-7 text-violet-400" /></div>
-                    <div>
-                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Revenue</p>
-                        <p className="text-2xl font-black text-slate-100 mt-0.5">{stats.total_mrr?.toLocaleString() || 0} MAD</p>
+                <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-xl shadow-blue-500/20 hover-lift">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl"></div>
+                    <div className="flex items-center gap-3 mb-3 relative z-10">
+                        <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-sm"><History className="w-5 h-5" /></div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-blue-100">Total Revenue</p>
                     </div>
+                    <p className="text-4xl font-black relative z-10 tabular-nums">{stats.total_mrr?.toLocaleString() || 0} <span className="text-lg font-bold text-blue-200">MAD</span></p>
                 </div>
-                <div className="border border-slate-800 bg-[#1e293b]/50 backdrop-blur rounded-2xl p-5 flex items-center gap-4">
-                    <div className="p-3 rounded-2xl bg-amber-500/10"><Ban className="w-7 h-7 text-amber-400" /></div>
-                    <div>
-                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Suspended</p>
-                        <p className="text-2xl font-black text-slate-100 mt-0.5">{suspendedCount}</p>
+                <div className="relative overflow-hidden bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white shadow-xl shadow-amber-500/20 hover-lift">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl"></div>
+                    <div className="flex items-center gap-3 mb-3 relative z-10">
+                        <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-sm"><Ban className="w-5 h-5" /></div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-100">Suspended</p>
                     </div>
+                    <p className="text-4xl font-black relative z-10 tabular-nums">{suspendedCount}</p>
                 </div>
             </div>
 
-            {/* Plan Cards with Limits */}
-            <div className="mt-8">
-                <h3 className="text-lg font-bold text-slate-200 mb-5 flex items-center gap-2">
-                    <Crown className="w-5 h-5 text-violet-400" /> Available Plans
+            {/* Plan Cards — Premium Redesign */}
+            <div>
+                <h3 className="text-lg font-extrabold text-surface-800 mb-6 flex items-center gap-2">
+                    <Crown className="w-5 h-5 text-violet-500" /> Available Plans
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {PLANS.map(plan => {
                         const Icon = plan.icon;
                         const count = academies.filter(a => a.plan_id === plan.id && a.status !== 'suspended').length;
+                        
+                        const colorMap = {
+                            emerald: { gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', iconBg: 'bg-emerald-100', badge: 'bg-emerald-500', shadow: 'shadow-emerald-500/15', check: 'text-emerald-500' },
+                            blue: { gradient: 'from-indigo-600 via-blue-600 to-cyan-500', bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-300', iconBg: 'bg-indigo-100', badge: 'bg-indigo-600', shadow: 'shadow-indigo-500/25', check: 'text-indigo-500' },
+                            violet: { gradient: 'from-violet-600 to-purple-600', bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-violet-200', iconBg: 'bg-violet-100', badge: 'bg-violet-600', shadow: 'shadow-violet-500/15', check: 'text-violet-500' },
+                        };
+                        const c = colorMap[plan.color] || colorMap.emerald;
+
                         return (
-                            <div key={plan.id} className={`relative border rounded-2xl p-6 transition-all duration-200 hover:scale-[1.02] ${
+                            <div key={plan.id} className={`relative rounded-[1.5rem] transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1 ${
                                 plan.recommended
-                                    ? 'border-blue-500/40 bg-blue-500/5 shadow-lg shadow-blue-500/10'
-                                    : 'border-slate-800 bg-[#1e293b]/50'
+                                    ? `bg-white border-2 ${c.border} shadow-2xl ${c.shadow} ring-1 ring-indigo-100`
+                                    : 'bg-white border border-surface-200 shadow-lg shadow-surface-900/5 hover:shadow-xl'
                             }`}>
                                 {plan.recommended && (
-                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-500 text-white shadow-lg shadow-blue-500/30">
-                                        Most Popular
+                                    <div className={`absolute -top-4 left-1/2 -translate-x-1/2 px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] ${c.badge} text-white shadow-lg ${c.shadow}`}>
+                                        ⭐ Most Popular
                                     </div>
                                 )}
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className={`p-2.5 rounded-xl bg-${plan.color}-500/10`}>
-                                        <Icon className={`w-5 h-5 text-${plan.color}-400`} />
+                                
+                                {/* Card Header with Gradient */}
+                                <div className={`bg-gradient-to-r ${c.gradient} rounded-t-[1.5rem] p-6 pb-8 text-white relative overflow-hidden`}>
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-12 -mt-12 blur-xl"></div>
+                                    <div className="flex items-center gap-3 mb-4 relative z-10">
+                                        <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-sm">
+                                            <Icon className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-black text-lg">{plan.name}</h4>
+                                            <p className="text-[10px] font-bold text-white/70">{count} active {count === 1 ? 'academy' : 'academies'}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h4 className="font-bold text-slate-200">{plan.name}</h4>
-                                        <p className="text-[10px] text-slate-500 font-semibold">{count} active {count === 1 ? 'academy' : 'academies'}</p>
-                                    </div>
-                                </div>
-                                <div className="mb-4">
-                                    <span className="text-3xl font-black text-slate-100">{plan.price === 0 ? 'FREE' : plan.price}</span>
-                                    {plan.price > 0 && <span className="text-sm text-slate-400 font-semibold"> {plan.currency}{plan.period}</span>}
-                                </div>
-                                {/* Resource Limits */}
-                                <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-slate-900/50 rounded-xl border border-slate-700/50">
-                                    <div className="text-center">
-                                        <Users className={`w-3.5 h-3.5 text-${plan.color}-400 mx-auto mb-1`} />
-                                        <p className="text-[10px] text-slate-500 font-bold">Players</p>
-                                        <p className="text-sm font-black text-slate-200">{formatLimit(plan.limits.players)}</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <UserCog className={`w-3.5 h-3.5 text-${plan.color}-400 mx-auto mb-1`} />
-                                        <p className="text-[10px] text-slate-500 font-bold">Admins</p>
-                                        <p className="text-sm font-black text-slate-200">{formatLimit(plan.limits.admins)}</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <Dumbbell className={`w-3.5 h-3.5 text-${plan.color}-400 mx-auto mb-1`} />
-                                        <p className="text-[10px] text-slate-500 font-bold">Coaches</p>
-                                        <p className="text-sm font-black text-slate-200">{formatLimit(plan.limits.coaches)}</p>
+                                    <div className="relative z-10">
+                                        <span className="text-4xl font-black">{plan.price === 0 ? 'FREE' : plan.price}</span>
+                                        {plan.price > 0 && <span className="text-sm font-bold text-white/70 ml-1">{plan.currency}/month</span>}
                                     </div>
                                 </div>
-                                <ul className="space-y-2">
-                                    {plan.features.map((f, i) => (
-                                        <li key={i} className="flex items-center gap-2 text-xs text-slate-400">
-                                            <CheckCircle2 className={`w-3.5 h-3.5 text-${plan.color}-400 shrink-0`} />
-                                            {f}
-                                        </li>
-                                    ))}
-                                </ul>
+
+                                {/* Limits Badge Row */}
+                                <div className="px-6 -mt-4 relative z-10">
+                                    <div className={`grid grid-cols-3 gap-2 p-3 ${c.bg} rounded-xl border ${c.border} shadow-sm`}>
+                                        <div className="text-center">
+                                            <Users className={`w-3.5 h-3.5 ${c.text} mx-auto mb-0.5`} />
+                                            <p className="text-[9px] text-surface-500 font-bold uppercase">Players</p>
+                                            <p className={`text-sm font-black ${c.text}`}>{formatLimit(plan.limits.players)}</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <UserCog className={`w-3.5 h-3.5 ${c.text} mx-auto mb-0.5`} />
+                                            <p className="text-[9px] text-surface-500 font-bold uppercase">Admins</p>
+                                            <p className={`text-sm font-black ${c.text}`}>{formatLimit(plan.limits.admins)}</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <Dumbbell className={`w-3.5 h-3.5 ${c.text} mx-auto mb-0.5`} />
+                                            <p className="text-[9px] text-surface-500 font-bold uppercase">Coaches</p>
+                                            <p className={`text-sm font-black ${c.text}`}>{formatLimit(plan.limits.coaches)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Features */}
+                                <div className="px-6 py-5">
+                                    <ul className="space-y-2.5">
+                                        {plan.features.map((f, i) => (
+                                            <li key={i} className="flex items-center gap-2.5 text-[13px] text-surface-600 font-medium">
+                                                <CheckCircle2 className={`w-4 h-4 ${c.check} shrink-0`} />
+                                                {f}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             </div>
                         );
                     })}
@@ -319,79 +343,79 @@ export default function SaasSubscriptions() {
             {loading ? (
                 <div className="py-20 flex justify-center text-emerald-500"><Loader2 className="w-8 h-8 animate-spin" /></div>
             ) : (
-                <div className="mt-8 border border-slate-800 bg-[#1e293b]/50 backdrop-blur rounded-2xl overflow-hidden">
-                    <div className="p-5 border-b border-slate-800/60 flex justify-between items-center">
-                        <h3 className="text-base font-bold text-slate-200">Academy Billing Overview</h3>
-                        <button onClick={fetchData} className="text-slate-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-slate-800/50">
+                <div className="mt-8 bg-white border border-surface-200 rounded-[1.5rem] overflow-hidden shadow-lg shadow-surface-900/5">
+                    <div className="p-5 border-b border-surface-100 flex justify-between items-center bg-surface-50/50">
+                        <h3 className="text-base font-extrabold text-surface-800">Academy Billing Overview</h3>
+                        <button onClick={fetchData} className="text-surface-400 hover:text-surface-700 transition-colors p-2 rounded-lg hover:bg-surface-100">
                             <RefreshCw className="w-4 h-4" />
                         </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-slate-800/30 text-slate-400 text-xs uppercase tracking-widest font-bold">
-                                    <th className="p-4 font-semibold">Academy</th>
-                                    <th className="p-4 font-semibold">Current Plan</th>
-                                    <th className="p-4 font-semibold">Limits</th>
-                                    <th className="p-4 font-semibold">Status</th>
-                                    <th className="p-4 font-semibold">Last Payment</th>
-                                    <th className="p-4 font-semibold text-right">Actions</th>
+                                <tr className="bg-surface-50 text-surface-500 text-[10px] uppercase tracking-widest font-bold border-b border-surface-100">
+                                    <th className="p-4 font-bold">Academy</th>
+                                    <th className="p-4 font-bold">Current Plan</th>
+                                    <th className="p-4 font-bold">Limits</th>
+                                    <th className="p-4 font-bold">Status</th>
+                                    <th className="p-4 font-bold">Last Payment</th>
+                                    <th className="p-4 font-bold text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-800/50">
+                            <tbody className="divide-y divide-surface-100">
                                 {academies.length === 0 ? (
-                                    <tr><td colSpan="6" className="text-center py-8 text-slate-500">No academies found.</td></tr>
+                                    <tr><td colSpan="6" className="text-center py-8 text-surface-400 font-medium">No academies found.</td></tr>
                                 ) : (
                                     academies.map(acc => {
                                         const plan = PLANS.find(p => p.id === acc.plan_id);
                                         return (
-                                            <tr key={acc.id} className="hover:bg-slate-800/20 transition-colors">
+                                            <tr key={acc.id} className="hover:bg-surface-50/80 transition-colors">
                                                 <td className="p-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-400 font-bold text-xs">
+                                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-black text-sm shadow-sm">
                                                             {(acc.name || 'A').charAt(0)}
                                                         </div>
                                                         <div>
-                                                            <p className="font-semibold text-slate-200 text-sm">{acc.name || 'Unnamed'}</p>
-                                                            <p className="text-[10px] text-slate-500">#{acc.id?.slice(0, 8)}</p>
+                                                            <p className="font-bold text-surface-800 text-sm">{acc.name || 'Unnamed'}</p>
+                                                            <p className="text-[10px] text-surface-400">#{acc.id?.slice(0, 8)}</p>
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td className="p-4">
                                                     {plan ? (
-                                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-${plan.color}-500/10 text-${plan.color}-400 border border-${plan.color}-500/15`}>
+                                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-${plan.color}-50 text-${plan.color}-600 border border-${plan.color}-200`}>
                                                             <plan.icon className="w-3 h-3" /> {plan.name}
                                                         </span>
                                                     ) : (
-                                                        <span className="text-xs text-slate-500 font-medium">No plan</span>
+                                                        <span className="text-xs text-surface-400 font-medium">No plan</span>
                                                     )}
                                                 </td>
                                                 <td className="p-4">
                                                     {plan ? (
-                                                        <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400">
+                                                        <div className="flex items-center gap-3 text-[10px] font-bold text-surface-500">
                                                             <span title="Players">{formatLimit(plan.limits.players)} 👤</span>
                                                             <span title="Admins">{formatLimit(plan.limits.admins)} 🛡️</span>
                                                             <span title="Coaches">{formatLimit(plan.limits.coaches)} 🏋️</span>
                                                         </div>
-                                                    ) : <span className="text-xs text-slate-600">—</span>}
+                                                    ) : <span className="text-xs text-surface-300">—</span>}
                                                 </td>
                                                 <td className="p-4">
                                                     {acc.subscription_status === 'active' || (acc.status !== 'suspended' && acc.plan_id) ? (
-                                                        <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full w-max border border-emerald-500/15">
+                                                        <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full w-max border border-emerald-200">
                                                             <CheckCircle2 className="w-3.5 h-3.5" /> Active
                                                         </span>
                                                     ) : acc.status === 'suspended' ? (
-                                                        <span className="flex items-center gap-1.5 text-xs font-bold text-rose-400 bg-rose-400/10 px-3 py-1 rounded-full w-max border border-rose-500/15">
+                                                        <span className="flex items-center gap-1.5 text-xs font-bold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-full w-max border border-rose-200">
                                                             <Ban className="w-3.5 h-3.5" /> Suspended
                                                         </span>
                                                     ) : (
-                                                        <span className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-400/10 px-3 py-1 rounded-full w-max border border-amber-500/15">
+                                                        <span className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full w-max border border-amber-200">
                                                             <Clock className="w-3.5 h-3.5" /> Unpaid
                                                         </span>
                                                     )}
                                                 </td>
                                                 <td className="p-4">
-                                                    <span className="text-xs text-slate-400">
+                                                    <span className="text-xs text-surface-500 font-medium">
                                                         {acc.last_payment_at ? new Date(acc.last_payment_at).toLocaleDateString() : '—'}
                                                     </span>
                                                 </td>
