@@ -11,6 +11,8 @@ from services.billing_engine import (
     get_alert_notification,
     generate_invoice_number
 )
+from core.auth_middleware import verify_token, require_role
+from core.context import user_id_ctx, role_ctx
 
 router = APIRouter(prefix="/finances", tags=["Finances"], dependencies=[Depends(verify_token)])
 
@@ -20,11 +22,12 @@ router = APIRouter(prefix="/finances", tags=["Finances"], dependencies=[Depends(
 # =========================================================
 
 @router.get("/payments")
-async def get_all_payments():
+async def get_all_payments(user: dict = Depends(require_role("admin", "coach", "super_admin"))):
+    """كل الدفعات — فقط الأدمين والمدرب يقدر يشوفها"""
     try:
         return await supabase.get_payments()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching payments: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب الدفعات: {str(e)}")
 
 
 @router.get("/payments/player/{player_id}")
@@ -37,20 +40,36 @@ async def get_payments_by_player(player_id: str):
 
 @router.get("/payments/user/{user_id}")
 async def get_payments_by_user(user_id: str):
-    """Returns payments where user_id matches (parent or player directly)"""
+    """دفعات مستخدم معين — الولي يشوف فقط دفعات ديالو/ديال ولده"""
     try:
+        current_role = role_ctx.get()
+        current_user = user_id_ctx.get()
+        
+        # الولي يقدر يشوف فقط دفعاته — الأدمين يشوف أي حد
+        if current_role == "parent" and current_user != user_id:
+            # نتأكد أن هذا هو ولد الولي
+            from core.config import settings
+            players_res = await supabase.client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/players?parent_id=eq.{current_user}&user_id=eq.{user_id}&select=id"
+            )
+            if not (players_res.status_code == 200 and players_res.json()):
+                raise HTTPException(status_code=403, detail="غير مسموح — يمكنك فقط مشاهدة دفعات طفلك")
+        
         from core.config import settings
         res = await supabase.client.get(
             f"{settings.SUPABASE_URL}/rest/v1/payments?user_id=eq.{user_id}&select=*&order=payment_date.desc"
         )
         res.raise_for_status()
         return res.json()
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching user payments: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"خطأ في جلب دفعات المستخدم: {str(e)}")
 
 
 @router.post("/payments")
-async def create_payment(payment: PaymentCreate):
+async def create_payment(payment: PaymentCreate, user: dict = Depends(require_role("admin", "coach", "super_admin"))):
+    """إنشاء دفعة — فقط الأدمين"""
     try:
         payment_dict = payment.model_dump(exclude_none=True)
         if payment.payment_date:
@@ -76,11 +95,51 @@ async def create_payment(payment: PaymentCreate):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error saving payment: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"خطأ في حفظ الدفعة: {str(e)}")
+
+
+@router.post("/payments/parent")
+async def create_parent_payment(payment: PaymentCreate):
+    """
+    🔒 إنشاء دفعة من ولي الأمر — دائماً Pending
+    الولي يرسل إثبات دفع فقط — الأدمين هو من يأكد
+    
+    ⚠️ هذا المسار مفصول تماماً عن مالية الأدمين والـ SaaS
+    """
+    try:
+        current_user = user_id_ctx.get()
+        
+        payment_dict = payment.model_dump(exclude_none=True)
+        if payment.payment_date:
+            payment_dict['payment_date'] = payment.payment_date.isoformat()
+        
+        # ✅ إجبار الحالة = معلق — الولي لا يقدر يأكد الدفع بنفسه
+        payment_dict['status'] = 'Pending'
+        payment_dict['user_id'] = payment.user_id or current_user
+        
+        response = await supabase.insert_payment(payment_dict)
+        
+        # إشعار الأدمين — ولي أمر أرسل إثبات دفع
+        try:
+            await supabase.insert_notification({
+                "title": "📩 إثبات دفع جديد من ولي أمر",
+                "message": f"تم استلام إثبات دفع بقيمة {payment.amount} درهم. يرجى المراجعة والتأكيد.",
+                "type": "admin_alert",
+                "target_role": "Admin"
+            })
+        except Exception as e:
+            print(f"خطأ في الإشعار: {e}")
+        
+        return response[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ في إرسال إثبات الدفع: {str(e)}")
 
 
 @router.delete("/payments/{payment_id}")
-async def delete_payment(payment_id: str):
+async def delete_payment(payment_id: str, user: dict = Depends(require_role("admin", "super_admin"))):
+    """حذف دفعة — فقط الأدمين"""
     try:
         await supabase.delete_payment(payment_id)
         return {"message": "Payment deleted successfully"}
@@ -89,7 +148,8 @@ async def delete_payment(payment_id: str):
 
 
 @router.patch("/payments/{payment_id}")
-async def update_payment(payment_id: str, payment: PaymentCreate):
+async def update_payment(payment_id: str, payment: PaymentCreate, user: dict = Depends(require_role("admin", "super_admin"))):
+    """تحديث دفعة — فقط الأدمين"""
     try:
         payment_dict = payment.model_dump(exclude_none=True)
         if payment.payment_date:
