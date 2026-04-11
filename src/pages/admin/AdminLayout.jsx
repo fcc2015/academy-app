@@ -1,21 +1,35 @@
 import React from 'react';
-import { Outlet, Navigate, useLocation } from 'react-router-dom';
+import { Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/layout/AdminSidebar';
 import BottomNav from '../../components/layout/BottomNav';
 import NotificationsDropdown from '../../components/NotificationsDropdown';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
 import ThemeToggle from '../../components/ThemeToggle';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useIdleTimer } from '../../hooks/useIdleTimer';
+import SessionWarning from '../../components/SessionWarning';
 
 const AdminLayout = () => {
     const { isRTL, dir } = useLanguage();
     const location = useLocation();
+    const navigate = useNavigate();
     const [authChecked, setAuthChecked] = useState(false);
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     const isChatPage = location.pathname.includes('/chat');
+
+    // 🔒 Session Security — تسجيل خروج بعد 10 دقائق بدون نشاط
+    const handleIdleLogout = useCallback(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('token_expires');
+        navigate('/login', { state: { message: 'تم تسجيل الخروج تلقائياً بسبب عدم النشاط' } });
+    }, [navigate]);
+
+    const { showWarning, remainingSeconds, extendSession } = useIdleTimer(handleIdleLogout);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -86,6 +100,15 @@ const AdminLayout = () => {
             </div>
 
             <BottomNav />
+
+            {/* 🔒 Session Security Warning */}
+            {showWarning && (
+                <SessionWarning
+                    remainingSeconds={remainingSeconds}
+                    onExtend={extendSession}
+                    isRTL={isRTL}
+                />
+            )}
         </div>
     );
 };

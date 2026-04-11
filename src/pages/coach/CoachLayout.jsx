@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -14,6 +14,8 @@ import {
 import NotificationsDropdown from '../../components/NotificationsDropdown';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useIdleTimer } from '../../hooks/useIdleTimer';
+import SessionWarning from '../../components/SessionWarning';
 
 function checkCoachAuth() {
     const token = localStorage.getItem('token');
@@ -48,11 +50,16 @@ const CoachLayout = () => {
         { path: '/coach/chat', name: t('sidebar.chat') || 'Chat', icon: MessageCircle },
     ];
 
-    const handleLogout = () => {
+    const handleLogout = useCallback(() => {
         localStorage.removeItem('token');
         localStorage.removeItem('role');
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('token_expires');
         navigate('/login');
-    };
+    }, [navigate]);
+
+    // 🔒 Session Security — تسجيل خروج بعد 10 دقائق بدون نشاط
+    const { showWarning, remainingSeconds, extendSession } = useIdleTimer(handleLogout);
 
     return (
         <div className="min-h-screen bg-slate-50 relative flex overflow-hidden">
@@ -154,6 +161,15 @@ const CoachLayout = () => {
                     </div>
                 )}
             </main>
+
+            {/* 🔒 Session Security Warning */}
+            {showWarning && (
+                <SessionWarning
+                    remainingSeconds={remainingSeconds}
+                    onExtend={extendSession}
+                    isRTL={isRTL}
+                />
+            )}
         </div>
     );
 };
