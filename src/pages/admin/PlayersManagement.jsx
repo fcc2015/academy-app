@@ -25,6 +25,7 @@ import Swal from 'sweetalert2';
 import PlayerBadgeModal from '../../components/PlayerBadgeModal';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../components/Toast';
 
 const PlayerMatchesModal = ({ isOpen, onClose, player, isRTL, dir }) => {
     const [matches, setMatches] = useState([]);
@@ -289,8 +290,8 @@ const PlayersManagement = () => {
     const [currentPlayer, setCurrentPlayer] = useState(null);
     const [resolvingRequestId, setResolvingRequestId] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [statusBanner, setStatusBanner] = useState({ show: false, message: '', type: 'success', id: 0 });
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null, type: '' });
+    const toast = useToast();
 
     useEffect(() => {
         return () => document.body.classList.remove('modal-open');
@@ -384,9 +385,8 @@ const PlayersManagement = () => {
     };
 
     const showBanner = (message, type = 'success') => {
-        const id = Date.now();
-        setStatusBanner({ show: true, message, type, id });
-        setTimeout(() => setStatusBanner(prev => prev.id === id ? { ...prev, show: false } : prev), 6000);
+        if (type === 'error') toast.error(message);
+        else toast.success(message);
     };
 
     const openAddModal = () => {
@@ -577,23 +577,7 @@ const PlayersManagement = () => {
                 </div>
             </div>
 
-            {/* Status Banner */}
-            {statusBanner.show && (
-                <div key={statusBanner.id} className="fixed top-24 left-1/2 -translate-x-1/2 z-[200]">
-                    <div className={`flex items-center gap-4 px-10 py-5 rounded-[2.5rem] shadow-2xl border-2 backdrop-blur-md ${statusBanner.type === 'success' ? 'bg-emerald-600/90 border-emerald-400 text-white' : 'bg-red-600/90 border-red-400 text-white'}`}>
-                        <div className="bg-white/20 p-2 rounded-full">
-                            {statusBanner.type === 'success' ? <CheckCircle size={28} /> : <AlertCircle size={28} />}
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">
-                                {statusBanner.type === 'success' ? (isRTL ? 'نجاح العملية' : 'System Success') : (isRTL ? 'خطأ في النظام' : 'System Error')}
-                            </span>
-                            <span className="font-extrabold text-base">{statusBanner.message}</span>
-                        </div>
-                        <button onClick={() => setStatusBanner({ ...statusBanner, show: false })} className="ml-6 p-2 hover:bg-white/10 rounded-full transition-all"><X size={18} /></button>
-                    </div>
-                </div>
-            )}
+            {/* Toast notifications handled by global Toast provider */}
 
             {/* Pending Requests */}
             {pendingRequests.length > 0 && (
