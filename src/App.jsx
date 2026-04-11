@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { LanguageProvider } from './i18n/LanguageContext';
 import { ThemeProvider } from './components/ThemeContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
 import React, { Suspense, lazy } from 'react';
 
 // Pages — Eagerly loaded (public/critical)
@@ -80,6 +81,7 @@ function App() {
     <ErrorBoundary>
     <ThemeProvider>
     <LanguageProvider>
+    <ToastProvider>
       <Router>
         <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -154,6 +156,7 @@ function App() {
         </Routes>
         </Suspense>
       </Router>
+    </ToastProvider>
     </LanguageProvider>
     </ThemeProvider>
     </ErrorBoundary>
