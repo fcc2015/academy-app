@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Star, TrendingUp, Award, Download, XCircle, IdCard } from 'lucide-react';
 import FUTCard from '../../components/FUTCard';
 import html2canvas from 'html2canvas';
+import { SkeletonDashboard } from '../../components/Skeleton';
 
 const skills = [
     { key: 'technical_score', label: 'التقييم التقني', color: 'bg-blue-500' },
@@ -65,11 +66,7 @@ const ParentEvaluations = () => {
     }, [userId]);
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600"></div>
-            </div>
-        );
+        return <SkeletonDashboard />;
     }
 
     const avgScores = {};

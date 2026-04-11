@@ -3,6 +3,7 @@ import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { User, Shield, MapPin, Calendar, Award, Trophy, Star, CalendarCheck, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { SkeletonDashboard } from '../../components/Skeleton';
 
 const ParentChildProfile = () => {
     const { isRTL, dir } = useLanguage();
@@ -94,11 +95,7 @@ const ParentChildProfile = () => {
     }, [userId]);
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600"></div>
-            </div>
-        );
+        return <SkeletonDashboard />;
     }
 
     if (!child) {
