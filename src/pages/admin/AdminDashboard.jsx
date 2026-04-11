@@ -1,6 +1,6 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Users,
@@ -23,13 +23,18 @@ import {
     RefreshCw,
     Loader2,
     CheckCircle2,
-    X
+    X,
+    BarChart3
 } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useToast } from '../../components/Toast';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const { t, isRTL, dir, language } = useLanguage();
+    const toast = useToast();
+    const [allPayments, setAllPayments] = useState([]);
     const [stats, setStats] = useState({
         totalPlayers: 0,
         totalRevenue: 0,
@@ -77,6 +82,7 @@ const AdminDashboard = () => {
             const cArr = Array.isArray(safeCoaches) ? safeCoaches : [];
             const eArr = Array.isArray(safeEvents) ? safeEvents : [];
 
+            setAllPayments(payArr);
             const totalRevenue = payArr.filter(p => p && ['paid','Paid','Completed','completed'].includes(p.status)).reduce((sum, p) => sum + (p.amount || 0), 0);
             const activeCoaches = cArr.filter(c => c && (c.status === 'Active' || c.status === 'active')).length || cArr.length;
 
@@ -137,12 +143,30 @@ const AdminDashboard = () => {
             if (res.ok) {
                 setIsNotificationModalOpen(false);
                 setNotifData({ title: '', message: '', target_role: '' });
-                alert(t('dashboard.sendSuccess'));
+                toast.success(t('dashboard.sendSuccess'));
             }
         } catch (err) {
             console.error('Failed to send notification:', err);
         }
     };
+
+    // Revenue chart data — last 6 months
+    const revenueData = useMemo(() => {
+        const months = [];
+        const now = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const label = d.toLocaleDateString(language === 'ar' ? 'ar-MA' : language === 'fr' ? 'fr-FR' : 'en-GB', { month: 'short' });
+            const monthPayments = allPayments.filter(p => {
+                if (!p || !['paid', 'Paid', 'Completed', 'completed'].includes(p.status)) return false;
+                const pd = p.payment_date || p.created_at;
+                return pd && pd.startsWith(key);
+            });
+            months.push({ name: label, revenue: monthPayments.reduce((s, p) => s + (p.amount || 0), 0) });
+        }
+        return months;
+    }, [allPayments, language]);
 
     const metricCards = [
         { title: t('dashboard.totalPlayers'), value: stats.totalPlayers, icon: Users, color: 'blue', desc: t('dashboard.registeredPlayers') },
@@ -214,6 +238,42 @@ const AdminDashboard = () => {
                             );
                         })}
                     </div>
+
+                    {/* Revenue Chart */}
+                    {!isLoading && (
+                        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
+                            <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
+                                        <BarChart3 size={20} />
+                                    </div>
+                                    <h3 className="font-extrabold text-slate-800 text-lg tracking-tight">{isRTL ? 'المداخيل — آخر 6 أشهر' : 'Revenus — 6 derniers mois'}</h3>
+                                </div>
+                                <button onClick={() => navigate('/admin/finances')} className="text-emerald-600 text-[11px] font-black uppercase tracking-widest hover:text-emerald-800 transition-colors bg-emerald-50 px-4 py-2 rounded-xl">
+                                    {isRTL ? 'التفاصيل' : 'Détails'}
+                                </button>
+                            </div>
+                            <div className="p-6" style={{ height: 260 }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={revenueData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }} reversed={isRTL} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }} width={50} orientation={isRTL ? 'right' : 'left'} />
+                                        <Tooltip
+                                            contentStyle={{ background: '#1e293b', border: 'none', borderRadius: 12, color: '#fff', fontSize: 13, fontWeight: 700 }}
+                                            formatter={(v) => [`${v.toLocaleString()} ${t('common.currency')}`, isRTL ? 'المداخيل' : 'Revenus']}
+                                        />
+                                        <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5} fill="url(#revenueGrad)" dot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Operational Alerts */}
                     {!isLoading && pendingPayments.length > 0 && (
