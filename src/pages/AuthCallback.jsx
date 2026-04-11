@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../config';
 
-const SUPABASE_URL = 'https://kbhnqntteexatihidhkn.supabase.co';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://kbhnqntteexatihidhkn.supabase.co';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /**
  * Google OAuth Callback Page
@@ -29,32 +30,28 @@ const AuthCallback = () => {
             try {
                 // Fetch user data from Supabase using the access token
                 const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-                    headers: { Authorization: `Bearer ${access_token}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiaG5xbnR0ZWV4YXRpaGlkaGtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NDk2MDksImV4cCI6MjA4ODMyNTYwOX0.dwF2cxTuH7tCjDQv_IXsQNzWQmol6FbvWV17hBSyl94' }
+                    headers: { Authorization: `Bearer ${access_token}`, apikey: SUPABASE_ANON_KEY }
                 });
 
                 if (!res.ok) throw new Error('Failed to fetch user info');
                 const user = await res.json();
 
                 const user_id = user.id;
-                let role = user.user_metadata?.role;
 
-                // If role not in metadata, look it up from the database
-                if (!role) {
-                    try {
-                        const roleRes = await fetch(`${API_URL}/auth/role`, {
-                            headers: { Authorization: `Bearer ${access_token}` }
-                        });
-                        if (roleRes.ok) {
-                            const roleData = await roleRes.json();
-                            role = roleData.role;
-                        }
-                    } catch (e) {
-                        console.warn('Could not fetch role from API, using fallback');
+                // ALWAYS fetch role from the backend DB (user_metadata is unreliable)
+                let role = 'parent';
+                try {
+                    const roleRes = await fetch(`${API_URL}/auth/role`, {
+                        headers: { Authorization: `Bearer ${access_token}` }
+                    });
+                    if (roleRes.ok) {
+                        const roleData = await roleRes.json();
+                        role = roleData.role || 'parent';
                     }
+                } catch (e) {
+                    console.warn('Could not fetch role from API, using fallback');
+                    role = user.user_metadata?.role || 'parent';
                 }
-
-                // Final fallback
-                if (!role) role = 'parent';
 
                 // Store in localStorage
                 localStorage.setItem('token', access_token);
@@ -63,6 +60,15 @@ const AuthCallback = () => {
                 localStorage.setItem('token_expires', Date.now() + 24 * 60 * 60 * 1000);
 
                 setStatus('تم التحقق! يتم تحويلك...');
+
+                // Check if coming from SaaS payment registration
+                const pendingSaas = localStorage.getItem('pending_saas_registration');
+                if (pendingSaas === 'true') {
+                    localStorage.removeItem('pending_saas_registration');
+                    // Add user as admin in DB then redirect to saas platform to complete setup
+                    setTimeout(() => navigate('/saas-platform?setup=true&user_id=' + user_id + '&email=' + encodeURIComponent(user.email)), 800);
+                    return;
+                }
 
                 // Redirect based on role
                 setTimeout(() => {
