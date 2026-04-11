@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Settings, Save, Loader2, CheckCircle2, Shield, Bell, Database, Globe, Key, RefreshCw, AlertCircle, CreditCard, Zap, Star, Crown, Users, UserCog, Dumbbell } from 'lucide-react';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
+import { SkeletonDashboard } from '../../components/Skeleton';
 
 export default function SaasSettings() {
     const [loading, setLoading] = useState(true);
@@ -124,9 +125,7 @@ export default function SaasSettings() {
     ];
 
     if (loading) {
-        return (
-            <div className="py-20 flex justify-center text-emerald-500"><Loader2 className="w-8 h-8 animate-spin" /></div>
-        );
+        return <SkeletonDashboard />;
     }
 
     const PlanCard = ({ planKey, icon: Icon, color, colorBg, colorBorder, colorText }) => {

@@ -1,4 +1,5 @@
 import { Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { useToast } from './Toast';
 import { API_URL } from '../config';
 import { authFetch } from '../api';
 
@@ -11,6 +12,7 @@ import { authFetch } from '../api';
  *   <ExportButtons type="attendance" squadId="xxx" />
  */
 export default function ExportButtons({ type = 'players', squadId = null }) {
+    const toast = useToast();
     const handleExport = async () => {
         try {
             let url = `${API_URL}/exports/${type}/csv`;
@@ -30,7 +32,7 @@ export default function ExportButtons({ type = 'players', squadId = null }) {
             window.URL.revokeObjectURL(downloadUrl);
         } catch (err) {
             console.error('Export error:', err);
-            alert('Erreur lors de l\'export');
+            toast.error('Erreur lors de l\'export');
         }
     };
 

@@ -3,6 +3,7 @@ import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { CreditCard, CheckCircle2, Clock, AlertTriangle, TrendingUp, Upload, X, Camera, Send } from 'lucide-react';
 import { useToast } from '../../components/Toast';
+import { SkeletonDashboard } from '../../components/Skeleton';
 
 const ParentPayments = () => {
     const toast = useToast();
@@ -91,11 +92,7 @@ const ParentPayments = () => {
     };
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600"></div>
-            </div>
-        );
+        return <SkeletonDashboard />;
     }
 
     const totalPaid = payments.filter(p => p.status === 'Completed' || p.status === 'paid').reduce((sum, p) => sum + (p.amount || 0), 0);

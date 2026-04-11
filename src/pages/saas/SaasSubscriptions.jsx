@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CreditCard, History, Building2, CheckCircle2, Loader2, Ban, Plus, Eye, X, Zap, Star, Crown, Clock, DollarSign, ExternalLink, RefreshCw, ArrowUpRight, ArrowDownRight, Calculator, Users, UserCog, Dumbbell } from 'lucide-react';
+import { useToast } from '../../components/Toast';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 
@@ -70,6 +71,7 @@ function calculateProRata(currentPlan, newPlan, billingCycleStart) {
 }
 
 export default function SaasSubscriptions() {
+    const toast = useToast();
     const [academies, setAcademies] = useState([]);
     const [stats, setStats] = useState({ total_academies: 0, active_academies: 0, total_mrr: 0 });
     const [loading, setLoading] = useState(true);
@@ -171,7 +173,7 @@ export default function SaasSubscriptions() {
                 }
             } else {
                 const err = await res.json();
-                alert(err.detail || 'Payment failed');
+                toast.error(err.detail || 'Payment failed');
             }
         } catch (err) {
             console.error("PayPal checkout error:", err);

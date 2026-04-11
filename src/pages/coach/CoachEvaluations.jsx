@@ -3,6 +3,7 @@ import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { Star, Save, Users, PlusCircle, Trash2, X, Zap, TrendingUp } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useToast } from '../../components/Toast';
 
 const getSkillColor = (val) => {
     if (val >= 8) return { bar: 'bg-emerald-500', text: 'text-emerald-600', glow: 'shadow-emerald-500/30' };
@@ -13,7 +14,8 @@ const getSkillColor = (val) => {
 
 const CoachEvaluations = () => {
     const { t, isRTL, dir } = useLanguage();
-    
+    const toast = useToast();
+
     const skills = [
         { key: 'technique', labelKey: 'coach.technique', emoji: '⚽', color: 'blue' },
         { key: 'speed', labelKey: 'coach.speed', emoji: '⚡', color: 'emerald' },
@@ -101,6 +103,7 @@ const CoachEvaluations = () => {
             if (res.ok) {
                 setShowForm(false);
                 setForm({ technique: 5, speed: 5, teamwork: 5, discipline: 5, game_sense: 5, notes: '', evaluation_date: new Date().toISOString().split('T')[0] });
+                toast.success(isRTL ? 'تم حفظ التقييم بنجاح!' : 'Evaluation saved successfully!');
                 fetchEvaluations();
             }
         } catch (error) {
@@ -111,9 +114,9 @@ const CoachEvaluations = () => {
     };
 
     const handleDelete = async (evalId) => {
-        if (!confirm('هل أنت متأكد من حذف هذا التقييم؟')) return;
         try {
             await authFetch(`${API_URL}/evaluations/${evalId}`, { method: 'DELETE' });
+            toast.success(isRTL ? 'تم حذف التقييم' : 'Evaluation deleted');
             fetchEvaluations();
         } catch (error) {
             console.error('Error deleting evaluation:', error);

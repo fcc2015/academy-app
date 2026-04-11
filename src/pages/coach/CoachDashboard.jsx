@@ -7,6 +7,7 @@ import {
     Star, Clock, CheckCircle, BarChart3, Zap
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { SkeletonDashboard } from '../../components/Skeleton';
 
 const CoachDashboard = () => {
     const navigate = useNavigate();
@@ -123,11 +124,7 @@ const CoachDashboard = () => {
     ];
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
-            </div>
-        );
+        return <SkeletonDashboard />;
     }
 
     return (
@@ -143,7 +140,7 @@ const CoachDashboard = () => {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 stagger-children">
                 {statCards.map((stat, i) => {
                     const Icon = stat.icon;
                     return (

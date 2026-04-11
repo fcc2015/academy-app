@@ -3,6 +3,7 @@ import { Shield, Users, CreditCard, Activity, TrendingUp, UserCheck } from 'luci
 import { useLanguage } from '../../i18n/LanguageContext';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
+import { SkeletonDashboard } from '../../components/Skeleton';
 
 export default function SaasDashboard() {
     const { dir } = useLanguage();
@@ -44,7 +45,7 @@ export default function SaasDashboard() {
         { title: 'Platform Revenue', value: `${stats.total_mrr.toLocaleString()} MAD`, icon: TrendingUp, color: 'text-rose-400', bg: 'bg-rose-500/10' },
     ];
 
-    if (loading) return <div className="text-slate-400">Loading platform metrics...</div>;
+    if (loading) return <SkeletonDashboard />;
 
     return (
         <div className="space-y-6" dir={dir}>

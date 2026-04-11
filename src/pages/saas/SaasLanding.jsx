@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useToast } from '../../components/Toast';
 import { API_URL } from '../../config';
 import {
     Check, ChevronRight, Star, Users, Phone, Mail, MapPin, Instagram, Facebook,
@@ -56,6 +57,7 @@ const NAV_LINKS = [
 ];
 
 export default function SaasLanding() {
+    const toast = useToast();
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [activeSection, setActiveSection] = useState('');
@@ -256,10 +258,10 @@ export default function SaasLanding() {
                 }
             } else {
                 const errData = await res.json().catch(() => ({}));
-                alert(errData.detail || "Erreur de paiement. Veuillez réessayer.");
+                toast.error(errData.detail || "Erreur de paiement. Veuillez réessayer.");
             }
         } catch {
-            alert("Connexion échouée. Veuillez réessayer.");
+            toast.error("Connexion échouée. Veuillez réessayer.");
         } finally {
             setPaypalLoading(null);
         }

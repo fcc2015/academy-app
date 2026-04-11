@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useToast } from '../../components/Toast';
 import { Save, Plus, Trash2, Users, Trophy, Download } from 'lucide-react';
 
 const INITIAL_PLAYERS = [
@@ -18,6 +19,7 @@ const INITIAL_PLAYERS = [
 
 const AdminTactics = () => {
     const { dir, isRTL } = useLanguage();
+    const toast = useToast();
     const [players, setPlayers] = useState(INITIAL_PLAYERS);
     const [draggingId, setDraggingId] = useState(null);
     const pitchRef = useRef(null);
@@ -66,7 +68,7 @@ const AdminTactics = () => {
     };
 
     const saveTactics = () => {
-        alert(isRTL ? "تم حفظ التشكيلة بنجاح!" : "Tactics saved successfully!");
+        toast.success(isRTL ? "تم حفظ التشكيلة بنجاح!" : "Tactics saved successfully!");
     };
 
     return (

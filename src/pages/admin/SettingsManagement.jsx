@@ -1,6 +1,7 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
+import { SkeletonDashboard } from '../../components/Skeleton';
 import {
     Settings,
     Save,
@@ -276,7 +277,7 @@ const SettingsManagement = () => {
         }
     };
 
-    if (isLoading) return <div className="p-20 text-center font-bold text-slate-400">Loading configurations...</div>;
+    if (isLoading) return <SkeletonDashboard />;
 
     return (
         <div className="animate-fade-in pb-20 text-right" dir="rtl">
