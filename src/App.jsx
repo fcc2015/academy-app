@@ -13,6 +13,7 @@ import NotFound from './pages/NotFound';
 
 // Lazy-loaded pages — only loaded when navigated to
 const DownloadPage = lazy(() => import('./pages/DownloadPage'));
+const QRLoginPage = lazy(() => import('./pages/QRLoginPage'));
 
 // SaaS Root
 const SaasLogin = lazy(() => import('./pages/saas/SaasLogin'));
@@ -89,6 +90,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/download" element={<DownloadPage />} />
           <Route path="/login" element={<AdminLogin />} />
+          <Route path="/qr-login" element={<QRLoginPage />} />
           <Route path="/saas/login" element={<SaasLogin />} />
           <Route path="/saas-platform" element={<SaasLanding />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
