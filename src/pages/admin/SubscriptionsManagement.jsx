@@ -23,19 +23,19 @@ import {
     Check
 } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../components/Toast';
 
 const SubscriptionsManagement = () => {
     const [subscriptions, setSubscriptions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedInvoice, setSelectedInvoice] = useState(null);
-    const [statusBanner, setStatusBanner] = useState({ show: false, message: '', type: 'success', id: 0 });
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, payment: null });
+    const toast = useToast();
 
     const showBanner = (message, type = 'success') => {
-        const id = Date.now();
-        setStatusBanner({ show: true, message, type, id });
-        setTimeout(() => setStatusBanner(prev => prev.id === id ? { ...prev, show: false } : prev), 5000);
+        if (type === 'error') toast.error(message);
+        else toast.success(message);
     };
 
     useEffect(() => {
@@ -160,16 +160,7 @@ const SubscriptionsManagement = () => {
 
     return (
         <div className="animate-fade-in pb-16 text-right" dir="rtl">
-            {/* Status Banner */}
-            {statusBanner.show && (
-                <div key={statusBanner.id} className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] animate-fade-in">
-                    <div className={`flex items-center gap-4 px-8 py-4 rounded-[2rem] shadow-2xl border-2 backdrop-blur-md ${statusBanner.type === 'success' ? 'bg-emerald-600/90 border-emerald-400 text-white' : 'bg-red-600/90 border-red-400 text-white'}`}>
-                        {statusBanner.type === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
-                        <span className="font-black text-base" dir="ltr">{statusBanner.message}</span>
-                        <button onClick={() => setStatusBanner({ ...statusBanner, show: false })} className="ml-4 hover:bg-white/20 p-1 rounded-full"><X size={16} /></button>
-                    </div>
-                </div>
-            )}
+            {/* Toast handled by global provider */}
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                 <div>
