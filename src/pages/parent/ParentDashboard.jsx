@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import PlayerBadgeModal from '../../components/PlayerBadgeModal';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useToast } from '../../components/Toast';
 
 const ParentDashboard = () => {
+    const toast = useToast();
     const { t, isRTL, dir } = useLanguage();
     const navigate = useNavigate();
     const [childData, setChildData] = useState(null);
@@ -174,10 +176,10 @@ const ParentDashboard = () => {
         try {
             const res = await authFetch(`${API_URL}/finances/test-notification/${userId}`, { method: 'POST' });
             if (res.ok) {
-                alert(isRTL ? 'تم إرسال تنبيه تجريبي! تحقق من أيقونة الجرس في الأعلى.' : 'Test notification sent! Check the bell icon.');
+                toast.success(isRTL ? 'تم إرسال تنبيه تجريبي! تحقق من أيقونة الجرس في الأعلى.' : 'Test notification sent! Check the bell icon.');
             }
         } catch {
-            alert(isRTL ? 'فشل إرسال التنبيه' : 'Failed to send notification');
+            toast.error(isRTL ? 'فشل إرسال التنبيه' : 'Failed to send notification');
         } finally {
             setIsSendingTest(false);
         }

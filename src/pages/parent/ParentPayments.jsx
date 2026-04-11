@@ -2,8 +2,10 @@ import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
 import { CreditCard, CheckCircle2, Clock, AlertTriangle, TrendingUp, Upload, X, Camera, Send } from 'lucide-react';
+import { useToast } from '../../components/Toast';
 
 const ParentPayments = () => {
+    const toast = useToast();
     const [payments, setPayments] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [childInfo, setChildInfo] = useState(null);
@@ -73,16 +75,16 @@ const ParentPayments = () => {
             });
 
             if (res.ok) {
-                alert('تم إرسال وصل الدفع للإدارة بنجاح ليتم مراجعته.');
+                toast.success('تم إرسال وصل الدفع للإدارة بنجاح ليتم مراجعته.');
                 setIsUploadModalOpen(false);
                 setUploadData({ amount: '', payment_method: 'Bank Transfer', notes: '' });
                 fetchPayments(); // Refresh list
             } else {
-                alert('حدث خطأ أثناء الإرسال');
+                toast.error('حدث خطأ أثناء الإرسال');
             }
         } catch (error) {
             console.error('Submit error:', error);
-            alert('خطأ في الاتصال');
+            toast.error('خطأ في الاتصال');
         } finally {
             setIsUploading(false);
         }
