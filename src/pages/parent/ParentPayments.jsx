@@ -37,14 +37,17 @@ const ParentPayments = () => {
                 }
             }
 
-            const res = await authFetch(`${API_URL}/finances/payments`);
-            if (res.ok) {
-                const allPayments = await res.json();
-                const filtered = allPayments.filter(p => p.user_id === childUserId || p.user_id === userId);
-                setPayments(filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+            // ✅ نستعمل endpoint خاص بالمستخدم — لا نجيب كل الدفعات
+            const targetId = childUserId || userId;
+            if (targetId) {
+                const res = await authFetch(`${API_URL}/finances/payments/user/${targetId}`);
+                if (res.ok) {
+                    const userPayments = await res.json();
+                    setPayments(userPayments.sort((a, b) => new Date(b.created_at || b.payment_date) - new Date(a.created_at || a.payment_date)));
+                }
             }
         } catch (error) {
-            console.error('Error:', error);
+            console.error('خطأ في جلب البيانات:', error);
         } finally {
             setIsLoading(false);
         }
@@ -71,7 +74,7 @@ const ParentPayments = () => {
                 payment_date: new Date().toISOString()
             };
 
-            const res = await authFetch(`${API_URL}/finances/payments`, {
+            const res = await authFetch(`${API_URL}/finances/payments/parent`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
