@@ -67,11 +67,11 @@ const CoachLayout = () => {
             {/* Sidebar */}
             <aside
                 className={`
-                    fixed lg:static inset-y-0 left-0 z-50
-                    bg-white border-r border-slate-200 
-                    transition-all duration-300 ease-in-out
+                    fixed lg:static inset-y-0 z-50
+                    bg-white transition-all duration-300 ease-in-out
                     flex flex-col shrink-0 overflow-hidden
-                    ${isSidebarOpen ? 'w-72 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-20'}
+                    ${isRTL ? 'right-0 border-l border-slate-200' : 'left-0 border-r border-slate-200'}
+                    ${isSidebarOpen ? 'w-72 translate-x-0' : isRTL ? 'w-0 translate-x-full lg:translate-x-0 lg:w-20' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-20'}
                 `}
             >
                 <div className="w-72 h-full flex flex-col">
@@ -97,7 +97,7 @@ const CoachLayout = () => {
                             <button
                                 key={item.path}
                                 onClick={() => navigate(item.path)}
-                                className={`nav-item w-full ${isActive ? 'active' : ''}`}
+                                className={`nav-item w-full ${isActive ? 'active' : ''} ${isRTL ? 'flex-row-reverse text-right' : ''}`}
                             >
                                 <Icon size={20} className={isActive ? 'text-surface-900' : 'text-surface-400'} />
                                 <span className={isActive ? 'font-semibold' : 'font-medium'}>{item.name}</span>

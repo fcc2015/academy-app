@@ -199,6 +199,80 @@
   transform: translateY(-2px);
 }
 
+/* Pulse glow — for interactive buttons/icons */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+}
+.pulse-glow {
+  animation: pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Glass card — glassmorphism effect */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Card enter animation */
+@keyframes cardEnter {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-card-enter {
+  animation: cardEnter 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Smooth bounce in */
+@keyframes bounceIn {
+  0% { opacity: 0; transform: scale(0.3); }
+  50% { opacity: 1; transform: scale(1.05); }
+  70% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+.animate-bounce-in {
+  animation: bounceIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Slide in from right (for RTL toasts/panels) */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slideInRight 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Slide in from left */
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Number count-up visual effect via tabular nums */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Focus ring utility */
+.focus-ring {
+  transition: box-shadow 0.2s ease;
+}
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+}
+
+/* Modal open — prevent body scroll */
+body.modal-open {
+  overflow: hidden;
+}
+
 /* Scrollbar tweaks */
 ::-webkit-scrollbar {
   width: 8px;

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Star, Save, Users, PlusCircle, Trash2, X, Zap, TrendingUp } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useToast } from '../../components/Toast';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const getSkillColor = (val) => {
     if (val >= 8) return { bar: 'bg-emerald-500', text: 'text-emerald-600', glow: 'shadow-emerald-500/30' };
@@ -31,6 +32,7 @@ const CoachEvaluations = () => {
     const [showForm, setShowForm] = useState(false);
 
     const [isSaving, setIsSaving] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
 
     const [form, setForm] = useState({
         technique: 5,
@@ -114,12 +116,18 @@ const CoachEvaluations = () => {
     };
 
     const handleDelete = async (evalId) => {
+        setConfirmDelete({ open: true, id: evalId });
+    };
+
+    const confirmDeleteEval = async () => {
+        const evalId = confirmDelete.id;
+        setConfirmDelete({ open: false, id: null });
         try {
             await authFetch(`${API_URL}/evaluations/${evalId}`, { method: 'DELETE' });
             toast.success(isRTL ? 'تم حذف التقييم' : 'Evaluation deleted');
             fetchEvaluations();
         } catch (error) {
-            console.error('Error deleting evaluation:', error);
+            toast.error(isRTL ? 'فشل الحذف' : 'Delete failed');
         }
     };
 
@@ -147,31 +155,43 @@ const CoachEvaluations = () => {
                 )}
             </div>
 
+            {/* Confirm Delete Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDelete.open}
+                onConfirm={confirmDeleteEval}
+                onCancel={() => setConfirmDelete({ open: false, id: null })}
+                title={isRTL ? 'حذف التقييم' : 'Delete Evaluation'}
+                message={isRTL ? 'هل أنت متأكد من حذف هذا التقييم؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to delete this evaluation? This action cannot be undone.'}
+                confirmText={isRTL ? 'حذف' : 'Delete'}
+                cancelText={isRTL ? 'إلغاء' : 'Cancel'}
+                isRTL={isRTL}
+            />
+
             {/* Filters */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white rounded-[2rem] border border-slate-200 premium-shadow p-6">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex-row-reverse">
-                        <Users size={16} className="text-emerald-600" /> تصفية حسب الفريق
+                    <label className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <Users size={16} className="text-emerald-600" /> {isRTL ? 'تصفية حسب الفريق' : 'Filter by Squad'}
                     </label>
                     <select
-                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-right cursor-pointer shadow-sm appearance-none"
+                        className={`w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold cursor-pointer shadow-sm appearance-none ${isRTL ? 'text-right' : 'text-left'}`}
                         value={selectedSquad}
                         onChange={(e) => { setSelectedSquad(e.target.value); setSelectedPlayer(''); }}
                     >
-                        <option value="">جميع الفرق</option>
+                        <option value="">{isRTL ? 'جميع الفرق' : 'All Squads'}</option>
                         {squads.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                 </div>
                 <div className="bg-white rounded-[2rem] border border-slate-200 premium-shadow p-6">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex-row-reverse">
-                        <Star size={16} className="text-emerald-600" /> اختيار اللاعب
+                    <label className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <Star size={16} className="text-emerald-600" /> {isRTL ? 'اختيار اللاعب' : 'Select Player'}
                     </label>
                     <select
-                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-right cursor-pointer shadow-sm appearance-none"
+                        className={`w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold cursor-pointer shadow-sm appearance-none ${isRTL ? 'text-right' : 'text-left'}`}
                         value={selectedPlayer}
                         onChange={(e) => setSelectedPlayer(e.target.value)}
                     >
-                        <option value="">— اختر اللاعب —</option>
+                        <option value="">— {isRTL ? 'اختر اللاعب' : 'Select Player'} —</option>
                         {filteredPlayers.map(p => (
                             <option key={p.user_id} value={p.user_id}>
                                 {p.technical_level === 'A' ? '⭐ ' : ''}{p.full_name} ({p.u_category || p.category || ''})
@@ -228,10 +248,10 @@ const CoachEvaluations = () => {
                             })}
 
                             {/* Overall Score Display */}
-                            <div className="bg-slate-900 rounded-2xl p-5 flex items-center justify-between flex-row-reverse">
-                                <div className="flex items-center gap-3 flex-row-reverse">
+                            <div className={`bg-slate-900 rounded-2xl p-5 flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
                                     <TrendingUp size={20} className="text-emerald-400" />
-                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">المعدل العام</span>
+                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">{isRTL ? 'المعدل العام' : 'Overall Score'}</span>
                                 </div>
                                 <span className="text-3xl font-black text-white tabular-nums">
                                     {overallAvg.toFixed(1)}
@@ -241,7 +261,7 @@ const CoachEvaluations = () => {
                             {/* Date & Notes */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">التاريخ</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">{isRTL ? 'التاريخ' : 'Date'}</label>
                                     <input
                                         type="date"
                                         value={form.evaluation_date}
@@ -251,12 +271,12 @@ const CoachEvaluations = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">ملاحظات</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">{isRTL ? 'ملاحظات' : 'Notes'}</label>
                                     <input
                                         value={form.notes}
                                         onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl font-medium bg-slate-50 text-right"
-                                        placeholder="ملاحظة قصيرة..."
+                                        className={`w-full px-4 py-3 border border-slate-200 rounded-xl font-medium bg-slate-50 ${isRTL ? 'text-right' : 'text-left'}`}
+                                        placeholder={isRTL ? 'ملاحظة قصيرة...' : 'Short note...'}
                                     />
                                 </div>
                             </div>
@@ -265,7 +285,7 @@ const CoachEvaluations = () => {
                                 disabled={isSaving}
                                 className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/20 hover:shadow-emerald-600/40 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-[11px] uppercase tracking-widest active:scale-95"
                             >
-                                <Save size={18} /> {isSaving ? 'جاري الحفظ...' : 'تسجيل التقييم'}
+                                <Save size={18} /> {isSaving ? (isRTL ? 'جاري الحفظ...' : 'Saving...') : (isRTL ? 'تسجيل التقييم' : 'Save Evaluation')}
                             </button>
                         </form>
                     </div>
@@ -275,15 +295,15 @@ const CoachEvaluations = () => {
             {/* Evaluations List */}
             {selectedPlayer ? (
                 <div className="bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden">
-                    <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3 flex-row-reverse">
+                    <div className={`px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <TrendingUp size={20} className="text-purple-600" />
-                        <h3 className="font-extrabold text-slate-800 text-lg">سجل التقييمات</h3>
+                        <h3 className="font-extrabold text-slate-800 text-lg">{isRTL ? 'سجل التقييمات' : 'Evaluation History'}</h3>
                     </div>
                     {evaluations.length === 0 ? (
                         <div className="p-16 text-center">
                             <Star className="mx-auto text-slate-200 mb-4" size={48} />
-                            <p className="text-lg font-bold text-slate-700 mb-1">لا توجد تقييمات بعد</p>
-                            <p className="text-sm text-slate-400">ابدأ بتقييم هذا اللاعب لتتبع تطوره</p>
+                            <p className="text-lg font-bold text-slate-700 mb-1">{isRTL ? 'لا توجد تقييمات بعد' : 'No evaluations yet'}</p>
+                            <p className="text-sm text-slate-400">{isRTL ? 'ابدأ بتقييم هذا اللاعب لتتبع تطوره' : 'Start evaluating this player to track their progress'}</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-slate-100">
@@ -292,14 +312,14 @@ const CoachEvaluations = () => {
                                 const avgColors = getSkillColor(avg);
                                 return (
                                     <div key={ev.id} className="p-6 hover:bg-slate-50/50 transition-colors group">
-                                        <div className="flex items-center justify-between mb-5 flex-row-reverse">
-                                            <div className="flex items-center gap-4 flex-row-reverse">
+                                        <div className={`flex items-center justify-between mb-5 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                            <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
                                                 <div className={`w-14 h-14 rounded-2xl ${avgColors.text} bg-slate-50 font-black text-xl flex items-center justify-center border border-slate-200 shadow-sm`}>
                                                     {avg.toFixed(1)}
                                                 </div>
-                                                <div className="text-right">
+                                                <div className={isRTL ? 'text-right' : 'text-left'}>
                                                     <p className="font-bold text-slate-900">
-                                                        {ev.evaluation_date ? new Date(ev.evaluation_date).toLocaleDateString('ar-MA', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}
+                                                        {ev.evaluation_date ? new Date(ev.evaluation_date).toLocaleDateString(isRTL ? 'ar-MA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}
                                                     </p>
                                                     {ev.notes && <p className="text-sm text-slate-500 mt-1">{ev.notes}</p>}
                                                 </div>
@@ -339,8 +359,8 @@ const CoachEvaluations = () => {
             ) : (
                 <div className="bg-white rounded-[2.5rem] border border-slate-200 premium-shadow p-16 text-center">
                     <Star className="mx-auto text-slate-200 mb-4" size={56} />
-                    <h3 className="text-xl font-black text-slate-800 mb-2">اختر لاعباً</h3>
-                    <p className="text-slate-500 text-sm max-w-md mx-auto">حدد لاعباً من القائمة أعلاه لعرض سجل تقييماته وإضافة تقييمات جديدة</p>
+                    <h3 className="text-xl font-black text-slate-800 mb-2">{isRTL ? 'اختر لاعباً' : 'Select a Player'}</h3>
+                    <p className="text-slate-500 text-sm max-w-md mx-auto">{isRTL ? 'حدد لاعباً من القائمة أعلاه لعرض سجل تقييماته وإضافة تقييمات جديدة' : 'Select a player from the list above to view their evaluation history and add new evaluations'}</p>
                 </div>
             )}
         </div>

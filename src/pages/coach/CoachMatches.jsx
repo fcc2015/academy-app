@@ -5,16 +5,20 @@ import {
     Calendar, MapPin, Users2, Trophy, Clock, Search, X, CheckCircle, AlertCircle, Plus, Edit2, Trash2
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useToast } from '../../components/Toast';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { SkeletonTable } from '../../components/Skeleton';
 
 const CoachMatches = () => {
-    const { isRTL, dir } = useLanguage();
+    const { t, isRTL, dir } = useLanguage();
+    const toast = useToast();
     const [matches, setMatches] = useState([]);
     const [players, setPlayers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [editingMatch, setEditingMatch] = useState(null);
-    const [statusBanner, setStatusBanner] = useState({ show: false, message: '', type: 'success', id: 0 });
+    const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
     
     const userId = localStorage.getItem('user_id');
 
@@ -32,9 +36,8 @@ const CoachMatches = () => {
     const typeOptions = ['Friendly', 'League', 'Cup', 'Tournament'];
 
     const showBanner = (message, type = 'success') => {
-        const id = Date.now();
-        setStatusBanner({ show: true, message, type, id });
-        setTimeout(() => setStatusBanner(prev => prev.id === id ? { ...prev, show: false } : prev), 5000);
+        if (type === 'error') toast.error(message);
+        else toast.success(message);
     };
 
     useEffect(() => {
@@ -191,15 +194,20 @@ const CoachMatches = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm(isRTL ? 'هل أنت متأكد من حذف هذه المباراة؟' : 'Are you sure you want to delete this match?')) return;
+        setConfirmDelete({ open: true, id });
+    };
+
+    const confirmDeleteMatch = async () => {
+        const id = confirmDelete.id;
+        setConfirmDelete({ open: false, id: null });
         try {
             const res = await authFetch(`${API_URL}/matches/${id}`, { method: 'DELETE' });
             if (res.ok) {
-                showBanner(isRTL ? 'تم الحذف' : 'Match deleted', 'success');
+                toast.success(isRTL ? 'تم الحذف' : 'Match deleted');
                 fetchData();
             }
         } catch (error) {
-            console.error(error);
+            toast.error(isRTL ? 'فشل الحذف' : 'Delete failed');
         }
     };
 
@@ -213,16 +221,17 @@ const CoachMatches = () => {
 
     return (
         <div className={`animate-fade-in pb-20 ${isRTL ? 'text-right' : 'text-left'}`} dir={dir}>
-            {/* Status Banner */}
-            {statusBanner.show && (
-                <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[200] animate-fade-in">
-                    <div className={`flex items-center gap-4 px-8 py-4 rounded-[2rem] shadow-2xl border-2 backdrop-blur-md ${statusBanner.type === 'success' ? 'bg-emerald-600/90 border-emerald-400 text-white' : 'bg-red-600/90 border-red-400 text-white'}`}>
-                        {statusBanner.type === 'success' ? <CheckCircle size={24} /> : <AlertCircle size={24} />}
-                        <span className="font-black text-base">{statusBanner.message}</span>
-                        <button onClick={() => setStatusBanner({ ...statusBanner, show: false })} className="ml-4 hover:bg-white/20 p-1 rounded-full"><X size={16} /></button>
-                    </div>
-                </div>
-            )}
+            {/* Confirm Delete Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDelete.open}
+                onConfirm={confirmDeleteMatch}
+                onCancel={() => setConfirmDelete({ open: false, id: null })}
+                title={isRTL ? 'حذف المباراة' : 'Delete Match'}
+                message={isRTL ? 'هل أنت متأكد من حذف هذه المباراة؟ لا يمكن التراجع عن هذا الإجراء.' : 'Are you sure you want to delete this match? This action cannot be undone.'}
+                confirmText={isRTL ? 'حذف' : 'Delete'}
+                cancelText={isRTL ? 'إلغاء' : 'Cancel'}
+                isRTL={isRTL}
+            />
 
             <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
                 <div>
@@ -255,7 +264,7 @@ const CoachMatches = () => {
 
                 <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {isLoading ? (
-                        <div className="col-span-full py-20 text-center font-bold text-slate-400 italic">Loading matches...</div>
+                        <div className="col-span-full"><SkeletonTable rows={3} cols={3} /></div>
                     ) : filteredMatches.length === 0 ? (
                         <div className="col-span-full py-20 text-center font-bold text-slate-400 italic">{isRTL ? 'لا توجد مباريات مسجلة.' : 'No match convocations found.'}</div>
                     ) : (
