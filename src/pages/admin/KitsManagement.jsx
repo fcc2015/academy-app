@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Shirt, Plus, Edit2, Trash2, X, CheckCircle, AlertTriangle, Search, RotateCcw } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../components/Toast';
 
 const API_URL = import.meta.env.VITE_API_URL;
 const ITEM_TYPES = ['Kit', 'Jersey', 'Shorts', 'Socks', 'Boots', 'Bag', 'Ball', 'Gloves', 'Other'];
@@ -18,8 +19,8 @@ const KitsManagement = () => {
     const [editingId, setEditingId] = useState(null);
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
-    const [banner, setBanner] = useState({ show: false, msg: '', ok: true });
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null });
+    const toast = useToast();
 
     const blank = { player_id: '', player_name: '', item_name: '', item_type: 'Kit', size: 'M', quantity: 1, assigned_date: new Date().toISOString().slice(0,10), returned_date: '', status: 'Assigned', notes: '' };
     const [form, setForm] = useState(blank);
@@ -36,7 +37,7 @@ const KitsManagement = () => {
         finally { setIsLoading(false); }
     };
 
-    const showBanner = (msg, ok = true) => { setBanner({ show: true, msg, ok }); setTimeout(() => setBanner(b => ({...b, show: false})), 3000); };
+    const showBanner = (msg, ok = true) => { if (ok) toast.success(msg); else toast.error(msg); };
     const openAdd = () => { setForm(blank); setIsEdit(false); setEditingId(null); setIsModalOpen(true); };
     const openEdit = (item) => { setForm({ ...item, assigned_date: item.assigned_date || '', returned_date: item.returned_date || '' }); setIsEdit(true); setEditingId(item.id); setIsModalOpen(true); };
 
@@ -88,12 +89,7 @@ const KitsManagement = () => {
 
     return (
         <div className={`animate-fade-in pb-10 ${isRTL ? 'text-right' : 'text-left'}`} dir={dir}>
-            {/* Banner */}
-            <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[150] transition-all duration-500 ${banner.show ? 'translate-y-0 opacity-100' : '-translate-y-24 opacity-0'}`}>
-                <div className={`px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-extrabold text-white ${banner.ok ? 'bg-emerald-600' : 'bg-red-600'}`}>
-                    {banner.ok ? <CheckCircle size={22}/> : <AlertTriangle size={22}/>} {banner.msg}
-                </div>
-            </div>
+            {/* Toast handled by global provider */}
 
             {/* Header */}
             <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
