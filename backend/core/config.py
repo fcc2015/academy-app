@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     PAYPAL_SANDBOX: bool = True  # True = sandbox, False = live
     FRONTEND_URL: str = "https://jolly-kangaroo-3c3d92.netlify.app"
 
+    # Email / SMTP
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASS: Optional[str] = None
+    SMTP_FROM: str = "noreply@academy.com"
+
     # DEV_MODE=true في .env يفعّل الـ bypass للتطوير المحلي فقط
     # في الإنتاج يجب أن يكون DEV_MODE=false أو غير موجود
     DEV_MODE: bool = False

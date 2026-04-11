@@ -289,6 +289,14 @@ const AdminLogin = () => {
                                 )}
                             </button>
 
+                            <div className="text-center">
+                                <button type="button"
+                                    onClick={() => navigate('/saas/login?mode=forgot')}
+                                    className="text-xs font-semibold text-indigo-400/70 hover:text-indigo-300 transition-colors">
+                                    {isRTL ? 'نسيت كلمة المرور؟' : 'Mot de passe oublié?'}
+                                </button>
+                            </div>
+
                             {/* ── Divider ── */}
                             <div className="flex items-center gap-3 mt-1">
                                 <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
