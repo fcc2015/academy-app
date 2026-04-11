@@ -138,7 +138,10 @@ const PlayerModal = ({
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.phone')}</label>
-                                    <input required type="text" name="parent_whatsapp" value={formData.parent_whatsapp} onChange={handleInputChange} placeholder="+212 6..." className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" dir="ltr" />
+                                    <input required type="tel" name="parent_whatsapp" value={formData.parent_whatsapp} onChange={handleInputChange} 
+                                        pattern="^\+?[0-9]{8,15}$" 
+                                        title="Must be a valid phone number, e.g., +212600000000"
+                                        placeholder="+212 6..." className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" dir="ltr" />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.address')}</label>

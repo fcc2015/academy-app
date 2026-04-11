@@ -84,22 +84,30 @@ const AdminLogin = () => {
             loginAttempts.count = 0;
             loginAttempts.lockedUntil = null;
 
-            // Store credentials securely
+            // Store token first
             localStorage.setItem('token', data.access_token);
-            localStorage.setItem('role', data.role);
             localStorage.setItem('user_id', data.user_id);
-            // Store token expiry (JWT lifetime typically 24h)
             localStorage.setItem('token_expires', Date.now() + 24 * 60 * 60 * 1000);
 
-            if (data.role === 'admin') {
-                navigate('/admin/dashboard');
-            } else if (data.role === 'coach') {
-                navigate('/coach/dashboard');
-            } else if (data.role === 'parent') {
-                navigate('/parent/dashboard');
-            } else {
-                throw new Error('Accès refusé. Rôle non autorisé.');
-            }
+            // Always verify role from DB (not just from token metadata)
+            let role = data.role;
+            try {
+                const roleRes = await fetch(`${API_URL}/auth/role`, {
+                    headers: { Authorization: `Bearer ${data.access_token}` }
+                });
+                if (roleRes.ok) {
+                    const roleData = await roleRes.json();
+                    if (roleData.role) role = roleData.role;
+                }
+            } catch (e) { /* use token role as fallback */ }
+
+            localStorage.setItem('role', role);
+
+            if (role === 'super_admin') navigate('/saas/dashboard');
+            else if (role === 'admin') navigate('/admin/dashboard');
+            else if (role === 'coach') navigate('/coach/dashboard');
+            else if (role === 'parent') navigate('/parent/dashboard');
+            else throw new Error('Accès refusé. Rôle non autorisé.');
 
         } catch (err) {
             setError(err.message);

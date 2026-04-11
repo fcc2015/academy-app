@@ -15,6 +15,7 @@ const DownloadPage = lazy(() => import('./pages/DownloadPage'));
 
 // SaaS Root
 const SaasLogin = lazy(() => import('./pages/saas/SaasLogin'));
+const SaasLanding = lazy(() => import('./pages/saas/SaasLanding'));
 const SaasLayout = lazy(() => import('./pages/saas/SaasLayout'));
 const SaasDashboard = lazy(() => import('./pages/saas/SaasDashboard'));
 const SaasAcademies = lazy(() => import('./pages/saas/SaasAcademies'));
@@ -33,6 +34,8 @@ const Evaluations = lazy(() => import('./pages/admin/Evaluations'));
 const FinancesManagement = lazy(() => import('./pages/admin/FinancesManagement'));
 const SubscriptionsManagement = lazy(() => import('./pages/admin/SubscriptionsManagement'));
 const EventsManagement = lazy(() => import('./pages/admin/EventsManagement'));
+const TournamentsManagement = lazy(() => import('./pages/admin/TournamentsManagement'));
+const TryoutsManagement = lazy(() => import('./pages/admin/TryoutsManagement'));
 const SettingsManagement = lazy(() => import('./pages/admin/SettingsManagement'));
 const AdminsManagement = lazy(() => import('./pages/admin/AdminsManagement'));
 const ChatManagement = lazy(() => import('./pages/admin/ChatManagement'));
@@ -85,6 +88,7 @@ function App() {
           <Route path="/download" element={<DownloadPage />} />
           <Route path="/login" element={<AdminLogin />} />
           <Route path="/saas/login" element={<SaasLogin />} />
+          <Route path="/saas-platform" element={<SaasLanding />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* SaaS Root */}
@@ -109,6 +113,8 @@ function App() {
             <Route path="finances" element={<FinancesManagement />} />
             <Route path="subscriptions" element={<SubscriptionsManagement />} />
             <Route path="events" element={<EventsManagement />} />
+            <Route path="tournaments" element={<TournamentsManagement />} />
+            <Route path="tryouts" element={<TryoutsManagement />} />
             <Route path="matches" element={<MatchesManagement />} />
             <Route path="training" element={<TrainingManagement />} />
             <Route path="medical" element={<MedicalManagement />} />

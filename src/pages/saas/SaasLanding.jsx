@@ -67,12 +67,36 @@ export default function SaasLanding() {
     const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
     const [paymentMethodForm, setPaymentMethodForm] = useState({ type: 'bank_transfer', bank_name: '', iban: '', holder_name: '', notes: '' });
     const [paymentMethodStatus, setPaymentMethodStatus] = useState(null);
+    const [showPostPaymentReg, setShowPostPaymentReg] = useState(false);
+    const [postPaymentForm, setPostPaymentForm] = useState({ academy_name: '', country: '', city: '', admin_name: '', admin_email: '', admin_email_confirm: '', admin_password: '', admin_password_confirm: '' });
+    const [postPaymentStatus, setPostPaymentStatus] = useState(null);
+    const [isGoogleUser, setIsGoogleUser] = useState(false); // true if user authenticated via Google OAuth
+    const [postPaymentError, setPostPaymentError] = useState('');
 
     // Free academy registration modal
     const [showRegModal, setShowRegModal] = useState(false);
-    const [regForm, setRegForm] = useState({ academy_name: '', admin_name: '', admin_email: '', admin_password: '' });
+    const [regForm, setRegForm] = useState({ academy_name: '', admin_name: '', admin_email: '', admin_email_confirm: '', admin_password: '', admin_password_confirm: '' });
     const [regStatus, setRegStatus] = useState(null); // null | 'loading' | 'success' | 'error'
     const [regError, setRegError] = useState('');
+
+    // Wake up Render backend on page load (free tier cold start)
+    useEffect(() => {
+        const api = API_URL.includes('localhost') ? 'https://academy-backend-4dln.onrender.com' : API_URL;
+        fetch(`${api}/health`).catch(() => {});
+    }, []);
+
+    // Auto-open registration form if coming back from Google OAuth after payment
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('setup') === 'true') {
+            const email = decodeURIComponent(params.get('email') || '');
+            const hasToken = !!localStorage.getItem('token');
+            setIsGoogleUser(hasToken);
+            setPostPaymentForm(f => ({ ...f, admin_email: email }));
+            setShowPostPaymentReg(true);
+            window.history.replaceState({}, '', '/saas-platform');
+        }
+    }, []);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -153,13 +177,29 @@ export default function SaasLanding() {
 
     const handleRegisterAcademy = async (e) => {
         e.preventDefault();
-        setRegStatus('loading');
         setRegError('');
+        // Validate confirmations
+        if (regForm.admin_email !== regForm.admin_email_confirm) {
+            setRegStatus('error');
+            setRegError('Les adresses email ne correspondent pas.');
+            return;
+        }
+        if (regForm.admin_password !== regForm.admin_password_confirm) {
+            setRegStatus('error');
+            setRegError('Les mots de passe ne correspondent pas.');
+            return;
+        }
+        setRegStatus('loading');
         try {
             const res = await fetch(`${API_URL}/public/register-academy`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(regForm)
+                body: JSON.stringify({
+                    academy_name: regForm.academy_name,
+                    admin_name: regForm.admin_name,
+                    admin_email: regForm.admin_email,
+                    admin_password: regForm.admin_password
+                })
             });
             const data = await res.json();
             if (res.ok && data.success) {
@@ -193,6 +233,9 @@ export default function SaasLanding() {
             const PAYPAL_API = API_URL.includes('localhost')
                 ? 'https://academy-backend-4dln.onrender.com'
                 : API_URL;
+
+            // Wake up Render backend (free tier sleeps after 15min)
+            try { await fetch(`${PAYPAL_API}/health`, { signal: AbortSignal.timeout(8000) }); } catch {}
 
             const res = await fetch(`${PAYPAL_API}/payments/gateway/create-order`, {
                 method: 'POST',
@@ -254,16 +297,11 @@ export default function SaasLanding() {
                             <>
                                 <CheckCircle2 size={56} style={{ margin: '0 auto 16px', color: '#10b981' }} />
                                 <h3 style={{ fontSize: 22, fontWeight: 700, color: '#10b981' }}>Paiement Réussi! 🎉</h3>
-                                <p style={{ color: '#64748b', marginTop: 8 }}>Votre abonnement a été activé avec succès.</p>
-                                <p style={{ color: '#94a3b8', marginTop: 4, fontSize: 14 }}>Vous recevrez un email de confirmation.</p>
+                                <p style={{ color: '#64748b', marginTop: 8 }}>Créez maintenant votre académie.</p>
                                 <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                    <button onClick={() => setPaymentResult(null)}
-                                        style={{ padding: '12px 32px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 600, cursor: 'pointer', fontSize: 15 }}>
-                                        Continuer
-                                    </button>
-                                    <button onClick={() => { setPaymentResult(null); setShowPaymentMethodModal(true); }}
-                                        style={{ padding: '12px 32px', background: 'transparent', color: '#6366f1', border: '2px solid #6366f1', borderRadius: 12, fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
-                                        + Ajouter un moyen de paiement
+                                    <button onClick={() => { setPaymentResult(null); setShowPostPaymentReg(true); }}
+                                        style={{ padding: '13px 32px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 700, cursor: 'pointer', fontSize: 15 }}>
+                                        Créer mon académie →
                                     </button>
                                 </div>
                             </>
@@ -289,6 +327,192 @@ export default function SaasLanding() {
                                     Retour
                                 </button>
                             </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ─── POST PAYMENT REGISTRATION MODAL ─── */}
+            {showPostPaymentReg && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div style={{ background: '#fff', borderRadius: 24, padding: '36px 32px', maxWidth: 480, width: '100%', boxShadow: '0 30px 80px rgba(0,0,0,0.35)', maxHeight: '90vh', overflowY: 'auto' }}>
+                        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                            <div style={{ fontSize: 40, marginBottom: 8 }}>🏟️</div>
+                            <h3 style={{ fontSize: 22, fontWeight: 800, color: '#1e293b', margin: 0 }}>Créer votre Académie</h3>
+                            <p style={{ color: '#64748b', fontSize: 14, marginTop: 6 }}>Remplissez les informations pour activer votre espace.</p>
+                        </div>
+
+                        {postPaymentStatus === 'success' ? (
+                            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                                <CheckCircle2 size={56} style={{ color: '#10b981', margin: '0 auto 16px' }} />
+                                <h4 style={{ fontSize: 20, fontWeight: 700, color: '#10b981' }}>Académie créée! 🎉</h4>
+                                <p style={{ color: '#64748b', marginTop: 8 }}>
+                                    {isGoogleUser ? 'Votre académie est prête. Accédez à votre tableau de bord.' : 'Connectez-vous avec vos identifiants.'}
+                                </p>
+                                <button onClick={() => { window.location.href = '/admin/dashboard'; }}
+                                    style={{ marginTop: 20, padding: '12px 32px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 700, cursor: 'pointer', fontSize: 15 }}>
+                                    Accéder au Dashboard →
+                                </button>
+                            </div>
+                        ) : (
+                            <form onSubmit={async (e) => {
+                                e.preventDefault();
+                                setPostPaymentStatus('loading');
+                                setPostPaymentError('');
+                                try {
+                                    const API = API_URL.includes('localhost') ? 'https://academy-backend-4dln.onrender.com' : API_URL;
+                                    const token = localStorage.getItem('token');
+                                    let res, data;
+
+                                    if (token) {
+                                        // Google user already authenticated — just setup academy
+                                        res = await fetch(`${API}/public/setup-academy`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                            body: JSON.stringify({
+                                                academy_name: postPaymentForm.academy_name,
+                                                country: postPaymentForm.country,
+                                                city: postPaymentForm.city
+                                            })
+                                        });
+                                        data = await res.json();
+                                        if (res.ok && data.success) {
+                                            localStorage.setItem('role', 'admin');
+                                            setIsGoogleUser(true);
+                                            setPostPaymentStatus('success');
+                                        } else {
+                                            setPostPaymentStatus('error');
+                                            setPostPaymentError(data.detail || 'Erreur lors de la création.');
+                                        }
+                                    } else {
+                                        // Validate email & password confirmation
+                                        if (postPaymentForm.admin_email !== postPaymentForm.admin_email_confirm) {
+                                            setPostPaymentStatus('error');
+                                            setPostPaymentError('Les adresses email ne correspondent pas.');
+                                            return;
+                                        }
+                                        if (postPaymentForm.admin_password !== postPaymentForm.admin_password_confirm) {
+                                            setPostPaymentStatus('error');
+                                            setPostPaymentError('Les mots de passe ne correspondent pas.');
+                                            return;
+                                        }
+                                        // Email/password — create new account
+                                        res = await fetch(`${API}/public/register-academy`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                academy_name: `${postPaymentForm.academy_name}${postPaymentForm.city ? ' — ' + postPaymentForm.city : ''}`,
+                                                admin_name: postPaymentForm.admin_name,
+                                                admin_email: postPaymentForm.admin_email,
+                                                admin_password: postPaymentForm.admin_password
+                                            })
+                                        });
+                                        data = await res.json();
+                                        if (res.ok && data.success) {
+                                            // Auto-login after registration
+                                            try {
+                                                const loginRes = await fetch(`${API}/auth/login`, {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ email: postPaymentForm.admin_email, password: postPaymentForm.admin_password })
+                                                });
+                                                const loginData = await loginRes.json();
+                                                if (loginRes.ok && loginData.access_token) {
+                                                    localStorage.setItem('token', loginData.access_token);
+                                                    localStorage.setItem('role', loginData.role);
+                                                    localStorage.setItem('user_id', loginData.user_id);
+                                                    localStorage.setItem('token_expires', Date.now() + 24 * 60 * 60 * 1000);
+                                                }
+                                            } catch {}
+                                            setPostPaymentStatus('success');
+                                        } else {
+                                            setPostPaymentStatus('error');
+                                            setPostPaymentError(data.detail || 'Erreur lors de la création.');
+                                        }
+                                    }
+                                } catch {
+                                    setPostPaymentStatus('error');
+                                    setPostPaymentError('Connexion échouée. Réessayez.');
+                                }
+                            }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+                                {/* Academy info — shown to all users */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                    <input required placeholder="Nom de l'académie *" value={postPaymentForm.academy_name}
+                                        onChange={e => setPostPaymentForm({ ...postPaymentForm, academy_name: e.target.value })}
+                                        style={{ padding: '11px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, outline: 'none', gridColumn: '1 / -1' }} />
+                                    <input placeholder="Pays" value={postPaymentForm.country}
+                                        onChange={e => setPostPaymentForm({ ...postPaymentForm, country: e.target.value })}
+                                        style={{ padding: '11px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, outline: 'none' }} />
+                                    <input placeholder="Ville" value={postPaymentForm.city}
+                                        onChange={e => setPostPaymentForm({ ...postPaymentForm, city: e.target.value })}
+                                        style={{ padding: '11px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, outline: 'none' }} />
+                                </div>
+
+                                {/* Admin account fields — only for non-Google users */}
+                                {!isGoogleUser && (
+                                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
+                                        <p style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10, fontWeight: 600 }}>COMPTE ADMINISTRATEUR</p>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                            <input required placeholder="Nom complet *" value={postPaymentForm.admin_name}
+                                                onChange={e => setPostPaymentForm({ ...postPaymentForm, admin_name: e.target.value })}
+                                                style={{ padding: '11px 14px', borderRadius: 10, border: '1.5px solid #e2e8f0', fontSize: 14, outline: 'none' }} />
+
+                                            <input required type="email" placeholder="Email *" value={postPaymentForm.admin_email}
+                                                onChange={e => setPostPaymentForm({ ...postPaymentForm, admin_email: e.target.value })}
+                                                style={{ padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${postPaymentForm.admin_email_confirm && postPaymentForm.admin_email !== postPaymentForm.admin_email_confirm ? '#ef4444' : '#e2e8f0'}`, fontSize: 14, outline: 'none' }} />
+                                            <input required type="email" placeholder="Confirmer l'email *" value={postPaymentForm.admin_email_confirm}
+                                                onChange={e => setPostPaymentForm({ ...postPaymentForm, admin_email_confirm: e.target.value })}
+                                                style={{ padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${postPaymentForm.admin_email_confirm && postPaymentForm.admin_email !== postPaymentForm.admin_email_confirm ? '#ef4444' : postPaymentForm.admin_email_confirm && postPaymentForm.admin_email === postPaymentForm.admin_email_confirm ? '#10b981' : '#e2e8f0'}`, fontSize: 14, outline: 'none' }} />
+
+                                            <input required type="password" placeholder="Mot de passe (min. 6 car.) *" value={postPaymentForm.admin_password}
+                                                onChange={e => setPostPaymentForm({ ...postPaymentForm, admin_password: e.target.value })}
+                                                style={{ padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${postPaymentForm.admin_password_confirm && postPaymentForm.admin_password !== postPaymentForm.admin_password_confirm ? '#ef4444' : '#e2e8f0'}`, fontSize: 14, outline: 'none' }} />
+                                            <input required type="password" placeholder="Confirmer le mot de passe *" value={postPaymentForm.admin_password_confirm}
+                                                onChange={e => setPostPaymentForm({ ...postPaymentForm, admin_password_confirm: e.target.value })}
+                                                style={{ padding: '11px 14px', borderRadius: 10, border: `1.5px solid ${postPaymentForm.admin_password_confirm && postPaymentForm.admin_password !== postPaymentForm.admin_password_confirm ? '#ef4444' : postPaymentForm.admin_password_confirm && postPaymentForm.admin_password === postPaymentForm.admin_password_confirm ? '#10b981' : '#e2e8f0'}`, fontSize: 14, outline: 'none' }} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Google user badge */}
+                                {isGoogleUser && (
+                                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <img src="https://www.google.com/favicon.ico" width={16} height={16} alt="G" />
+                                        <span style={{ fontSize: 13, color: '#15803d', fontWeight: 600 }}>Connecté via Google — saisissez juste le nom de l'académie</span>
+                                    </div>
+                                )}
+
+                                {postPaymentError && (
+                                    <p style={{ color: '#ef4444', fontSize: 13, fontWeight: 600, background: '#fef2f2', padding: '10px 14px', borderRadius: 10 }}>{postPaymentError}</p>
+                                )}
+
+                                <button type="submit" disabled={postPaymentStatus === 'loading'}
+                                    style={{ padding: '13px', background: 'linear-gradient(135deg, #6366f1, #10b981)', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 700, cursor: 'pointer', fontSize: 15, marginTop: 4 }}>
+                                    {postPaymentStatus === 'loading' ? 'Création en cours...' : 'Créer mon académie 🚀'}
+                                </button>
+
+                                {/* Google option — only for non-authenticated users */}
+                                {!isGoogleUser && (
+                                    <>
+                                        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>— ou —</div>
+                                        <button type="button" onClick={() => {
+                                            localStorage.setItem('pending_saas_registration', 'true');
+                                            const redirectTo = `${window.location.origin}/auth/callback`;
+                                            window.location.href = `https://kbhnqntteexatihidhkn.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
+                                        }}
+                                            style={{ padding: '12px', background: '#fff', color: '#1e293b', border: '2px solid #e2e8f0', borderRadius: 12, fontWeight: 600, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                                            <img src="https://www.google.com/favicon.ico" width={18} height={18} alt="G" />
+                                            Continuer avec Google
+                                        </button>
+                                    </>
+                                )}
+
+                                <button type="button" onClick={() => { setShowPostPaymentReg(false); setPostPaymentStatus(null); setIsGoogleUser(false); }}
+                                    style={{ padding: '10px', background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer', fontSize: 13 }}>
+                                    Annuler
+                                </button>
+                            </form>
                         )}
                     </div>
                 </div>
@@ -1119,9 +1343,26 @@ export default function SaasLanding() {
                                         onChange={e => setRegForm({ ...regForm, admin_email: e.target.value })}
                                         placeholder="admin@votre-academie.ma"
                                         className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all"
-                                        style={{ background: '#f8fafc', border: '1.5px solid rgba(148,163,184,0.2)', color: '#0f172a' }}
+                                        style={{ background: '#f8fafc', border: `1.5px solid ${regForm.admin_email_confirm && regForm.admin_email !== regForm.admin_email_confirm ? '#ef4444' : 'rgba(148,163,184,0.2)'}`, color: '#0f172a' }}
                                         onFocus={e => e.target.style.borderColor = '#6366f1'}
-                                        onBlur={e => e.target.style.borderColor = 'rgba(148,163,184,0.2)'}
+                                        onBlur={e => e.target.style.borderColor = regForm.admin_email_confirm && regForm.admin_email !== regForm.admin_email_confirm ? '#ef4444' : 'rgba(148,163,184,0.2)'}
+                                    />
+                                </div>
+
+                                {/* Confirm Email */}
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
+                                        Confirmer l'Email
+                                    </label>
+                                    <input
+                                        type="email" required
+                                        value={regForm.admin_email_confirm}
+                                        onChange={e => setRegForm({ ...regForm, admin_email_confirm: e.target.value })}
+                                        placeholder="Retaper l'email"
+                                        className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all"
+                                        style={{ background: '#f8fafc', border: `1.5px solid ${regForm.admin_email_confirm ? (regForm.admin_email === regForm.admin_email_confirm ? '#10b981' : '#ef4444') : 'rgba(148,163,184,0.2)'}`, color: '#0f172a' }}
+                                        onFocus={e => e.target.style.borderColor = '#6366f1'}
+                                        onBlur={e => e.target.style.borderColor = regForm.admin_email_confirm ? (regForm.admin_email === regForm.admin_email_confirm ? '#10b981' : '#ef4444') : 'rgba(148,163,184,0.2)'}
                                     />
                                 </div>
 
@@ -1137,9 +1378,26 @@ export default function SaasLanding() {
                                         onChange={e => setRegForm({ ...regForm, admin_password: e.target.value })}
                                         placeholder="Min. 6 caractères"
                                         className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all"
-                                        style={{ background: '#f8fafc', border: '1.5px solid rgba(148,163,184,0.2)', color: '#0f172a' }}
+                                        style={{ background: '#f8fafc', border: `1.5px solid ${regForm.admin_password_confirm && regForm.admin_password !== regForm.admin_password_confirm ? '#ef4444' : 'rgba(148,163,184,0.2)'}`, color: '#0f172a' }}
                                         onFocus={e => e.target.style.borderColor = '#6366f1'}
-                                        onBlur={e => e.target.style.borderColor = 'rgba(148,163,184,0.2)'}
+                                        onBlur={e => e.target.style.borderColor = regForm.admin_password_confirm && regForm.admin_password !== regForm.admin_password_confirm ? '#ef4444' : 'rgba(148,163,184,0.2)'}
+                                    />
+                                </div>
+
+                                {/* Confirm Password */}
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
+                                        Confirmer le Mot de passe
+                                    </label>
+                                    <input
+                                        type="password" required
+                                        value={regForm.admin_password_confirm}
+                                        onChange={e => setRegForm({ ...regForm, admin_password_confirm: e.target.value })}
+                                        placeholder="Retaper le mot de passe"
+                                        className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all"
+                                        style={{ background: '#f8fafc', border: `1.5px solid ${regForm.admin_password_confirm ? (regForm.admin_password === regForm.admin_password_confirm ? '#10b981' : '#ef4444') : 'rgba(148,163,184,0.2)'}`, color: '#0f172a' }}
+                                        onFocus={e => e.target.style.borderColor = '#6366f1'}
+                                        onBlur={e => e.target.style.borderColor = regForm.admin_password_confirm ? (regForm.admin_password === regForm.admin_password_confirm ? '#10b981' : '#ef4444') : 'rgba(148,163,184,0.2)'}
                                     />
                                 </div>
 

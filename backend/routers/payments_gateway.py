@@ -4,10 +4,12 @@ Handles subscription payments from client academies.
 """
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
+from typing import Optional
 from core.config import settings
 from services.supabase_client import supabase
 import httpx
 import base64
+import uuid
 from datetime import datetime, timezone
 
 router = APIRouter(
@@ -19,11 +21,12 @@ router = APIRouter(
 # ── Schemas ──
 
 class CreateOrderRequest(BaseModel):
-    academy_id: str
+    academy_id: Optional[str] = None   # Optional for public landing page
     plan_id: str
     amount: float
     currency: str = "USD"
     description: str = "Academy SaaS Subscription"
+    source: Optional[str] = None       # e.g. 'saas_landing'
 
 
 class CaptureOrderRequest(BaseModel):
@@ -75,23 +78,34 @@ async def create_paypal_order(req: CreateOrderRequest):
     token = await get_paypal_access_token()
     base_url = get_paypal_base_url()
 
+    # Use a temp UUID if no academy_id (public landing page flow)
+    effective_academy_id = req.academy_id or f"temp_{uuid.uuid4().hex[:12]}"
+
+    # Determine return URLs based on source
+    if req.source == 'saas_landing':
+        return_url = f"{settings.FRONTEND_URL}/saas-platform?payment=success"
+        cancel_url = f"{settings.FRONTEND_URL}/saas-platform?payment=cancelled"
+    else:
+        return_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success"
+        cancel_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=cancelled"
+
     order_payload = {
         "intent": "CAPTURE",
         "purchase_units": [{
-            "reference_id": f"academy_{req.academy_id}",
+            "reference_id": f"academy_{effective_academy_id}",
             "description": req.description,
             "amount": {
                 "currency_code": req.currency,
                 "value": f"{req.amount:.2f}"
             },
-            "custom_id": f"{req.academy_id}|{req.plan_id}"
+            "custom_id": f"{effective_academy_id}|{req.plan_id}"
         }],
         "application_context": {
             "brand_name": "Academy SaaS Platform",
             "landing_page": "NO_PREFERENCE",
             "user_action": "PAY_NOW",
-            "return_url": f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success",
-            "cancel_url": f"{settings.FRONTEND_URL}/saas/subscriptions?payment=cancelled",
+            "return_url": return_url,
+            "cancel_url": cancel_url,
         }
     }
 
@@ -111,26 +125,27 @@ async def create_paypal_order(req: CreateOrderRequest):
 
         order = res.json()
 
-        # Save pending payment record in DB (using admin/service_role headers)
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as db_client:
-                save_res = await db_client.post(
-                    f"{supabase.url}/rest/v1/payment_transactions",
-                    json={
-                        "paypal_order_id": order["id"],
-                        "academy_id": req.academy_id,
-                        "plan_id": req.plan_id,
-                        "amount": req.amount,
-                        "currency": req.currency,
-                        "status": "pending",
-                        "created_at": datetime.now(timezone.utc).isoformat()
-                    },
-                    headers=supabase.admin_headers
-                )
-                if save_res.status_code not in [200, 201]:
-                    print(f"⚠️ DB save response: {save_res.status_code} - {save_res.text}")
-        except Exception as e:
-            print(f"⚠️ Failed to save transaction record: {e}")
+        # Save pending payment record in DB — only if we have a real academy_id
+        if req.academy_id:
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as db_client:
+                    save_res = await db_client.post(
+                        f"{supabase.url}/rest/v1/payment_transactions",
+                        json={
+                            "paypal_order_id": order["id"],
+                            "academy_id": req.academy_id,
+                            "plan_id": req.plan_id,
+                            "amount": req.amount,
+                            "currency": req.currency,
+                            "status": "pending",
+                            "created_at": datetime.now(timezone.utc).isoformat()
+                        },
+                        headers=supabase.admin_headers
+                    )
+                    if save_res.status_code not in [200, 201]:
+                        print(f"⚠️ DB save response: {save_res.status_code} - {save_res.text}")
+            except Exception as e:
+                print(f"⚠️ Failed to save transaction record: {e}")
 
         # Return the approval URL for frontend redirect
         approve_link = next(

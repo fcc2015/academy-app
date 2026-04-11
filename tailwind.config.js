@@ -9,17 +9,37 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: 'var(--color-brand-50)',
-          100: 'var(--color-brand-100)',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: 'var(--color-brand-500)',
-          600: 'var(--color-brand-600)',
-          700: 'var(--color-brand-700)',
-          800: '#075985',
-          900: 'var(--color-brand-900)',
+          50: '#f6f8f6',
+          100: '#eef3ef',
+          200: '#dce5dd',
+          300: '#bfcbbb',
+          400: '#9cb59b',
+          500: '#759972',
+          600: '#5a7a58',
+          700: '#486246',
+          800: '#3a4e39',
+          900: '#304030', // Deep sophisticated Emerald/Olive
+        },
+        surface: {
+          50: '#fafafa',
+          100: '#f4f4f5',
+          200: '#e4e4e7',
+          300: '#d4d4d8',
+          400: '#a1a1aa',
+          500: '#71717a',
+          600: '#52525b',
+          700: '#3f3f46',
+          800: '#27272a',
+          900: '#18181b', // Slate/Zinc
         }
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      boxShadow: {
+        'subtle': '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+        'float': '0 4px 12px -2px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03)',
+        'elevate': '0 10px 24px -4px rgba(0, 0, 0, 0.04), 0 4px 8px -4px rgba(0, 0, 0, 0.02)',
       }
     },
   },
