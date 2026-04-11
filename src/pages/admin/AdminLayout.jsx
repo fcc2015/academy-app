@@ -39,10 +39,10 @@ const AdminLayout = () => {
 
     if (!authChecked) {
         return (
-            <div className="min-h-screen flex items-center justify-center" style={{ background: '#0f0c29' }}>
+            <div className="min-h-screen flex items-center justify-center bg-surface-50">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-10 h-10 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                    <p className="text-indigo-300/60 text-xs font-black uppercase tracking-widest">Vérification...</p>
+                    <div className="w-10 h-10 border-2 border-surface-200 border-t-brand-600 rounded-full animate-spin" />
+                    <p className="text-surface-500 text-xs font-bold uppercase tracking-widest">Vérification...</p>
                 </div>
             </div>
         );
@@ -53,7 +53,7 @@ const AdminLayout = () => {
     }
 
     return (
-        <div className={`min-h-screen bg-[#f8fafc] text-[#0f172a] flex`} dir={dir}>
+        <div className="min-h-screen bg-surface-50 text-surface-900 flex" dir={dir}>
             <AdminSidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
 
             <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${
@@ -62,14 +62,9 @@ const AdminLayout = () => {
                     : (sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[240px]')
             }`}>
                 <header
-                    className={`sticky top-0 z-50 h-16 flex items-center px-4 sm:px-6 lg:px-8 gap-3 border-b ${
+                    className={`sticky top-0 z-50 h-16 flex items-center px-4 sm:px-6 lg:px-8 gap-3 border-b border-surface-200 bg-white/90 backdrop-blur-sm ${
                         isRTL ? 'flex-row-reverse justify-end' : 'flex-row justify-end'
                     }`}
-                    style={{
-                        background: 'rgba(248, 250, 252, 0.85)',
-                        backdropFilter: 'blur(8px)',
-                        borderColor: 'rgba(148, 163, 184, 0.15)'
-                    }}
                 >
                     <div className="flex-1"></div>
                     <ThemeToggle />

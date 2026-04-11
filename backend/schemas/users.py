@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import date
 
@@ -19,7 +19,7 @@ class PlayerCreate(BaseModel):
     discount_value: Optional[float] = None
     u_category: str 
     parent_name: str
-    parent_whatsapp: str
+    parent_whatsapp: str = Field(..., pattern=r"^\+?[0-9]{8,15}$", description="Valid phone number")
     address: Optional[str] = None
     account_status: str = "Pending"
     photo_url: Optional[str] = None

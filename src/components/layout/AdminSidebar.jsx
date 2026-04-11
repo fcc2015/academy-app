@@ -27,58 +27,46 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 
-// eslint-disable-next-line no-unused-vars
 const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setMobileOpen, navGroups, handleLogout, CollapseIcon }) => (
-    <div className="flex flex-col h-full overflow-hidden" dir={dir}>
+    <div className="flex flex-col h-full bg-white border-r border-surface-200 overflow-hidden" dir={dir}>
         {/* Brand Header */}
-        <div className={`flex items-center px-5 py-6 border-b ${collapsed ? 'justify-center' : 'justify-between'}`}
-            style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className={`flex items-center px-5 py-5 border-b border-surface-200 ${collapsed ? 'justify-center' : 'justify-between'}`}>
             {!collapsed && (
                 <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain drop-shadow-md" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-                        <div className="hidden w-9 h-9 rounded-xl items-center justify-center"
-                            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 4px 16px rgba(79,70,229,0.4)' }}>
-                            <Trophy size={18} className="text-white" />
-                        </div>
-                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border border-[#1e1e3f]" />
+                    <div className="w-8 h-8 rounded shrink-0 bg-surface-900 flex items-center justify-center text-white">
+                        <Trophy size={16} />
                     </div>
                     <div className={isRTL ? 'text-right' : 'text-left'}>
-                        <h2 className="text-sm font-black text-white tracking-tight leading-none">{t('common.appName')}</h2>
-                        <p className="text-[9px] font-black uppercase tracking-widest mt-0.5" style={{ color: '#818cf8' }}>
+                        <h2 className="text-sm font-semibold text-surface-900 leading-none">{t('common.appName')}</h2>
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-surface-500 mt-1">
                             {isRTL ? 'لوحة الإدارة' : 'Admin Panel'}
                         </p>
                     </div>
                 </div>
             )}
             {collapsed && (
-                <>
-                <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain drop-shadow-md" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-                <div className="hidden w-9 h-9 rounded-xl items-center justify-center"
-                    style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
-                    <Trophy size={18} className="text-white" />
+                <div className="w-8 h-8 rounded bg-surface-900 flex items-center justify-center text-white">
+                    <Trophy size={16} />
                 </div>
-                </>
             )}
             <button
                 onClick={() => setCollapsed(!collapsed)}
-                className="p-1.5 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/5 transition-all hidden lg:flex items-center justify-center"
+                className="p-1 rounded-md text-surface-400 hover:text-surface-600 hover:bg-surface-50 transition-colors hidden lg:flex items-center justify-center"
             >
-                <CollapseIcon size={14} />
+                <CollapseIcon size={16} />
             </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto custom-scrollbar">
             {navGroups.map((group, gi) => (
                 <div key={gi}>
                     {!collapsed && (
-                        <p className={`text-[9px] font-black uppercase tracking-widest px-3 mb-2 ${isRTL ? 'text-right' : 'text-left'}`}
-                            style={{ color: 'rgba(129,140,248,0.4)' }}>
+                        <p className={`text-[10px] font-semibold uppercase tracking-wider px-3 mb-2 text-surface-400 ${isRTL ? 'text-right' : 'text-left'}`}>
                             {group.label}
                         </p>
                     )}
-                    <div className="space-y-0.5">
+                    <div className="space-y-1">
                         {group.items.map((item) => {
                             const Icon = item.icon;
                             const isActive = location.pathname === item.to;
@@ -87,32 +75,21 @@ const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setM
                                     key={item.to}
                                     to={item.to}
                                     onClick={() => setMobileOpen(false)}
-                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-black text-[12px] transition-all duration-200 relative group
-                                        ${collapsed ? 'justify-center' : ''}
-                                        ${isActive
-                                            ? 'text-white'
-                                            : 'text-white/40 hover:text-white/70 hover:bg-white/5'
-                                        }
-                                    `}
-                                    style={isActive ? {
-                                        background: 'linear-gradient(135deg, rgba(79,70,229,0.25), rgba(124,58,237,0.15))',
-                                        boxShadow: '0 0 0 1px rgba(99,102,241,0.2) inset'
-                                    } : undefined}
+                                    className={`nav-item relative ${collapsed ? 'justify-center px-0' : ''} ${isActive ? 'active' : ''}`}
                                     title={collapsed ? t(item.labelKey) : undefined}
                                 >
                                     {/* Active indicator */}
                                     {isActive && (
                                         <span
-                                            className={`absolute inset-y-2 w-0.5 rounded-full bg-indigo-400 ${isRTL ? 'right-0' : 'left-0'}`}
+                                            className={`absolute inset-y-1 w-[3px] rounded-full bg-surface-900 ${isRTL ? 'right-0' : 'left-0'}`}
                                         />
                                     )}
                                     <Icon
-                                        size={16}
-                                        strokeWidth={isActive ? 2.5 : 2}
-                                        className={`shrink-0 transition-colors ${isActive ? 'text-indigo-300' : 'text-white/30 group-hover:text-white/60'}`}
+                                        size={18}
+                                        className={`shrink-0 transition-colors ${isActive ? 'text-surface-900' : 'text-surface-500 group-hover:text-surface-700'}`}
                                     />
                                     {!collapsed && (
-                                        <span className="uppercase tracking-wider leading-none">{t(item.labelKey)}</span>
+                                        <span className={`tracking-wide ${isActive ? 'font-semibold' : 'font-medium'}`}>{t(item.labelKey)}</span>
                                     )}
                                 </NavLink>
                             );
@@ -123,12 +100,12 @@ const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setM
         </nav>
 
         {/* Bottom Section */}
-        <div className="p-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="p-3 border-t border-surface-200">
             <button
                 onClick={handleLogout}
-                className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-red-400/70 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 font-black text-[12px] uppercase tracking-wider"
+                className={`flex items-center w-full px-3 py-2.5 rounded-md text-red-600 hover:bg-red-50 transition-colors text-sm font-medium ${collapsed ? 'justify-center px-0' : 'gap-3'}`}
             >
-                <LogOut size={16} className="shrink-0" />
+                <LogOut size={18} className="shrink-0" />
                 {!collapsed && <span>{t('common.logout')}</span>}
             </button>
         </div>
@@ -164,6 +141,8 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
             items: [
                 { to: '/admin/attendance',   icon: ClipboardCheck, labelKey: 'sidebar.attendance' },
                 { to: '/admin/events',       icon: Calendar,       labelKey: 'sidebar.events' },
+                { to: '/admin/tournaments',  icon: Trophy,         labelKey: 'sidebar.tournaments' },
+                { to: '/admin/tryouts',      icon: Sparkles,       labelKey: 'sidebar.tryouts' },
                 { to: '/admin/evaluations',  icon: Star,           labelKey: 'sidebar.evaluations' },
                 { to: '/admin/matches',      icon: Trophy,         labelKey: 'sidebar.matches' },
                 { to: '/admin/tactics',      icon: Users,          labelKey: 'sidebar.tactics' },
@@ -200,10 +179,9 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
             {/* Mobile hamburger */}
             <button
                 onClick={() => setMobileOpen(true)}
-                className="lg:hidden fixed top-4 z-50 p-3 rounded-xl text-white shadow-xl"
+                className="lg:hidden fixed top-3 z-50 p-2 rounded-md bg-white border border-surface-200 text-surface-700 shadow-sm"
                 style={{
-                    [isRTL ? 'right' : 'left']: '1rem',
-                    background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                    [isRTL ? 'right' : 'left']: '1rem'
                 }}
             >
                 <Menu size={20} />
@@ -212,17 +190,16 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
             {/* Mobile overlay */}
             {mobileOpen && (
                 <div
-                    className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+                    className="lg:hidden fixed inset-0 z-40 bg-surface-900/40 backdrop-blur-sm"
                     onClick={() => setMobileOpen(false)}
                 >
                     <div
-                        className={`absolute top-0 h-full w-72 flex flex-col ${isRTL ? 'right-0' : 'left-0'}`}
-                        style={{ background: '#0f0c29' }}
+                        className={`absolute top-0 h-full w-72 flex flex-col bg-white ${isRTL ? 'right-0' : 'left-0'}`}
                         onClick={e => e.stopPropagation()}
                     >
                         <button
                             onClick={() => setMobileOpen(false)}
-                            className={`absolute top-4 ${isRTL ? 'left-4' : 'right-4'} p-2 rounded-lg text-white/40 hover:text-white/70`}
+                            className={`absolute top-4 ${isRTL ? 'left-4' : 'right-4'} p-2 rounded-md text-surface-400 hover:bg-surface-50`}
                         >
                             <X size={20} />
                         </button>
@@ -244,12 +221,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
 
             {/* Desktop Sidebar */}
             <aside
-                className={`hidden lg:flex flex-col h-screen fixed top-0 z-40 transition-all duration-300 ${isRTL ? 'right-0' : 'left-0'} ${collapsed ? 'w-[72px]' : 'w-[240px]'}`}
-                style={{
-                    background: 'linear-gradient(180deg, #0d0b24 0%, #14103c 50%, #0d0b24 100%)',
-                    borderRight: isRTL ? 'none' : '1px solid rgba(255,255,255,0.05)',
-                    borderLeft: isRTL ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                }}
+                className={`hidden lg:flex flex-col h-screen fixed top-0 z-40 transition-all duration-300 bg-white ${isRTL ? 'right-0' : 'left-0'} ${collapsed ? 'w-[72px]' : 'w-[240px]'}`}
             >
                 <SidebarContent
                     collapsed={collapsed}

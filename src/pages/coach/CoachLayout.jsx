@@ -97,15 +97,10 @@ const CoachLayout = () => {
                             <button
                                 key={item.path}
                                 onClick={() => navigate(item.path)}
-                                className={`
-                                    w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all
-                                    ${isActive
-                                        ? 'bg-emerald-50 text-emerald-700'
-                                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}
-                                `}
+                                className={`nav-item w-full ${isActive ? 'active' : ''}`}
                             >
-                                <Icon size={20} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
-                                {item.name}
+                                <Icon size={20} className={isActive ? 'text-surface-900' : 'text-surface-400'} />
+                                <span className={isActive ? 'font-semibold' : 'font-medium'}>{item.name}</span>
                             </button>
                         );
                     })}

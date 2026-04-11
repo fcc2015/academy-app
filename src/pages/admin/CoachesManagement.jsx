@@ -400,12 +400,16 @@ const CoachesManagement = () => {
                                     <div>
                                         <label className={`block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 ${isRTL ? 'text-right' : ''}`}>{isRTL ? 'البريد الإلكتروني' : 'Email'} *</label>
                                         <input type="email" name="email" value={formData.email} onChange={handleInputChange} required
+                                            pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
+                                            title={isRTL ? 'يرجى إدخال بريد إلكتروني صحيح' : 'Please enter a valid email address'}
                                             placeholder="rachid@academy.com"
                                             className={`w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all ${isRTL ? 'text-right' : ''}`} />
                                     </div>
                                     <div>
                                         <label className={`block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 ${isRTL ? 'text-right' : ''}`}>{isRTL ? 'الهاتف' : 'Phone'}</label>
-                                        <input name="phone" value={formData.phone} onChange={handleInputChange}
+                                        <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange}
+                                            pattern="^\+?[0-9]{8,15}$"
+                                            title={isRTL ? 'يجب إدخال رقم هاتف صحيح، مثال: 212600000000+' : 'Must be a valid phone number, e.g., +212600000000'}
                                             placeholder="+212 6..."
                                             className={`w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all ${isRTL ? 'text-right' : ''}`} />
                                     </div>

@@ -1,11 +1,11 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 
 class CoachBase(BaseModel):
     full_name: str
     email: EmailStr
-    phone: Optional[str] = None
+    phone: Optional[str] = Field(None, pattern=r"^\+?[0-9]{8,15}$", description="Valid phone number")
     specialization: str
     status: str = "Active"
 

@@ -9,6 +9,56 @@ import httpx
 router = APIRouter(prefix="/public", tags=["Public"])
 
 
+class SetupAcademyRequest(BaseModel):
+    academy_name: str
+    country: Optional[str] = None
+    city: Optional[str] = None
+
+@router.post("/setup-academy")
+async def setup_academy_for_google_user(req: SetupAcademyRequest, user: dict = Depends(require_role("player", "parent", "admin", "coach", "super_admin"))):
+    """
+    Called after Google OAuth — creates academy and adds the authenticated user as admin.
+    The user already exists in Supabase Auth, we just need to create the academy + admin record.
+    """
+    from core.auth_middleware import verify_token
+    user_id = user.get("user_id")
+    user_email = user.get("email")
+
+    academy_name = req.academy_name
+    if req.city:
+        academy_name = f"{req.academy_name} — {req.city}"
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # 1. Create academy
+        res = await client.post(
+            f"{supabase.url}/rest/v1/academies?select=id",
+            json={"name": academy_name, "status": "active", "subscription_status": "free"},
+            headers=supabase.admin_headers
+        )
+        if res.status_code not in [200, 201]:
+            raise HTTPException(status_code=500, detail=f"Erreur création académie: {res.text}")
+        academy_row = res.json()
+        if isinstance(academy_row, list):
+            academy_row = academy_row[0]
+        new_academy_id = academy_row["id"]
+
+        # 2. Create/update users record
+        await client.post(
+            f"{supabase.url}/rest/v1/users",
+            json={"id": user_id, "full_name": user_email, "role": "admin", "academy_id": new_academy_id},
+            headers={**supabase.admin_headers, "Prefer": "resolution=merge-duplicates,return=minimal"}
+        )
+
+        # 3. Add to admins table
+        await client.post(
+            f"{supabase.url}/rest/v1/admins",
+            json={"user_id": user_id, "email": user_email, "full_name": user_email, "status": "active", "academy_id": new_academy_id},
+            headers={**supabase.admin_headers, "Prefer": "resolution=merge-duplicates,return=minimal"}
+        )
+
+    return {"success": True, "academy_id": new_academy_id}
+
+
 # ── Self-Service Academy Registration (Free Plan) ──
 
 class RegisterAcademyRequest(BaseModel):

@@ -4,7 +4,7 @@ from datetime import date, time, datetime
 
 class EventBase(BaseModel):
     title: str
-    type: str # 'Match', 'Training', 'Tournament', 'Other'
+    type: str # 'Match', 'Training', 'Tournament', 'Tryouts', 'Meeting', 'Holiday', 'Other'
     event_date: date
     event_time: time
     location: str

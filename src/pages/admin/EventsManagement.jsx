@@ -202,11 +202,15 @@ const EventsManagement = () => {
                                     {/* Info Column */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${event.type === 'Match' ? 'bg-orange-100 text-orange-700' :
+                                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                                                event.type === 'Match' ? 'bg-orange-100 text-orange-700' :
                                                 event.type === 'Training' ? 'bg-blue-100 text-blue-700' :
-                                                    event.type === 'Tournament' ? 'bg-purple-100 text-purple-700' :
-                                                        'bg-slate-100 text-slate-700'
-                                                }`}>
+                                                event.type === 'Tournament' ? 'bg-purple-100 text-purple-700' :
+                                                event.type === 'Tryouts' ? 'bg-amber-100 text-amber-700' :
+                                                event.type === 'Meeting' ? 'bg-teal-100 text-teal-700' :
+                                                event.type === 'Holiday' ? 'bg-emerald-100 text-emerald-700' :
+                                                'bg-slate-100 text-slate-700'
+                                            }`}>
                                                 {event.type}
                                             </span>
                                             {event.status === 'Completed' && (
@@ -319,10 +323,13 @@ const EventsManagement = () => {
                                         onChange={handleInputChange}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[15px] font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                     >
-                                        <option value="Match">Official Match</option>
-                                        <option value="Training">Training Session</option>
-                                        <option value="Tournament">Tournament</option>
-                                        <option value="Other">Special Event</option>
+                                        <option value="Match">Official Match / مباراة</option>
+                                        <option value="Training">Training Session / تدريب</option>
+                                        <option value="Tournament">Tournament / دوري</option>
+                                        <option value="Tryouts">Tryouts & Testing / اختبار لاعبين</option>
+                                        <option value="Meeting">Meeting / اجتماع</option>
+                                        <option value="Holiday">Holiday / عطلة</option>
+                                        <option value="Other">Special Event / أخرى</option>
                                     </select>
                                 </div>
                             </div>

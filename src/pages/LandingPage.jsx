@@ -708,9 +708,13 @@ const LandingPage = () => {
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <input type="email" required value={regForm.email} onChange={e => setRegForm({ ...regForm, email: e.target.value })}
+                                                    pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
+                                                    title={isRTL ? 'يرجى إدخال بريد إلكتروني صحيح' : 'Please enter a valid email address'}
                                                     placeholder={isRTL ? 'البريد الإلكتروني' : 'Email Address'}
                                                     className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
                                                 <input type="tel" required value={regForm.phone} onChange={e => setRegForm({ ...regForm, phone: e.target.value })}
+                                                    pattern="^\+?[0-9]{8,15}$"
+                                                    title={isRTL ? 'يجب إدخال رقم هاتف صحيح' : 'Must be a valid phone number'}
                                                     placeholder={isRTL ? 'الهاتف (+212...)' : 'Phone Number'}
                                                     className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
                                             </div>
