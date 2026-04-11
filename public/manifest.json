@@ -1,26 +1,42 @@
 {
-  "name": "Football Academy",
-  "short_name": "Academy",
-  "description": "Football Academy Management Platform - SaaS",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#0f0c29",
-  "theme_color": "#4f46e5",
-  "orientation": "any",
-  "scope": "/",
-  "icons": [
-    { "src": "/icons/icon-72x72.png", "sizes": "72x72", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-128x128.png", "sizes": "128x128", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-144x144.png", "sizes": "144x144", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-152x152.png", "sizes": "152x152", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icons/icon-384x384.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ],
-  "categories": ["sports", "education", "business"],
-  "lang": "ar",
-  "dir": "rtl",
-  "screenshots": [],
-  "prefer_related_applications": false
+    "name": "DB Admin Academy",
+    "short_name": "DBAdmin",
+    "description": "منصة إدارة الأكاديميات الرياضية — DB Admin Academy SaaS Platform",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#4f46e5",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/logo.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["sports", "education", "business"],
+    "lang": "ar",
+    "dir": "rtl",
+    "screenshots": [],
+    "shortcuts": [
+        {
+            "name": "لوحة التحكم",
+            "short_name": "Dashboard",
+            "url": "/admin/dashboard",
+            "icons": [{ "src": "/logo.png", "sizes": "96x96" }]
+        },
+        {
+            "name": "اللاعبون",
+            "short_name": "Players",
+            "url": "/admin/players",
+            "icons": [{ "src": "/logo.png", "sizes": "96x96" }]
+        }
+    ]
 }

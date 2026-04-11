@@ -9,6 +9,7 @@ import { useLanguage } from '../../i18n/LanguageContext';
 import { useEffect, useState, useCallback } from 'react';
 import { useIdleTimer } from '../../hooks/useIdleTimer';
 import SessionWarning from '../../components/SessionWarning';
+import PWAInstallPrompt from '../../components/PWAInstallPrompt';
 
 const AdminLayout = () => {
     const { isRTL, dir } = useLanguage();
@@ -109,6 +110,9 @@ const AdminLayout = () => {
                     isRTL={isRTL}
                 />
             )}
+
+            {/* 📱 PWA Install Prompt */}
+            <PWAInstallPrompt isRTL={isRTL} />
         </div>
     );
 };

@@ -16,6 +16,7 @@ import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useIdleTimer } from '../../hooks/useIdleTimer';
 import SessionWarning from '../../components/SessionWarning';
+import PWAInstallPrompt from '../../components/PWAInstallPrompt';
 
 function checkCoachAuth() {
     const token = localStorage.getItem('token');
@@ -170,6 +171,9 @@ const CoachLayout = () => {
                     isRTL={isRTL}
                 />
             )}
+
+            {/* 📱 PWA Install Prompt */}
+            <PWAInstallPrompt isRTL={isRTL} />
         </div>
     );
 };
