@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../components/Toast';
 
 // ─── Specialization Config ────────────────────────────────────────────
 const SPEC_CONFIG = {
@@ -118,7 +119,6 @@ const CoachesManagement = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [search, setSearch] = useState('');
-    const [statusBanner, setStatusBanner] = useState({ show: false, message: '', type: 'success', id: 0 });
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null });
     const [isEditMode, setIsEditMode] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -127,11 +127,11 @@ const CoachesManagement = () => {
         specialization: 'Technical', status: 'Active',
         photo_url: '', diploma_url: ''
     });
+    const toast = useToast();
 
     const showBanner = (message, type = 'success') => {
-        const id = Date.now();
-        setStatusBanner({ show: true, message, type, id });
-        setTimeout(() => setStatusBanner(prev => prev.id === id ? { ...prev, show: false } : prev), 5000);
+        if (type === 'error') toast.error(message);
+        else toast.success(message);
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -262,16 +262,7 @@ const CoachesManagement = () => {
     return (
         <div className={`animate-fade-in pb-16 ${isRTL ? 'text-right' : 'text-left'}`} dir={dir}>
 
-            {/* Status Banner */}
-            {statusBanner.show && (
-                <div key={statusBanner.id} className="fixed top-24 left-1/2 -translate-x-1/2 z-[200]">
-                    <div className={`flex items-center gap-4 px-8 py-4 rounded-[2rem] shadow-2xl border-2 backdrop-blur-md ${statusBanner.type === 'success' ? 'bg-emerald-600/90 border-emerald-400 text-white' : 'bg-red-600/90 border-red-400 text-white'}`}>
-                        {statusBanner.type === 'success' ? <CheckCircle size={24} /> : <AlertCircle size={24} />}
-                        <span className="font-black text-base">{statusBanner.message}</span>
-                        <button type="button" onClick={() => setStatusBanner({ ...statusBanner, show: false })} className="ml-4 hover:bg-white/20 p-1 rounded-full"><X size={16} /></button>
-                    </div>
-                </div>
-            )}
+            {/* Toast handled by global provider */}
 
             {/* Header */}
             <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
