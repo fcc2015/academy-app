@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from core.config import settings
-from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin, payments_gateway, tournaments, tryouts
+from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin, payments_gateway, tournaments, tryouts, qr_auth
 
 # ─── Logging ────────────────────────────────────────────────
 logging.basicConfig(
@@ -130,6 +130,7 @@ app.include_router(saas_admin.router)
 app.include_router(payments_gateway.router)
 app.include_router(tournaments.router)
 app.include_router(tryouts.router)
+app.include_router(qr_auth.router)
 
 # ─── Global Exception Handler (mask internal errors) ───────
 from fastapi.responses import JSONResponse

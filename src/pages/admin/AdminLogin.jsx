@@ -1,7 +1,7 @@
 import { API_URL } from '../../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, Sparkles } from 'lucide-react';
+import { Shield, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, Sparkles, QrCode } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { isAuthenticated } from '../../api';
 
@@ -331,6 +331,23 @@ const AdminLogin = () => {
                                     </svg>
                                 )}
                                 {isRTL ? 'تسجيل الدخول بـ Google' : 'Continuer avec Google'}
+                            </button>
+
+                            {/* ── QR Code Login ── */}
+                            <button
+                                type="button"
+                                onClick={() => navigate('/qr-login')}
+                                className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-3 transition-all duration-200 ${isRTL ? 'flex-row-reverse' : ''}`}
+                                style={{
+                                    background: 'rgba(79,70,229,0.1)',
+                                    border: '1.5px solid rgba(79,70,229,0.3)',
+                                    color: 'rgba(165,160,255,0.9)',
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(79,70,229,0.2)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(79,70,229,0.1)'; }}
+                            >
+                                <QrCode size={18} />
+                                {isRTL ? '📱 سجل الدخول بـ QR Code' : '📱 Connexion par QR Code'}
                             </button>
                         </form>
                     )}
