@@ -1,7 +1,7 @@
 import { API_URL } from '../../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, Sparkles, UserPlus, Building2, CheckCircle2, User } from 'lucide-react';
+import { Shield, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, Sparkles, UserPlus, Building2, CheckCircle2, User, KeyRound, ArrowLeft } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { isAuthenticated } from '../../api';
 
@@ -22,7 +22,7 @@ const loginAttempts = { count: 0, lockedUntil: null };
 })();
 
 const SaasLogin = () => {
-    const [mode, setMode] = useState('login'); // 'login' | 'register'
+    const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot'
 
     // Login state
     const [email, setEmail] = useState('');
@@ -45,6 +45,21 @@ const SaasLogin = () => {
     const [regLoading, setRegLoading] = useState(false);
     const [regError, setRegError] = useState('');
     const [regSuccess, setRegSuccess] = useState(false);
+
+    // OTP verification state (for registration)
+    const [regStep, setRegStep] = useState('form'); // 'form' | 'otp'
+    const [otpCode, setOtpCode] = useState('');
+    const [otpLoading, setOtpLoading] = useState(false);
+    const [otpSent, setOtpSent] = useState(false);
+
+    // Forgot password state
+    const [forgotStep, setForgotStep] = useState('email'); // 'email' | 'otp' | 'newpass' | 'done'
+    const [forgotEmail, setForgotEmail] = useState('');
+    const [forgotOtp, setForgotOtp] = useState('');
+    const [forgotNewPass, setForgotNewPass] = useState('');
+    const [forgotLoading, setForgotLoading] = useState(false);
+    const [forgotError, setForgotError] = useState('');
+    const [showForgotPass, setShowForgotPass] = useState(false);
 
     const navigate = useNavigate();
     const { t, isRTL, dir } = useLanguage();
@@ -119,7 +134,8 @@ const SaasLogin = () => {
         }
     };
 
-    const handleRegister = async (e) => {
+    // Step 1: Validate form + send OTP
+    const handleRegisterStep1 = async (e) => {
         e.preventDefault();
         setRegError('');
         if (regForm.admin_email !== regForm.admin_email_confirm) {
@@ -130,13 +146,59 @@ const SaasLogin = () => {
             setRegError('Les mots de passe ne correspondent pas.');
             return;
         }
-        if (regForm.admin_password.length < 6) {
-            setRegError('Le mot de passe doit contenir au moins 6 caractères.');
+        if (regForm.admin_password.length < 8) {
+            setRegError('Le mot de passe doit contenir au moins 8 caractères.');
+            return;
+        }
+        setOtpLoading(true);
+        try {
+            const API = API_URL.includes('localhost') ? 'https://academy-backend-4dln.onrender.com' : API_URL;
+            const res = await fetch(`${API}/auth/send-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: regForm.admin_email, purpose: 'verify' })
+            });
+            if (res.ok) {
+                setRegStep('otp');
+                setOtpSent(true);
+                setOtpCode('');
+            } else {
+                const data = await res.json();
+                setRegError(data.detail || 'Erreur envoi du code.');
+            }
+        } catch {
+            setRegError('Connexion échouée. Veuillez réessayer.');
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
+    // Step 2: Verify OTP + create academy
+    const handleVerifyAndRegister = async (e) => {
+        e.preventDefault();
+        setRegError('');
+        if (otpCode.length !== 6) {
+            setRegError('Le code doit contenir 6 chiffres.');
             return;
         }
         setRegLoading(true);
         try {
             const API = API_URL.includes('localhost') ? 'https://academy-backend-4dln.onrender.com' : API_URL;
+
+            // Verify OTP first
+            const verifyRes = await fetch(`${API}/auth/verify-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: regForm.admin_email, code: otpCode })
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) {
+                setRegError(verifyData.detail || 'Code invalide.');
+                setRegLoading(false);
+                return;
+            }
+
+            // OTP verified — create academy
             const res = await fetch(`${API}/public/register-academy`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -164,11 +226,11 @@ const SaasLogin = () => {
                     localStorage.setItem('token_expires', Date.now() + 24 * 60 * 60 * 1000);
                     setTimeout(() => { navigate('/admin/dashboard'); }, 1500);
                 } else {
-                    // fallback: go to login tab with email pre-filled
                     setTimeout(() => {
                         setMode('login');
                         setEmail(regForm.admin_email);
                         setRegSuccess(false);
+                        setRegStep('form');
                         setRegForm({ academy_name: '', admin_name: '', admin_email: '', admin_email_confirm: '', admin_password: '', admin_password_confirm: '' });
                     }, 2000);
                 }
@@ -180,6 +242,75 @@ const SaasLogin = () => {
         } finally {
             setRegLoading(false);
         }
+    };
+
+    // Resend OTP
+    const handleResendOtp = async () => {
+        setOtpLoading(true);
+        setRegError('');
+        try {
+            const API = API_URL.includes('localhost') ? 'https://academy-backend-4dln.onrender.com' : API_URL;
+            await fetch(`${API}/auth/send-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: regForm.admin_email, purpose: 'verify' })
+            });
+            setOtpCode('');
+        } catch { /* ignore */ }
+        finally { setOtpLoading(false); }
+    };
+
+    // Forgot Password handlers
+    const handleForgotSendOtp = async (e) => {
+        e.preventDefault();
+        setForgotError('');
+        setForgotLoading(true);
+        try {
+            const API = API_URL.includes('localhost') ? 'https://academy-backend-4dln.onrender.com' : API_URL;
+            const res = await fetch(`${API}/auth/send-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: forgotEmail, purpose: 'reset' })
+            });
+            if (res.ok) {
+                setForgotStep('otp');
+            } else {
+                const data = await res.json();
+                setForgotError(data.detail || 'Erreur.');
+            }
+        } catch {
+            setForgotError('Connexion échouée.');
+        } finally { setForgotLoading(false); }
+    };
+
+    const handleForgotVerifyOtp = async (e) => {
+        e.preventDefault();
+        if (forgotOtp.length !== 6) { setForgotError('Le code doit contenir 6 chiffres.'); return; }
+        setForgotStep('newpass');
+        setForgotError('');
+    };
+
+    const handleForgotResetPassword = async (e) => {
+        e.preventDefault();
+        setForgotError('');
+        if (forgotNewPass.length < 8) { setForgotError('Min. 8 caractères.'); return; }
+        setForgotLoading(true);
+        try {
+            const API = API_URL.includes('localhost') ? 'https://academy-backend-4dln.onrender.com' : API_URL;
+            const res = await fetch(`${API}/auth/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: forgotEmail, code: forgotOtp, new_password: forgotNewPass })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setForgotStep('done');
+            } else {
+                setForgotError(data.detail || 'Erreur.');
+            }
+        } catch {
+            setForgotError('Connexion échouée.');
+        } finally { setForgotLoading(false); }
     };
 
     const handleGoogleLogin = async () => {
@@ -225,6 +356,7 @@ const SaasLogin = () => {
                 </div>
 
                 {/* Mode Tabs */}
+                {mode !== 'forgot' && (
                 <div className="flex rounded-2xl p-1 mb-4" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
                     <button onClick={() => { setMode('login'); setError(''); }}
                         className="flex-1 py-2.5 rounded-xl text-sm font-black transition-all duration-200 flex items-center justify-center gap-2"
@@ -232,13 +364,14 @@ const SaasLogin = () => {
                         <Lock size={14} />
                         {isRTL ? 'تسجيل الدخول' : 'Se connecter'}
                     </button>
-                    <button onClick={() => { setMode('register'); setRegError(''); setRegSuccess(false); }}
+                    <button onClick={() => { setMode('register'); setRegError(''); setRegSuccess(false); setRegStep('form'); }}
                         className="flex-1 py-2.5 rounded-xl text-sm font-black transition-all duration-200 flex items-center justify-center gap-2"
                         style={{ background: mode === 'register' ? 'rgba(16,185,129,0.3)' : 'transparent', color: mode === 'register' ? '#6ee7b7' : 'rgba(255,255,255,0.4)', border: mode === 'register' ? '1px solid rgba(16,185,129,0.3)' : 'none' }}>
                         <UserPlus size={14} />
                         {isRTL ? 'إنشاء حساب' : 'Créer un compte'}
                     </button>
                 </div>
+                )}
 
                 {/* Form Card */}
                 <div className="rounded-[28px] p-8 relative"
@@ -321,6 +454,14 @@ const SaasLogin = () => {
                                         {loading ? <><Loader2 size={18} className="animate-spin" /> Authenticating...</> : <><Sparkles size={18} /> Enter SaaS Portal</>}
                                     </button>
 
+                                    <div className="text-center">
+                                        <button type="button"
+                                            onClick={() => { setMode('forgot'); setForgotStep('email'); setForgotError(''); setForgotEmail(email); }}
+                                            className="text-xs font-semibold text-indigo-400/70 hover:text-indigo-300 transition-colors">
+                                            {isRTL ? 'نسيت كلمة المرور؟' : 'Mot de passe oublié?'}
+                                        </button>
+                                    </div>
+
                                     <div className="flex items-center gap-3">
                                         <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
                                         <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>ou</span>
@@ -355,11 +496,57 @@ const SaasLogin = () => {
                                     <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)' }}>
                                         <CheckCircle2 size={32} className="text-emerald-400" />
                                     </div>
-                                    <h4 className="text-white font-black text-lg mb-2">Académie créée! 🎉</h4>
-                                    <p className="text-emerald-300/80 text-sm font-medium">Redirection vers la connexion...</p>
+                                    <h4 className="text-white font-black text-lg mb-2">Académie créée!</h4>
+                                    <p className="text-emerald-300/80 text-sm font-medium">Redirection vers le dashboard...</p>
                                 </div>
+                            ) : regStep === 'otp' ? (
+                                <form onSubmit={handleVerifyAndRegister} className="space-y-5">
+                                    <div className="text-center mb-2">
+                                        <div className="w-14 h-14 mx-auto mb-3 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
+                                            <KeyRound size={26} className="text-indigo-400" />
+                                        </div>
+                                        <h3 className="text-white font-black text-base">{isRTL ? 'تحقق من بريدك' : 'Vérifiez votre email'}</h3>
+                                        <p className="text-indigo-300/60 text-xs mt-1">{isRTL ? 'أدخل الكود المرسل إلى' : 'Entrez le code envoyé à'} <span className="text-indigo-300 font-bold">{regForm.admin_email}</span></p>
+                                    </div>
+
+                                    {regError && (
+                                        <div className="flex items-center gap-3 p-3 rounded-xl text-sm font-semibold"
+                                            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5' }}>
+                                            <AlertCircle size={15} className="shrink-0" />
+                                            <span>{regError}</span>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <input type="text" required maxLength={6} autoFocus
+                                            placeholder="000000"
+                                            value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                            className="w-full py-4 text-center text-2xl font-black text-white placeholder-white/15 rounded-xl outline-none tracking-[16px]"
+                                            style={{ ...inputStyle, letterSpacing: '16px', fontFamily: 'monospace' }}
+                                            onFocus={e => e.target.style.borderColor = 'rgba(99,102,241,0.7)'}
+                                            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
+                                    </div>
+
+                                    <button type="submit" disabled={regLoading || otpCode.length !== 6}
+                                        className="w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest text-white transition-all flex items-center justify-center gap-3"
+                                        style={{ background: regLoading ? 'rgba(16,185,129,0.4)' : 'linear-gradient(135deg, #059669, #10b981)', boxShadow: regLoading ? 'none' : '0 8px 32px rgba(16,185,129,0.35)', opacity: otpCode.length !== 6 ? 0.5 : 1 }}>
+                                        {regLoading ? <><Loader2 size={18} className="animate-spin" /> {isRTL ? 'جاري الإنشاء...' : 'Création...'}</> : <><CheckCircle2 size={18} /> {isRTL ? 'تأكيد وإنشاء الأكاديمية' : 'Confirmer et créer'}</>}
+                                    </button>
+
+                                    <div className="flex items-center justify-between">
+                                        <button type="button" onClick={() => { setRegStep('form'); setRegError(''); }}
+                                            className="text-xs font-semibold text-indigo-400/60 hover:text-indigo-300 flex items-center gap-1">
+                                            <ArrowLeft size={12} /> {isRTL ? 'رجوع' : 'Retour'}
+                                        </button>
+                                        <button type="button" onClick={handleResendOtp} disabled={otpLoading}
+                                            className="text-xs font-semibold text-indigo-400/60 hover:text-indigo-300">
+                                            {otpLoading ? <Loader2 size={12} className="animate-spin inline" /> : null}
+                                            {isRTL ? ' إعادة إرسال الكود' : ' Renvoyer le code'}
+                                        </button>
+                                    </div>
+                                </form>
                             ) : (
-                                <form onSubmit={handleRegister} className="space-y-4">
+                                <form onSubmit={handleRegisterStep1} className="space-y-4">
                                     {regError && (
                                         <div className="flex items-center gap-3 p-3 rounded-xl text-sm font-semibold"
                                             style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5' }}>
@@ -455,8 +642,8 @@ const SaasLogin = () => {
                                             <div className={`absolute inset-y-0 ${isRTL ? 'right-0 pr-3.5' : 'left-0 pl-3.5'} flex items-center pointer-events-none`}>
                                                 <Lock size={15} className="text-indigo-400/50" />
                                             </div>
-                                            <input type={showRegPassword ? 'text' : 'password'} required minLength={6}
-                                                placeholder="Min. 6 caractères"
+                                            <input type={showRegPassword ? 'text' : 'password'} required minLength={8}
+                                                placeholder="Min. 8 caractères"
                                                 value={regForm.admin_password}
                                                 onChange={e => setRegForm({ ...regForm, admin_password: e.target.value })}
                                                 className={`w-full py-3 text-sm font-medium text-white placeholder-white/20 rounded-xl outline-none ${isRTL ? 'pr-10 pl-10' : 'pl-10 pr-10'}`}
@@ -494,10 +681,10 @@ const SaasLogin = () => {
                                         </div>
                                     </div>
 
-                                    <button type="submit" disabled={regLoading}
+                                    <button type="submit" disabled={otpLoading}
                                         className="w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest text-white transition-all flex items-center justify-center gap-3 mt-2"
-                                        style={{ background: regLoading ? 'rgba(16,185,129,0.4)' : 'linear-gradient(135deg, #059669, #10b981)', boxShadow: regLoading ? 'none' : '0 8px 32px rgba(16,185,129,0.35)', opacity: regLoading ? 0.8 : 1 }}>
-                                        {regLoading ? <><Loader2 size={18} className="animate-spin" /> {isRTL ? 'جارٍ الإنشاء...' : 'Création en cours...'}</> : <><UserPlus size={18} /> {isRTL ? 'إنشاء الأكاديمية' : 'Créer mon Académie'}</>}
+                                        style={{ background: otpLoading ? 'rgba(16,185,129,0.4)' : 'linear-gradient(135deg, #059669, #10b981)', boxShadow: otpLoading ? 'none' : '0 8px 32px rgba(16,185,129,0.35)', opacity: otpLoading ? 0.8 : 1 }}>
+                                        {otpLoading ? <><Loader2 size={18} className="animate-spin" /> {isRTL ? 'إرسال رمز التحقق...' : 'Envoi du code...'}</> : <><UserPlus size={18} /> {isRTL ? 'إنشاء الأكاديمية' : 'Créer mon Académie'}</>}
                                     </button>
 
                                     <div className="flex items-center gap-3">
@@ -522,6 +709,109 @@ const SaasLogin = () => {
                                         {isRTL ? 'التسجيل بـ Google' : "S'inscrire avec Google"}
                                     </button>
                                 </form>
+                            )}
+                        </>
+                    )}
+                    {/* ── FORGOT PASSWORD MODE ── */}
+                    {mode === 'forgot' && (
+                        <>
+                            {forgotStep === 'done' ? (
+                                <div className="text-center py-10">
+                                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)' }}>
+                                        <CheckCircle2 size={32} className="text-emerald-400" />
+                                    </div>
+                                    <h4 className="text-white font-black text-lg mb-2">{isRTL ? 'تم تغيير كلمة المرور' : 'Mot de passe modifié!'}</h4>
+                                    <p className="text-emerald-300/80 text-sm font-medium mb-4">{isRTL ? 'يمكنك الآن تسجيل الدخول' : 'Vous pouvez maintenant vous connecter.'}</p>
+                                    <button onClick={() => { setMode('login'); setEmail(forgotEmail); setForgotStep('email'); }}
+                                        className="px-6 py-3 rounded-xl font-black text-sm text-white"
+                                        style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
+                                        {isRTL ? 'تسجيل الدخول' : 'Se connecter'}
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-5">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <button onClick={() => { setMode('login'); setForgotStep('email'); setForgotError(''); }}
+                                            className="text-indigo-400/60 hover:text-indigo-300">
+                                            <ArrowLeft size={18} />
+                                        </button>
+                                        <h3 className="text-white font-black text-base">
+                                            {isRTL ? 'استعادة كلمة المرور' : 'Réinitialiser le mot de passe'}
+                                        </h3>
+                                    </div>
+
+                                    {forgotError && (
+                                        <div className="flex items-center gap-3 p-3 rounded-xl text-sm font-semibold"
+                                            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5' }}>
+                                            <AlertCircle size={15} className="shrink-0" />
+                                            <span>{forgotError}</span>
+                                        </div>
+                                    )}
+
+                                    {forgotStep === 'email' && (
+                                        <form onSubmit={handleForgotSendOtp} className="space-y-4">
+                                            <p className="text-indigo-300/60 text-xs">{isRTL ? 'أدخل بريدك الإلكتروني وسنرسل لك رمز التحقق' : 'Entrez votre email, nous vous enverrons un code de vérification.'}</p>
+                                            <div className="relative">
+                                                <div className={`absolute inset-y-0 ${isRTL ? 'right-0 pr-4' : 'left-0 pl-4'} flex items-center pointer-events-none`}>
+                                                    <Mail size={16} className="text-indigo-400/60" />
+                                                </div>
+                                                <input type="email" required autoFocus
+                                                    placeholder="admin@academy.ma"
+                                                    value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                                                    className={`w-full py-3.5 text-sm font-medium text-white placeholder-white/25 rounded-xl outline-none ${isRTL ? 'pr-11 pl-4' : 'pl-11 pr-4'}`}
+                                                    style={inputStyle} />
+                                            </div>
+                                            <button type="submit" disabled={forgotLoading}
+                                                className="w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest text-white flex items-center justify-center gap-3"
+                                                style={{ background: forgotLoading ? 'rgba(99,102,241,0.4)' : 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
+                                                {forgotLoading ? <Loader2 size={18} className="animate-spin" /> : <Mail size={18} />}
+                                                {isRTL ? 'إرسال الرمز' : 'Envoyer le code'}
+                                            </button>
+                                        </form>
+                                    )}
+
+                                    {forgotStep === 'otp' && (
+                                        <form onSubmit={handleForgotVerifyOtp} className="space-y-4">
+                                            <p className="text-indigo-300/60 text-xs">{isRTL ? 'أدخل الرمز المرسل إلى' : 'Entrez le code envoyé à'} <span className="text-indigo-300 font-bold">{forgotEmail}</span></p>
+                                            <input type="text" required maxLength={6} autoFocus
+                                                placeholder="000000"
+                                                value={forgotOtp} onChange={e => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                                className="w-full py-4 text-center text-2xl font-black text-white placeholder-white/15 rounded-xl outline-none"
+                                                style={{ ...inputStyle, letterSpacing: '16px', fontFamily: 'monospace' }} />
+                                            <button type="submit" disabled={forgotOtp.length !== 6}
+                                                className="w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest text-white flex items-center justify-center gap-3"
+                                                style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', opacity: forgotOtp.length !== 6 ? 0.5 : 1 }}>
+                                                <KeyRound size={18} /> {isRTL ? 'تأكيد الرمز' : 'Vérifier le code'}
+                                            </button>
+                                        </form>
+                                    )}
+
+                                    {forgotStep === 'newpass' && (
+                                        <form onSubmit={handleForgotResetPassword} className="space-y-4">
+                                            <p className="text-indigo-300/60 text-xs">{isRTL ? 'أدخل كلمة المرور الجديدة' : 'Entrez votre nouveau mot de passe.'}</p>
+                                            <div className="relative">
+                                                <div className={`absolute inset-y-0 ${isRTL ? 'right-0 pr-4' : 'left-0 pl-4'} flex items-center pointer-events-none`}>
+                                                    <Lock size={16} className="text-indigo-400/60" />
+                                                </div>
+                                                <input type={showForgotPass ? 'text' : 'password'} required minLength={8} autoFocus
+                                                    placeholder="Min. 8 caractères"
+                                                    value={forgotNewPass} onChange={e => setForgotNewPass(e.target.value)}
+                                                    className={`w-full py-3.5 text-sm font-medium text-white placeholder-white/25 rounded-xl outline-none ${isRTL ? 'pr-11 pl-11' : 'pl-11 pr-11'}`}
+                                                    style={inputStyle} />
+                                                <button type="button" onClick={() => setShowForgotPass(!showForgotPass)}
+                                                    className={`absolute inset-y-0 ${isRTL ? 'left-0 pl-4' : 'right-0 pr-4'} flex items-center text-indigo-400/60 hover:text-indigo-300`}>
+                                                    {showForgotPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                </button>
+                                            </div>
+                                            <button type="submit" disabled={forgotLoading}
+                                                className="w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest text-white flex items-center justify-center gap-3"
+                                                style={{ background: forgotLoading ? 'rgba(16,185,129,0.4)' : 'linear-gradient(135deg, #059669, #10b981)' }}>
+                                                {forgotLoading ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                                                {isRTL ? 'تغيير كلمة المرور' : 'Changer le mot de passe'}
+                                            </button>
+                                        </form>
+                                    )}
+                                </div>
                             )}
                         </>
                     )}

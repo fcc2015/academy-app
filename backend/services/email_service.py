@@ -1,26 +1,27 @@
 """
 Email service for sending notifications via SMTP.
-Configure environment variables:
-  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+Configure in .env: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 """
+import logging
 import smtplib
-import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from core.config import settings
 
+logger = logging.getLogger("email")
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "")
-SMTP_FROM = os.getenv("SMTP_FROM", "noreply@academy.com")
-ACADEMY_NAME = os.getenv("ACADEMY_NAME", "Football Academy")
+SMTP_HOST = settings.SMTP_HOST
+SMTP_PORT = settings.SMTP_PORT
+SMTP_USER = settings.SMTP_USER or ""
+SMTP_PASS = settings.SMTP_PASS or ""
+SMTP_FROM = settings.SMTP_FROM
+ACADEMY_NAME = "Football Academy SaaS"
 
 
 def _send_email(to: str, subject: str, html_body: str):
     """Send an email via SMTP. Silently fails if SMTP is not configured."""
     if not SMTP_USER or not SMTP_PASS:
-        print(f"[EMAIL] SMTP not configured. Would send to {to}: {subject}")
+        logger.info(f"SMTP not configured. Would send to {to}: {subject}")
         return False
 
     try:
@@ -35,10 +36,10 @@ def _send_email(to: str, subject: str, html_body: str):
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_FROM, to, msg.as_string())
 
-        print(f"[EMAIL] Sent to {to}: {subject}")
+        logger.info(f"Sent to {to}: {subject}")
         return True
     except Exception as e:
-        print(f"[EMAIL] Failed to send to {to}: {e}")
+        logger.error(f"Failed to send to {to}: {e}")
         return False
 
 
