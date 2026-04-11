@@ -2,18 +2,21 @@
 Auth middleware for FastAPI — verifies JWT tokens from Supabase.
 Use as a dependency on any protected route.
 """
+import logging
 import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from core.config import settings
 from core.context import academy_id_ctx, user_id_ctx, role_ctx
+from services.supabase_client import supabase
 
+logger = logging.getLogger("auth")
 security = HTTPBearer()
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Verifies the JWT token by calling Supabase's /auth/v1/user endpoint.
-    Returns the user dict with id, email, role, etc.
+    Resolves role from the database (public.users + admins table), NOT user_metadata.
     """
     token = credentials.credentials
 
@@ -36,22 +39,30 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
             user = res.json()
             user_id = user.get("id")
 
-            # Fetch academy_id from the public.users table
+            # Fetch role + academy_id from public.users table (authoritative source)
             db_res = await client.get(
-                f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=academy_id",
-                headers={
-                    "apikey": settings.SUPABASE_KEY,
-                    "Authorization": f"Bearer {token}",
-                }
+                f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=role,academy_id",
+                headers=supabase.admin_headers
             )
-            
-            academy_id = None
-            if db_res.status_code == 200:
-                db_data = db_res.json()
-                if db_data and len(db_data) > 0:
-                    academy_id = db_data[0].get("academy_id")
 
-            role = user.get("user_metadata", {}).get("role", "player")
+            academy_id = None
+            role = "parent"  # safe default
+
+            if db_res.status_code == 200 and db_res.json():
+                db_row = db_res.json()[0]
+                academy_id = db_row.get("academy_id")
+                db_role = db_row.get("role")
+
+                if db_role in ("super_admin", "admin", "coach", "parent", "player"):
+                    role = db_role
+                else:
+                    # Fallback: check admins table
+                    a_res = await client.get(
+                        f"{settings.SUPABASE_URL}/rest/v1/admins?user_id=eq.{user_id}&select=user_id",
+                        headers=supabase.admin_headers
+                    )
+                    if a_res.status_code == 200 and a_res.json():
+                        role = "admin"
 
             # Set Global Context for downstream injection
             academy_id_ctx.set(academy_id)
@@ -64,6 +75,8 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
                 "role": role,
                 "academy_id": academy_id
             }
+    except HTTPException:
+        raise
     except httpx.RequestError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

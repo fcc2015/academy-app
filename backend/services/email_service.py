@@ -80,6 +80,28 @@ def send_payment_reminder(to: str, player_name: str, amount: float, due_date: st
     return _send_email(to, f"Rappel: Paiement en attente - {player_name}", html)
 
 
+def send_otp_email(to: str, code: str, purpose: str = "verify"):
+    """Send 6-digit OTP code for email verification or password reset."""
+    title = "Code de vérification" if purpose == "verify" else "Réinitialisation du mot de passe"
+    html = f"""
+    <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+        <div style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 24px;">
+            <h1 style="color: white; font-size: 24px; margin: 0;">🔐 {title}</h1>
+        </div>
+        <p style="font-size: 16px; color: #374151;">Voici votre code de vérification:</p>
+        <div style="text-align: center; margin: 32px 0;">
+            <div style="display: inline-block; background: #f0f0ff; border: 2px solid #4f46e5; border-radius: 16px; padding: 20px 40px; letter-spacing: 12px; font-size: 36px; font-weight: 900; color: #1e1b4b; font-family: monospace;">
+                {code}
+            </div>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">Ce code expire dans <strong>10 minutes</strong>.</p>
+        <p style="color: #9ca3af; font-size: 12px;">Si vous n'avez pas demandé ce code, ignorez cet email.</p>
+        <p style="font-size: 12px; color: #9ca3af; text-align: center; margin-top: 32px;">{ACADEMY_NAME}</p>
+    </div>
+    """
+    return _send_email(to, f"{title} — {code}", html)
+
+
 def send_event_notification(to: str, event_title: str, event_date: str, event_time: str = ""):
     """Send event notification email."""
     html = f"""
