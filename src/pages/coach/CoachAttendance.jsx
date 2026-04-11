@@ -12,8 +12,13 @@ import {
     QrCode
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { useLanguage } from '../../i18n/LanguageContext';
+import { useToast } from '../../components/Toast';
+import { SkeletonTable } from '../../components/Skeleton';
 
 const CoachAttendance = () => {
+    const { t, isRTL, dir } = useLanguage();
+    const toast = useToast();
     const [squads, setSquads] = useState([]);
     const [players, setPlayers] = useState([]);
     const [selectedSquad, setSelectedSquad] = useState('');
@@ -21,7 +26,6 @@ const CoachAttendance = () => {
     const [attendanceData, setAttendanceData] = useState({});
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [saveSuccess, setSaveSuccess] = useState(false);
 
     const [isScannerOpen, setIsScannerOpen] = useState(false);
     const [scanFeedback, setScanFeedback] = useState({ show: false, message: '', type: '' });
@@ -111,11 +115,12 @@ const CoachAttendance = () => {
                 body: JSON.stringify({ squad_id: selectedSquad, date: selectedDate, records })
             });
             if (res.ok) {
-                setSaveSuccess(true);
-                setTimeout(() => setSaveSuccess(false), 3000);
+                toast.success(isRTL ? 'تم حفظ الحضور بنجاح!' : 'Attendance saved successfully!');
+            } else {
+                toast.error(isRTL ? 'فشل الحفظ' : 'Save failed');
             }
         } catch (error) {
-            console.error('Error saving attendance:', error);
+            toast.error(isRTL ? 'خطأ في الاتصال' : 'Connection error');
         } finally {
             setIsSaving(false);
         }
@@ -202,53 +207,47 @@ const CoachAttendance = () => {
     ];
 
     return (
-        <div className="animate-fade-in pb-20 text-left">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+        <div className={`animate-fade-in pb-20 ${isRTL ? 'text-right' : 'text-left'}`} dir={dir}>
+            <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
                 <div>
                     <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-1">
-                        Take <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">Attendance</span>
+                        {isRTL ? 'تسجيل' : 'Take'} <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500">{isRTL ? 'الحضور' : 'Attendance'}</span>
                     </h1>
-                    <p className="text-[15px] font-medium text-slate-500">Record daily training attendance for your squads</p>
+                    <p className="text-[15px] font-medium text-slate-500">{isRTL ? 'سجل حضور التمارين اليومية لفرقك' : 'Record daily training attendance for your squads'}</p>
                 </div>
                 {selectedSquad && (
                     <button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[13px] hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-50"
+                        className={`flex items-center gap-2 bg-emerald-600 text-white px-8 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[13px] hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-50 ${isRTL ? 'flex-row-reverse' : ''}`}
                     >
-                        <Save size={18} /> {isSaving ? 'Saving...' : 'Save Register'}
+                        <Save size={18} /> {isSaving ? (isRTL ? 'جاري الحفظ...' : 'Saving...') : (isRTL ? 'حفظ السجل' : 'Save Register')}
                     </button>
                 )}
             </div>
-
-            {saveSuccess && (
-                <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-700 font-bold text-center text-sm">
-                    ✅ Attendance saved successfully!
-                </div>
-            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 {/* Controls */}
                 <div className="lg:col-span-1 space-y-4">
                     <div className="bg-white rounded-[2rem] border border-slate-200 premium-shadow p-6 space-y-6">
                         <div>
-                            <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500 mb-3">
-                                <Users size={16} className="text-emerald-600" /> Select Squad
+                            <label className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500 mb-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                <Users size={16} className="text-emerald-600" /> {isRTL ? 'اختر الفريق' : 'Select Squad'}
                             </label>
                             <select
                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-emerald-500/20"
                                 value={selectedSquad}
                                 onChange={(e) => setSelectedSquad(e.target.value)}
                             >
-                                <option value="">-- Choose a Squad --</option>
+                                <option value="">-- {isRTL ? 'اختر فريقاً' : 'Choose a Squad'} --</option>
                                 {squads.map(s => (
                                     <option key={s.id} value={s.id}>{s.name} ({s.category})</option>
                                 ))}
                             </select>
                         </div>
                         <div>
-                            <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500 mb-3">
-                                <CalendarCheck size={16} className="text-emerald-600" /> Training Date
+                            <label className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500 mb-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                <CalendarCheck size={16} className="text-emerald-600" /> {isRTL ? 'تاريخ التمرين' : 'Training Date'}
                             </label>
                             <input
                                 type="date"
@@ -260,7 +259,7 @@ const CoachAttendance = () => {
 
                         {selectedSquad && (
                             <div className="pt-6 border-t border-slate-100">
-                                <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-4">Summary</h4>
+                                <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-4">{isRTL ? 'ملخص' : 'Summary'}</h4>
                                 <div className="space-y-3">
                                     {statuses.map(s => {
                                         const count = Object.values(attendanceData).filter(val => val === s.id).length;
@@ -272,7 +271,7 @@ const CoachAttendance = () => {
                                         );
                                     })}
                                     <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between items-center text-sm font-black text-slate-900">
-                                        <span>Total</span>
+                                        <span>{isRTL ? 'المجموع' : 'Total'}</span>
                                         <span>{currentSquadPlayers.length}</span>
                                     </div>
                                 </div>
@@ -287,14 +286,14 @@ const CoachAttendance = () => {
                         
                         {/* Header options inside roster */}
                         {selectedSquad && (
-                            <div className="p-4 md:p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sm:flex-row flex-col gap-4">
-                                <h2 className="font-extrabold text-slate-800 text-lg flex items-center gap-2"><Users size={20} className="text-emerald-500" /> Player Roster</h2>
+                            <div className={`p-4 md:p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sm:flex-row flex-col gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                <h2 className={`font-extrabold text-slate-800 text-lg flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}><Users size={20} className="text-emerald-500" /> {isRTL ? 'قائمة اللاعبين' : 'Player Roster'}</h2>
                                 
                                 <button 
                                     onClick={() => setIsScannerOpen(true)}
-                                    className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-xs hover:scale-105 transition-transform shadow-lg shadow-emerald-500/30"
+                                    className={`flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-xs hover:scale-105 transition-transform shadow-lg shadow-emerald-500/30 ${isRTL ? 'flex-row-reverse' : ''}`}
                                 >
-                                    <QrCode size={16} /> Scan QR Badge
+                                    <QrCode size={16} /> {isRTL ? 'مسح QR' : 'Scan QR Badge'}
                                 </button>
                             </div>
                         )}
@@ -308,18 +307,15 @@ const CoachAttendance = () => {
                         {!selectedSquad ? (
                             <div className="h-[500px] flex flex-col justify-center items-center text-center p-8">
                                 <Users className="text-slate-200 mb-6" size={48} />
-                                <h3 className="text-xl font-black text-slate-900 mb-2">No Squad Selected</h3>
-                                <p className="text-slate-500 font-medium max-w-sm">Select a squad from the panel to load their attendance roster.</p>
+                                <h3 className="text-xl font-black text-slate-900 mb-2">{isRTL ? 'لم يتم اختيار فريق' : 'No Squad Selected'}</h3>
+                                <p className="text-slate-500 font-medium max-w-sm">{isRTL ? 'اختر فريقاً من اللوحة الجانبية لتحميل سجل الحضور.' : 'Select a squad from the panel to load their attendance roster.'}</p>
                             </div>
                         ) : isLoading ? (
-                            <div className="h-[500px] flex flex-col justify-center items-center">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
-                                <p className="text-slate-500 font-bold tracking-widest uppercase text-xs">Loading roster...</p>
-                            </div>
+                            <div className="p-6"><SkeletonTable rows={5} cols={3} /></div>
                         ) : currentSquadPlayers.length === 0 ? (
-                            <div className="h-[500px] flex flex-col justify-center items-center text-center p-8">
+                            <div className="h-[400px] flex flex-col justify-center items-center text-center p-8">
                                 <Users className="text-slate-200 mb-4" size={48} />
-                                <p className="text-slate-500 font-medium">This squad has no players assigned.</p>
+                                <p className="text-slate-500 font-medium">{isRTL ? 'لا يوجد لاعبون في هذا الفريق.' : 'This squad has no players assigned.'}</p>
                             </div>
                         ) : (
                             <div className="divide-y divide-slate-100">
