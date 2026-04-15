@@ -20,9 +20,20 @@ class AcademyProvisionRequest(BaseModel):
     admin_email: EmailStr
     admin_password: str
     admin_name: str
+    city: str | None = None
+    notes: str | None = None
+    subdomain: str | None = None
 
 class AcademyStatusUpdate(BaseModel):
     status: str  # "active" or "suspended"
+
+class AcademyUpdateRequest(BaseModel):
+    name: str | None = None
+    city: str | None = None
+    notes: str | None = None
+    status: str | None = None
+    primary_color: str | None = None
+    custom_domain: str | None = None
 
 class DomainAssignment(BaseModel):
     custom_domain: str
@@ -119,8 +130,14 @@ async def create_academy(req: AcademyProvisionRequest):
         "name": req.name,
         "custom_domain": req.custom_domain,
         "domain_status": "pending" if req.custom_domain else None,
-        "status": "active"
+        "status": "active",
     }
+    if req.city:
+        academy_data["city"] = req.city
+    if req.notes:
+        academy_data["notes"] = req.notes
+    if req.subdomain:
+        academy_data["subdomain"] = req.subdomain
     try:
         res_academy = await supabase._post("/rest/v1/academies?select=id", academy_data)
     except Exception as e:
@@ -172,6 +189,35 @@ async def update_academy(academy_id: str, data: AcademyStatusUpdate):
         )
         res.raise_for_status()
         return res.json()
+
+
+@router.put("/academies/{academy_id}")
+async def full_update_academy(academy_id: str, data: AcademyUpdateRequest):
+    """Full update of academy details: name, city, notes, status, color."""
+    patch = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update.")
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # Try full patch — if city/notes columns don't exist, fall back to safe fields
+        res = await client.patch(
+            f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+            json=patch,
+            headers=supabase.admin_headers
+        )
+        if res.status_code >= 400:
+            # Retry with only safe known columns
+            safe = {k: v for k, v in patch.items() if k in ("name", "status", "primary_color", "custom_domain")}
+            if safe:
+                res = await client.patch(
+                    f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+                    json=safe,
+                    headers=supabase.admin_headers
+                )
+                res.raise_for_status()
+                return {"success": True, "note": "city/notes columns not yet in DB — only safe fields updated."}
+            res.raise_for_status()
+    return {"success": True}
 
 
 # ── Domain Management ──
