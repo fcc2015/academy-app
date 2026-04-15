@@ -18,4 +18,4 @@ services:
       - key: PAYPAL_SANDBOX
         value: "true"
       - key: FRONTEND_URL
-        value: "https://jolly-kangaroo-3c3d92.netlify.app"
+        value: "https://academy-app-mu.vercel.app"
