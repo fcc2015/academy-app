@@ -11,7 +11,7 @@ const TYPES = ['Technical', 'Physical', 'Tactical', 'Friendly', 'Recovery'];
 const STATUSES = ['Scheduled', 'Completed', 'Cancelled'];
 
 const TrainingManagement = () => {
-    const { isRTL, dir } = useLanguage();
+    const { isRTL, dir, t, formatDate } = useLanguage();
     const [sessions, setSessions] = useState([]);
     const [squads, setSquads] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +35,7 @@ const TrainingManagement = () => {
             const [sRes, sqRes] = await Promise.all([authFetch(`${API_URL}/training/`), authFetch(`${API_URL}/squads/`)]);
             if (sRes.ok) setSessions(await sRes.json());
             if (sqRes.ok) setSquads(await sqRes.json());
-        } catch { showBanner('خطأ في التحميل', false); }
+        } catch { showBanner(t('ui.loadError'), false); }
         finally { setIsLoading(false); }
     };
 
@@ -58,8 +58,8 @@ const TrainingManagement = () => {
             const res = await authFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, session_date: new Date(form.session_date).toISOString() }) });
             if (!res.ok) throw new Error();
             setIsModalOpen(false); fetchAll();
-            showBanner(isEdit ? 'تم تحديث الحصة بنجاح' : 'تمت إضافة الحصة بنجاح');
-        } catch { showBanner('خطأ في الحفظ', false); }
+            showBanner(isEdit ? t('ui.updated') : t('ui.added'));
+        } catch { showBanner(t('ui.saveError'), false); }
     };
 
     const handleDelete = (id) => {
@@ -72,8 +72,8 @@ const TrainingManagement = () => {
         try {
             await authFetch(`${API_URL}/training/${id}`, { method: 'DELETE' });
             setSessions(p => p.filter(s => s.id !== id));
-            showBanner('تم الحذف');
-        } catch { showBanner('خطأ في الحذف', false); }
+            showBanner(t('ui.deleted'));
+        } catch { showBanner(t('ui.deleteError'), false); }
     };
 
     const filtered = sessions.filter(s =>
@@ -93,22 +93,22 @@ const TrainingManagement = () => {
                 <div>
                     <h2 className={`text-4xl font-black text-slate-800 tracking-tight flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-600/30"><Calendar size={32}/></div>
-                        جدول التداريب
+                        {t('training.title')}
                     </h2>
-                    <p className="text-slate-400 font-bold mt-2 tracking-widest text-sm uppercase">إدارة الحصص التدريبية الأسبوعية للفئات</p>
+                    <p className="text-slate-400 font-bold mt-2 tracking-widest text-sm uppercase">{t('training.subtitle')}</p>
                 </div>
                 <button onClick={openAdd} className="flex items-center gap-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">
-                    <Plus size={20}/> حصة جديدة
+                    <Plus size={20}/> {t('training.newSession')}
                 </button>
             </div>
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 {[
-                    { label: 'إجمالي الحصص', val: sessions.length, color: 'indigo' },
-                    { label: 'مجدولة', val: sessions.filter(s=>s.status==='Scheduled').length, color: 'sky' },
-                    { label: 'مكتملة', val: sessions.filter(s=>s.status==='Completed').length, color: 'emerald' },
-                    { label: 'ملغاة', val: sessions.filter(s=>s.status==='Cancelled').length, color: 'red' },
+                    { label: t('training.totalSessions'), val: sessions.length, color: 'indigo' },
+                    { label: t('training.scheduled'), val: sessions.filter(s=>s.status==='Scheduled').length, color: 'sky' },
+                    { label: t('training.completed'), val: sessions.filter(s=>s.status==='Completed').length, color: 'emerald' },
+                    { label: t('training.cancelled'), val: sessions.filter(s=>s.status==='Cancelled').length, color: 'red' },
                 ].map((card, i) => (
                     <div key={i} className={`bg-${card.color}-50 border border-${card.color}-100 rounded-[2rem] p-5`}>
                         <div className={`text-3xl font-black text-${card.color}-700 mb-1`}>{card.val}</div>
@@ -121,10 +121,10 @@ const TrainingManagement = () => {
             <div className={`flex flex-col sm:flex-row gap-3 mb-6 ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
                 <div className="relative flex-1">
                     <Search className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-300`} size={18}/>
-                    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ابحث عن حصة..." className={`w-full ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 outline-none shadow-sm`}/>
+                    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t('training.searchPlaceholder')} className={`w-full ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 outline-none shadow-sm`}/>
                 </div>
                 <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none shadow-sm cursor-pointer">
-                    <option value="">كل الأنواع</option>
+                    <option value="">{t('training.allTypes')}</option>
                     {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
             </div>
@@ -133,7 +133,7 @@ const TrainingManagement = () => {
             {isLoading ? (
                 <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"/></div>
             ) : filtered.length === 0 ? (
-                <div className="text-center py-24 text-slate-300 font-black uppercase tracking-widest text-xs">لا توجد حصص تدريبية</div>
+                <div className="text-center py-24 text-slate-300 font-black uppercase tracking-widest text-xs">{t('training.noSessions')}</div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {filtered.map(s => (
@@ -154,8 +154,8 @@ const TrainingManagement = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-2 text-[12px] font-bold text-slate-500">
-                                    <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}><Calendar size={13} className="text-indigo-400"/>{new Date(s.session_date).toLocaleString('ar-MA', { weekday:'long', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</div>
-                                    <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}><Clock size={13} className="text-slate-400"/>{s.duration_minutes} دقيقة</div>
+                                    <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}><Calendar size={13} className="text-indigo-400"/>{formatDate(s.session_date)}</div>
+                                    <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}><Clock size={13} className="text-slate-400"/>{s.duration_minutes} {t('training.minutes')}</div>
                                     <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}><MapPin size={13} className="text-slate-400"/>{s.location}</div>
                                     {squads.find(sq=>sq.id===s.squad_id) && <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}><Users size={13} className="text-slate-400"/>{squads.find(sq=>sq.id===s.squad_id)?.name}</div>}
                                 </div>
@@ -171,58 +171,58 @@ const TrainingManagement = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in" dir="rtl">
                     <div className="bg-white rounded-[2.5rem] w-full max-w-lg premium-shadow border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
                         <div className="px-8 py-6 border-b border-slate-100 bg-indigo-50 flex justify-between items-center flex-row-reverse shrink-0">
-                            <h3 className="font-black text-indigo-900 text-xl flex items-center gap-3"><Calendar size={22}/> {isEdit ? 'تعديل الحصة' : 'حصة تدريبية جديدة'}</h3>
+                            <h3 className="font-black text-indigo-900 text-xl flex items-center gap-3"><Calendar size={22}/> {isEdit ? t('training.editSession') : t('training.newSessionForm')}</h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 text-indigo-300 hover:bg-white rounded-full"><X size={20}/></button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-8 space-y-5 text-right overflow-y-auto">
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">عنوان الحصة *</label>
-                                <input required value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 text-right" placeholder="مثال: تدريب تقني للفئة U15"/>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('training.sessionTitle')} *</label>
+                                <input required value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 text-right" placeholder={t('training.sessionPlaceholder')}/>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">الفريق</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('training.squad')}</label>
                                     <select value={form.squad_id} onChange={e => setForm({...form, squad_id: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none cursor-pointer appearance-none text-right">
-                                        <option value="">-- اختر --</option>
+                                        <option value="">{t('training.selectSquad')}</option>
                                         {squads.map(sq => <option key={sq.id} value={sq.id}>{sq.name}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">النوع</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('training.type')}</label>
                                     <select value={form.session_type} onChange={e => setForm({...form, session_type: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none cursor-pointer appearance-none text-right">
                                         {TYPES.map(t => <option key={t}>{t}</option>)}
                                     </select>
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">تاريخ وتوقيت الحصة *</label>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('training.dateTime')} *</label>
                                 <input required type="datetime-local" value={form.session_date} onChange={e => setForm({...form, session_date: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10"/>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">المدة (دقيقة)</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('training.duration')}</label>
                                     <input type="number" min="15" step="15" value={form.duration_minutes} onChange={e => setForm({...form, duration_minutes: +e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none text-center"/>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">الحالة</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('training.status')}</label>
                                     <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none cursor-pointer appearance-none text-right">
                                         {STATUSES.map(s => <option key={s}>{s}</option>)}
                                     </select>
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">الملعب / المكان</label>
-                                <input value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none text-right" placeholder="الملعب الرئيسي..."/>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('training.venue')}</label>
+                                <input value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none text-right" placeholder={t('training.venuePlaceholder')}/>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">الأهداف والمحتوى</label>
-                                <textarea rows="3" value={form.objectives} onChange={e => setForm({...form, objectives: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none resize-none text-right" placeholder="أهداف الحصة..."/>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('training.objectives')}</label>
+                                <textarea rows="3" value={form.objectives} onChange={e => setForm({...form, objectives: e.target.value})} className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none resize-none text-right" placeholder={t('training.objectivesPlaceholder')}/>
                             </div>
                             <div className="flex gap-4 pt-2 flex-row-reverse">
                                 <button type="submit" className="flex-1 py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">
-                                    {isEdit ? 'حفظ التغييرات' : 'إضافة الحصة'}
+                                    {isEdit ? t('ui.saveChanges') : t('training.addSession')}
                                 </button>
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-4 text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">إلغاء</button>
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-4 text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">{t('common.cancel')}</button>
                             </div>
                         </form>
                     </div>
@@ -234,8 +234,8 @@ const TrainingManagement = () => {
                 onConfirm={confirmDelete}
                 onCancel={() => setConfirmDialog({ isOpen: false, id: null })}
                 isRTL={isRTL}
-                title="حذف الحصة التدريبية"
-                message="هل أنت متأكد من حذف هذه الحصة؟ لا يمكن التراجع."
+                title={t('training.deleteTitle')}
+                message={t('training.deleteMessage')}
             />
         </div>
     );

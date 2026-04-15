@@ -39,7 +39,7 @@ const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setM
                     <div className={isRTL ? 'text-right' : 'text-left'}>
                         <h2 className="text-sm font-semibold text-surface-900 leading-none">{t('common.appName')}</h2>
                         <p className="text-[10px] font-medium uppercase tracking-wider text-surface-500 mt-1">
-                            {isRTL ? 'لوحة الإدارة' : 'Admin Panel'}
+                            {t('ui.adminPanel')}
                         </p>
                     </div>
                 </div>
@@ -128,7 +128,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
 
     const navGroups = [
         {
-            label: isRTL ? 'الرئيسية' : 'Main',
+            label: t('ui.main'),
             items: [
                 { to: '/admin/dashboard', icon: LayoutDashboard, labelKey: 'sidebar.dashboard' },
                 { to: '/admin/players',   icon: Users,           labelKey: 'sidebar.players' },
@@ -137,7 +137,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
             ]
         },
         {
-            label: isRTL ? 'العمليات' : 'Operations',
+            label: t('ui.operations'),
             items: [
                 { to: '/admin/attendance',   icon: ClipboardCheck, labelKey: 'sidebar.attendance' },
                 { to: '/admin/events',       icon: Calendar,       labelKey: 'sidebar.events' },
@@ -152,7 +152,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
             ]
         },
         {
-            label: isRTL ? 'الصحة والمالية' : 'Health & Finance',
+            label: t('ui.healthFinance'),
             items: [
                 { to: '/admin/medical',       icon: Heart,         labelKey: 'sidebar.medical' },
                 { to: '/admin/finances',      icon: DollarSign,    labelKey: 'sidebar.finances' },
@@ -161,7 +161,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
             ]
         },
         {
-            label: isRTL ? 'الإدارة' : 'Admin',
+            label: t('ui.admin'),
             items: [
                 { to: '/admin/chat',     icon: MessageCircle, labelKey: 'sidebar.chat' },
                 { to: '/admin/admins',   icon: Shield,  labelKey: 'sidebar.admins' },

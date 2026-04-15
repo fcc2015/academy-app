@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, History, Building2, CheckCircle2, Loader2, Ban, Plus, Eye, X, Zap, Star, Crown, Clock, DollarSign, ExternalLink, RefreshCw, ArrowUpRight, ArrowDownRight, Calculator, Users, UserCog, Dumbbell } from 'lucide-react';
+import { CreditCard, History, CheckCircle2, Loader2, Ban, X, Zap, Star, Crown, Clock, DollarSign, RefreshCw, ArrowUpRight, Calculator, Users, UserCog, Dumbbell } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
@@ -127,7 +127,7 @@ export default function SaasSubscriptions() {
                     plan_id: planId,
                     pro_rata_amount: proRata.amount,
                     pro_rata_credit: proRata.credit,
-                    upgrade_type: currentPlan && newPlan && newPlan.price > currentPlan.price ? 'upgrade' : 'downgrade'
+                    upgrade_type: 'upgrade'
                 })
             });
             if (res.ok) {
@@ -423,14 +423,14 @@ export default function SaasSubscriptions() {
                                                     <div className="flex items-center gap-2 justify-end">
                                                         <button
                                                             onClick={() => { setSelectedAcademy(acc); setShowPlanModal(true); setShowProRata(null); }}
-                                                            className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
+                                                            className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors border border-blue-100"
                                                             title="Upgrade / Change Plan"
                                                         >
                                                             <ArrowUpRight className="w-4 h-4" />
                                                         </button>
                                                         <button
                                                             onClick={() => viewHistory(acc)}
-                                                            className="p-2 rounded-lg bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors"
+                                                            className="p-2 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors border border-violet-100"
                                                             title="Payment History"
                                                         >
                                                             <History className="w-4 h-4" />
@@ -449,20 +449,20 @@ export default function SaasSubscriptions() {
 
             {/* ═══ UPGRADE PLAN MODAL WITH PRO-RATA ═══ */}
             {showPlanModal && selectedAcademy && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-[#1e293b] border border-slate-700 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center p-6 border-b border-slate-800">
+                <div className="modal-backdrop">
+                    <div className="bg-white border border-surface-200 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center p-6 border-b border-surface-200">
                             <div>
-                                <h3 className="text-xl font-bold text-white tracking-tight">Change Plan</h3>
-                                <p className="text-sm text-slate-400 mt-0.5">For: <strong className="text-slate-200">{selectedAcademy.name}</strong>
+                                <h3 className="text-lg font-semibold text-surface-900">Change Plan</h3>
+                                <p className="text-sm text-surface-500 mt-0.5">For: <strong className="text-surface-800">{selectedAcademy.name}</strong>
                                     {selectedAcademy.plan_id && (
-                                        <span className="ml-2 text-xs text-slate-500">
-                                            Current: <strong className="text-emerald-400">{PLANS.find(p => p.id === selectedAcademy.plan_id)?.name || 'None'}</strong>
+                                        <span className="ml-2 text-xs text-surface-400">
+                                            Current: <strong className="text-emerald-600">{PLANS.find(p => p.id === selectedAcademy.plan_id)?.name || 'None'}</strong>
                                         </span>
                                     )}
                                 </p>
                             </div>
-                            <button onClick={() => { setShowPlanModal(false); setSelectedAcademy(null); setShowProRata(null); }} className="text-slate-400 hover:text-white transition-colors">
+                            <button onClick={() => { setShowPlanModal(false); setSelectedAcademy(null); setShowProRata(null); }} className="text-surface-400 hover:text-surface-900 transition-colors">
                                 <X size={22} />
                             </button>
                         </div>
@@ -472,47 +472,45 @@ export default function SaasSubscriptions() {
                                 const isCurrentPlan = selectedAcademy.plan_id === plan.id;
                                 const currentPlan = PLANS.find(p => p.id === selectedAcademy.plan_id);
                                 const isUpgrade = currentPlan && plan.price > currentPlan.price;
-                                const isDowngrade = currentPlan && plan.price < currentPlan.price;
-                                const proRata = !isCurrentPlan && currentPlan 
-                                    ? calculateProRata(currentPlan, plan, selectedAcademy.billing_cycle_start) 
+                                const proRata = !isCurrentPlan && currentPlan
+                                    ? calculateProRata(currentPlan, plan, selectedAcademy.billing_cycle_start)
                                     : null;
                                 const isPreview = showProRata === plan.id;
 
                                 return (
                                     <div key={plan.id} className={`border rounded-xl p-5 transition-all ${
                                         isCurrentPlan
-                                            ? 'border-emerald-500/50 bg-emerald-500/5'
+                                            ? 'border-emerald-300 bg-emerald-50'
                                             : isPreview
-                                                ? 'border-blue-500/50 bg-blue-500/5 scale-[1.02]'
-                                                : 'border-slate-700 bg-slate-800/30 hover:border-slate-600'
+                                                ? 'border-blue-300 bg-blue-50 scale-[1.02]'
+                                                : 'border-surface-200 bg-surface-50 hover:border-surface-300'
                                     }`}>
                                         <div className="flex items-center gap-2 mb-3">
-                                            <Icon className={`w-5 h-5 text-${plan.color}-400`} />
-                                            <span className="font-bold text-slate-200">{plan.name}</span>
-                                            {isUpgrade && <ArrowUpRight className="w-4 h-4 text-emerald-400 ml-auto" />}
-                                            {isDowngrade && <ArrowDownRight className="w-4 h-4 text-amber-400 ml-auto" />}
+                                            <Icon className={`w-5 h-5 text-${plan.color}-500`} />
+                                            <span className="font-semibold text-surface-800">{plan.name}</span>
+                                            {isUpgrade && <ArrowUpRight className="w-4 h-4 text-emerald-600 ml-auto" />}
                                         </div>
-                                        <p className="text-2xl font-black text-white mb-1">{plan.price === 0 ? 'FREE' : plan.price} <span className="text-sm font-medium text-slate-400">{plan.price > 0 ? `${plan.currency}/mo` : ''}</span></p>
-                                        
+                                        <p className="text-2xl font-bold text-surface-900 mb-1">{plan.price === 0 ? 'FREE' : plan.price} <span className="text-sm font-medium text-surface-500">{plan.price > 0 ? `${plan.currency}/mo` : ''}</span></p>
+
                                         {/* Resource Limits in modal */}
-                                        <div className="grid grid-cols-3 gap-1 mb-3 p-2 bg-slate-900/50 rounded-lg border border-slate-700/40">
+                                        <div className="grid grid-cols-3 gap-1 mb-3 p-2 bg-surface-100 rounded-lg border border-surface-200">
                                             <div className="text-center">
-                                                <p className="text-[9px] text-slate-500 font-bold">Players</p>
-                                                <p className="text-xs font-black text-slate-300">{formatLimit(plan.limits.players)}</p>
+                                                <p className="text-[9px] text-surface-500 font-semibold">Players</p>
+                                                <p className="text-xs font-bold text-surface-800">{formatLimit(plan.limits.players)}</p>
                                             </div>
                                             <div className="text-center">
-                                                <p className="text-[9px] text-slate-500 font-bold">Admins</p>
-                                                <p className="text-xs font-black text-slate-300">{formatLimit(plan.limits.admins)}</p>
+                                                <p className="text-[9px] text-surface-500 font-semibold">Admins</p>
+                                                <p className="text-xs font-bold text-surface-800">{formatLimit(plan.limits.admins)}</p>
                                             </div>
                                             <div className="text-center">
-                                                <p className="text-[9px] text-slate-500 font-bold">Coaches</p>
-                                                <p className="text-xs font-black text-slate-300">{formatLimit(plan.limits.coaches)}</p>
+                                                <p className="text-[9px] text-surface-500 font-semibold">Coaches</p>
+                                                <p className="text-xs font-bold text-surface-800">{formatLimit(plan.limits.coaches)}</p>
                                             </div>
                                         </div>
 
                                         <ul className="space-y-1.5 my-3">
                                             {plan.features.slice(0, 4).map((f, i) => (
-                                                <li key={i} className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                                                <li key={i} className="text-[11px] text-surface-600 flex items-center gap-1.5">
                                                     <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {f}
                                                 </li>
                                             ))}
@@ -520,29 +518,29 @@ export default function SaasSubscriptions() {
 
                                         {/* Pro-Rata Preview */}
                                         {isPreview && proRata && (
-                                            <div className="my-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl animate-fade-in">
+                                            <div className="my-3 p-3 bg-blue-50 border border-blue-200 rounded-xl animate-fade-in">
                                                 <div className="flex items-center gap-1.5 mb-2">
-                                                    <Calculator className="w-3.5 h-3.5 text-blue-400" />
-                                                    <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wider">Pro-Rata Calculation</span>
+                                                    <Calculator className="w-3.5 h-3.5 text-blue-600" />
+                                                    <span className="text-[10px] font-semibold text-blue-700 uppercase tracking-wider">Pro-Rata Calculation</span>
                                                 </div>
                                                 <div className="space-y-1.5 text-[11px]">
                                                     <div className="flex justify-between">
-                                                        <span className="text-slate-400">Days remaining</span>
-                                                        <span className="text-slate-200 font-bold">{proRata.daysRemaining} / {proRata.totalDays} days</span>
+                                                        <span className="text-surface-500">Days remaining</span>
+                                                        <span className="text-surface-800 font-bold">{proRata.daysRemaining} / {proRata.totalDays} days</span>
                                                     </div>
                                                     {proRata.credit > 0 && (
                                                         <div className="flex justify-between">
-                                                            <span className="text-slate-400">Credit (unused {currentPlan?.name})</span>
-                                                            <span className="text-emerald-400 font-bold">-{proRata.credit} MAD</span>
+                                                            <span className="text-surface-500">Credit (unused {currentPlan?.name})</span>
+                                                            <span className="text-emerald-600 font-bold">-{proRata.credit} MAD</span>
                                                         </div>
                                                     )}
                                                     <div className="flex justify-between">
-                                                        <span className="text-slate-400">New plan ({proRata.daysRemaining}d)</span>
-                                                        <span className="text-slate-200 font-bold">+{proRata.newCost} MAD</span>
+                                                        <span className="text-surface-500">New plan ({proRata.daysRemaining}d)</span>
+                                                        <span className="text-surface-800 font-bold">+{proRata.newCost} MAD</span>
                                                     </div>
-                                                    <div className="flex justify-between pt-2 border-t border-blue-500/20">
-                                                        <span className="text-blue-300 font-bold">Amount to pay now</span>
-                                                        <span className="text-lg font-black text-white">{proRata.amount} MAD</span>
+                                                    <div className="flex justify-between pt-2 border-t border-blue-200">
+                                                        <span className="text-blue-700 font-semibold">Amount to pay now</span>
+                                                        <span className="text-lg font-bold text-surface-900">{proRata.amount} MAD</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -550,31 +548,31 @@ export default function SaasSubscriptions() {
 
                                         <div className="space-y-2 mt-3">
                                             {isCurrentPlan ? (
-                                                <button disabled className="w-full py-2 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-400 cursor-default border border-emerald-500/20">
+                                                <button disabled className="w-full py-2 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 cursor-default border border-emerald-200">
                                                     ✓ Current Plan
+                                                </button>
+                                            ) : currentPlan && plan.price < currentPlan.price ? (
+                                                <button disabled className="w-full py-2 rounded-lg text-xs font-semibold bg-surface-100 text-surface-400 cursor-not-allowed border border-surface-200">
+                                                    Downgrade not available
                                                 </button>
                                             ) : (
                                                 <>
-                                                    {/* Preview Pro-Rata button */}
-                                                    {currentPlan && !isPreview && (
+                                                    {/* Preview Pro-Rata button (upgrade only) */}
+                                                    {currentPlan && isUpgrade && !isPreview && (
                                                         <button
                                                             onClick={() => setShowProRata(plan.id)}
-                                                            className="w-full py-2 rounded-lg text-xs font-bold bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 transition-colors flex items-center justify-center gap-1.5"
+                                                            className="w-full py-2 rounded-lg text-xs font-semibold bg-surface-100 text-surface-700 hover:bg-surface-200 transition-colors flex items-center justify-center gap-1.5 border border-surface-200"
                                                         >
                                                             <Calculator className="w-3.5 h-3.5" />
-                                                            {isUpgrade ? 'Calculate Upgrade' : 'Calculate Downgrade'}
+                                                            Calculate Upgrade
                                                         </button>
                                                     )}
                                                     <button
                                                         onClick={() => handleAssignPlan(selectedAcademy, plan.id)}
                                                         disabled={assigningPlan}
-                                                        className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${
-                                                            isUpgrade ? 'bg-emerald-600 hover:bg-emerald-500 text-white' :
-                                                            isDowngrade ? 'bg-amber-600 hover:bg-amber-500 text-white' :
-                                                            'bg-slate-700 hover:bg-slate-600 text-white'
-                                                        }`}
+                                                        className="w-full py-2 rounded-lg text-xs font-bold transition-all bg-emerald-600 hover:bg-emerald-500 text-white"
                                                     >
-                                                        {assigningPlan ? 'Processing...' : isUpgrade ? '⬆ Upgrade Now' : isDowngrade ? '⬇ Downgrade' : 'Assign Plan'}
+                                                        {assigningPlan ? 'Processing...' : isUpgrade ? '⬆ Upgrade Now' : 'Assign Plan'}
                                                     </button>
                                                     {plan.price > 0 && (
                                                         <button
@@ -603,45 +601,45 @@ export default function SaasSubscriptions() {
 
             {/* Payment History Modal */}
             {showHistoryModal && selectedAcademy && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-[#1e293b] border border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
-                        <div className="flex justify-between items-center p-6 border-b border-slate-800">
+                <div className="modal-backdrop">
+                    <div className="modal-content">
+                        <div className="flex justify-between items-center p-6 border-b border-surface-200">
                             <div>
-                                <h3 className="text-xl font-bold text-white tracking-tight">Payment History</h3>
-                                <p className="text-sm text-slate-400 mt-0.5">{selectedAcademy.name}</p>
+                                <h3 className="text-lg font-semibold text-surface-900">Payment History</h3>
+                                <p className="text-sm text-surface-500 mt-0.5">{selectedAcademy.name}</p>
                             </div>
-                            <button onClick={() => { setShowHistoryModal(false); setSelectedAcademy(null); setTransactions([]); }} className="text-slate-400 hover:text-white transition-colors">
+                            <button onClick={() => { setShowHistoryModal(false); setSelectedAcademy(null); setTransactions([]); }} className="text-surface-400 hover:text-surface-900 transition-colors">
                                 <X size={22} />
                             </button>
                         </div>
                         <div className="p-6 max-h-[400px] overflow-y-auto">
                             {loadingTx ? (
-                                <div className="py-8 flex justify-center"><Loader2 className="w-6 h-6 text-emerald-400 animate-spin" /></div>
+                                <div className="py-8 flex justify-center"><Loader2 className="w-6 h-6 text-emerald-500 animate-spin" /></div>
                             ) : transactions.length === 0 ? (
                                 <div className="py-8 text-center">
-                                    <History className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                                    <p className="text-slate-500 text-sm font-medium">No transactions yet</p>
+                                    <History className="w-10 h-10 text-surface-300 mx-auto mb-3" />
+                                    <p className="text-surface-400 text-sm font-medium">No transactions yet</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
                                     {transactions.map((tx, i) => (
-                                        <div key={i} className="flex items-center justify-between p-4 bg-slate-800/30 border border-slate-700/50 rounded-xl">
+                                        <div key={i} className="flex items-center justify-between p-4 bg-surface-50 border border-surface-200 rounded-xl">
                                             <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-lg ${tx.status === 'completed' ? 'bg-emerald-500/10' : tx.status === 'pending' ? 'bg-amber-500/10' : 'bg-rose-500/10'}`}>
-                                                    {tx.status === 'completed' ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> :
-                                                     tx.status === 'pending' ? <Clock className="w-4 h-4 text-amber-400" /> :
-                                                     <Ban className="w-4 h-4 text-rose-400" />}
+                                                <div className={`p-2 rounded-lg ${tx.status === 'completed' ? 'bg-emerald-50' : tx.status === 'pending' ? 'bg-amber-50' : 'bg-rose-50'}`}>
+                                                    {tx.status === 'completed' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> :
+                                                     tx.status === 'pending' ? <Clock className="w-4 h-4 text-amber-600" /> :
+                                                     <Ban className="w-4 h-4 text-rose-600" />}
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-semibold text-slate-200">{tx.amount} {tx.currency || 'USD'}</p>
-                                                    <p className="text-[10px] text-slate-500">{tx.description || ''}</p>
-                                                    <p className="text-[10px] text-slate-500">{tx.created_at ? new Date(tx.created_at).toLocaleString() : '—'}</p>
+                                                    <p className="text-sm font-semibold text-surface-800">{tx.amount} {tx.currency || 'USD'}</p>
+                                                    <p className="text-[10px] text-surface-400">{tx.description || ''}</p>
+                                                    <p className="text-[10px] text-surface-400">{tx.created_at ? new Date(tx.created_at).toLocaleString() : '—'}</p>
                                                 </div>
                                             </div>
-                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                                                tx.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' :
-                                                tx.status === 'pending' ? 'bg-amber-500/10 text-amber-400' :
-                                                'bg-rose-500/10 text-rose-400'
+                                            <span className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                                                tx.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                tx.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                'bg-rose-50 text-rose-600 border-rose-200'
                                             }`}>
                                                 {tx.status}
                                             </span>

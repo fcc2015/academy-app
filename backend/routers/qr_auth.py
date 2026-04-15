@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import uuid
 import time
-from ..core.auth import get_current_user
+from core.auth_middleware import verify_token as get_current_user
 
 router = APIRouter(prefix="/api/qr-auth", tags=["QR Authentication"])
 

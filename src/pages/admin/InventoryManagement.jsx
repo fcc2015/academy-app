@@ -19,7 +19,7 @@ import { useToast } from '../../components/Toast';
 const API_URL = import.meta.env.VITE_API_URL;
 
 const InventoryManagement = () => {
-    const { isRTL, dir } = useLanguage();
+    const { isRTL, dir, t, formatDate } = useLanguage();
     
     const [items, setItems] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +48,7 @@ const InventoryManagement = () => {
             }
         } catch (error) {
             console.error('Error fetching inventory:', error);
-            showBanner('خطأ في تحميل البيانات', 'error');
+            showBanner(t('ui.loadError'), 'error');
         } finally {
             setIsLoading(false);
         }
@@ -113,8 +113,8 @@ const InventoryManagement = () => {
             
             setIsModalOpen(false);
             fetchInventory();
-            showBanner(isEditMode ? 'تم تحديث المعدات بنجاح' : 'تم إضافة المعدات بنجاح', 'success');
-        } catch { showBanner('خطأ في حفظ البيانات', 'error');
+            showBanner(isEditMode ? t('ui.updated') : t('ui.added'), 'success');
+        } catch { showBanner(t('ui.saveError'), 'error');
         }
     };
 
@@ -129,12 +129,12 @@ const InventoryManagement = () => {
             const res = await authFetch(`${API_URL}/inventory/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 setItems(prev => prev.filter(i => i.id !== id));
-                showBanner('تم الحذف بنجاح', 'success');
+                showBanner(t('ui.deleted'), 'success');
             } else {
                 throw new Error('Failed to delete');
             }
         } catch {
-            showBanner('خطأ في الحذف', 'error');
+            showBanner(t('ui.deleteError'), 'error');
         }
     };
 
@@ -149,23 +149,23 @@ const InventoryManagement = () => {
 
     const getConditionBadge = (condition) => {
         switch (condition) {
-            case 'New': return <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black tracking-widest uppercase">جديد</span>;
-            case 'Good': return <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black tracking-widest uppercase">جيد</span>;
-            case 'Fair': return <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black tracking-widest uppercase">متوسط</span>;
-            case 'Poor': return <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-black tracking-widest uppercase">سيء</span>;
-            case 'Lost': return <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-[10px] font-black tracking-widest uppercase">مفقود</span>;
+            case 'New': return <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-black tracking-widest uppercase">{t('inventory.condNew')}</span>;
+            case 'Good': return <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black tracking-widest uppercase">{t('inventory.condGood')}</span>;
+            case 'Fair': return <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-black tracking-widest uppercase">{t('inventory.condFair')}</span>;
+            case 'Poor': return <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-black tracking-widest uppercase">{t('inventory.condPoor')}</span>;
+            case 'Lost': return <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-[10px] font-black tracking-widest uppercase">{t('inventory.condLost')}</span>;
             default: return null;
         }
     };
     
     const getCategoryName = (category) => {
         const mapping = {
-            'Balls': 'كرات',
-            'Bibs': 'صدريات',
-            'Cones': 'أقماع',
-            'Jerseys': 'أقمصة',
-            'Medical': 'معدات طبية',
-            'Other': 'أخرى'
+            'Balls': t('inventory.catBalls'),
+            'Bibs': t('inventory.catBibs'),
+            'Cones': t('inventory.catCones'),
+            'Jerseys': t('inventory.catJerseys'),
+            'Medical': t('inventory.catMedical'),
+            'Other': t('inventory.catOther')
         };
         return mapping[category] || category;
     };
@@ -180,9 +180,9 @@ const InventoryManagement = () => {
                         <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-600/30">
                             <Box size={32} />
                         </div>
-                        إدارة المعدات
+                        {t('inventory.title')}
                     </h2>
-                    <p className="text-slate-400 font-bold mt-2 tracking-widest text-sm uppercase">تتبع المستودع وتجهيزات الأكاديمية</p>
+                    <p className="text-slate-400 font-bold mt-2 tracking-widest text-sm uppercase">{t('inventory.subtitle')}</p>
                 </div>
                 <div className="flex items-center gap-4 w-full md:w-auto">
                     <button
@@ -190,7 +190,7 @@ const InventoryManagement = () => {
                         className="flex-1 md:flex-none flex items-center justify-center gap-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl shadow-indigo-600/20 active:scale-95 transition-all"
                     >
                         <PlusCircle size={20} />
-                        <span>معدات جديدة</span>
+                        <span>{t('inventory.newItem')}</span>
                     </button>
                 </div>
             </div>
@@ -210,7 +210,7 @@ const InventoryManagement = () => {
                         <h4 className="text-3xl font-black text-slate-900 tracking-tighter mb-1">
                             {totalItems}
                         </h4>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">إجمالي القطع المتوفرة</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('inventory.totalPieces')}</p>
                     </div>
                 </div>
 
@@ -227,7 +227,7 @@ const InventoryManagement = () => {
                         <h4 className="text-3xl font-black text-slate-900 tracking-tighter mb-1">
                             {lowStockItems}
                         </h4>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">عناصر قاربت النفاذ (5 أو أقل)</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('inventory.lowStock')}</p>
                     </div>
                 </div>
 
@@ -244,7 +244,7 @@ const InventoryManagement = () => {
                         <h4 className="text-3xl font-black text-slate-900 tracking-tighter mb-1">
                             {outOfStockItems}
                         </h4>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">عناصر مفقودة أو نافذة</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('inventory.outOfStock')}</p>
                     </div>
                 </div>
             </div>
@@ -253,14 +253,14 @@ const InventoryManagement = () => {
             <div className="bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden border-b-8 border-b-indigo-900 animate-fade-in">
                 <div className={`px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 ${isRTL ? 'flex-row-reverse' : ''}`}>
                     <h3 className={`font-extrabold text-slate-800 text-lg flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                        <Box size={20} className="text-indigo-500" /> جرد المعدات
+                        <Box size={20} className="text-indigo-500" /> {t('inventory.inventoryList')}
                     </h3>
 
                     <div className={`relative w-full sm:w-80`}>
                         <Search className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-300`} size={18} />
                         <input
                             type="text"
-                            placeholder="ابحث عن معدات..."
+                            placeholder={t('inventory.searchPlaceholder')}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className={`w-full ${isRTL ? 'pr-12 pl-4 text-right' : 'pl-12 pr-4 text-left'} py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all shadow-sm`}
@@ -272,11 +272,11 @@ const InventoryManagement = () => {
                     <table className={`w-full ${isRTL ? 'text-right' : 'text-left'} border-collapse`} dir={dir}>
                         <thead>
                             <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase tracking-[0.2em] font-black border-b border-slate-100">
-                                <th className="px-8 py-6">الاسم والصنف</th>
-                                <th className="px-8 py-6">الكمية</th>
-                                <th className="px-8 py-6">الحالة</th>
-                                <th className="px-8 py-6">تاريخ التحديث</th>
-                                <th className="px-8 py-6">تعديل</th>
+                                <th className="px-8 py-6">{t('inventory.nameAndCategory')}</th>
+                                <th className="px-8 py-6">{t('inventory.quantity')}</th>
+                                <th className="px-8 py-6">{t('inventory.condition')}</th>
+                                <th className="px-8 py-6">{t('inventory.lastUpdate')}</th>
+                                <th className="px-8 py-6">{t('inventory.edit')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -285,14 +285,14 @@ const InventoryManagement = () => {
                                     <td colSpan="5" className="px-8 py-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">تحميل البيانات...</span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('inventory.loadingData')}</span>
                                         </div>
                                     </td>
                                 </tr>
                             ) : filteredItems.length === 0 ? (
                                 <tr>
                                     <td colSpan="5" className="px-8 py-20 text-center text-slate-300 font-black uppercase tracking-widest text-xs opacity-50">
-                                        لا توجد معدات مسجلة
+                                        {t('inventory.noItems')}
                                     </td>
                                 </tr>
                             ) : (
@@ -310,13 +310,13 @@ const InventoryManagement = () => {
                                             <span className={`font-black text-lg tracking-tighter ${item.quantity <= 5 ? 'text-red-500' : 'text-slate-900'}`}>
                                                 {item.quantity}
                                             </span>
-                                            <span className="text-slate-400 text-xs mr-1">وحدة</span>
+                                            <span className="text-slate-400 text-xs mr-1">{t('inventory.unit')}</span>
                                         </td>
                                         <td className="px-8 py-6">
                                             {getConditionBadge(item.condition)}
                                         </td>
                                         <td className="px-8 py-6 text-[10px] font-bold text-slate-400">
-                                            {new Date(item.last_updated).toLocaleString('ar-MA')}
+                                            {formatDate(item.last_updated)}
                                         </td>
                                         <td className="px-8 py-6 text-left">
                                             <div className={`flex justify-start gap-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -338,14 +338,14 @@ const InventoryManagement = () => {
                     <div className="bg-white rounded-[2.5rem] w-full max-w-lg premium-shadow overflow-hidden border border-slate-200">
                         <div className="px-10 py-8 border-b border-slate-100 bg-indigo-50 flex justify-between items-center flex-row-reverse">
                             <h3 className="font-black text-indigo-900 text-2xl tracking-tight flex items-center gap-3">
-                                <Package size={24} /> {isEditMode ? 'تعديل المعدات' : 'تسجيل معدات جديدة'}
+                                <Package size={24} /> {isEditMode ? t('inventory.editItem') : t('inventory.addItem')}
                             </h3>
                             <button onClick={() => setIsModalOpen(false)} className="text-indigo-400 hover:text-indigo-600 p-2 hover:bg-white rounded-full transition-all"><X size={20} /></button>
                         </div>
 
                         <form onSubmit={handleSubmit} className="p-10 space-y-6 text-right">
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">اسم المعدات / العنصر</label>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('inventory.itemName')}</label>
                                 <input
                                     type="text"
                                     name="item_name"
@@ -353,29 +353,29 @@ const InventoryManagement = () => {
                                     onChange={handleInputChange}
                                     required
                                     className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-slate-500/10 text-right shadow-sm"
-                                    placeholder="مثلا: كرات حجم 5، صدريات حمراء..."
+                                    placeholder={t('inventory.itemPlaceholder')}
                                 />
                             </div>
                             
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">الصنف</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('inventory.categoryLabel')}</label>
                                     <select
                                         name="category"
                                         value={formData.category}
                                         onChange={handleInputChange}
                                         className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none shadow-sm cursor-pointer appearance-none text-right"
                                     >
-                                        <option value="Balls">كرات</option>
-                                        <option value="Bibs">صدريات</option>
-                                        <option value="Cones">أقماع</option>
-                                        <option value="Jerseys">أقمصة</option>
-                                        <option value="Medical">معدات طبية</option>
-                                        <option value="Other">أخرى</option>
+                                        <option value="Balls">{t('inventory.catBalls')}</option>
+                                        <option value="Bibs">{t('inventory.catBibs')}</option>
+                                        <option value="Cones">{t('inventory.catCones')}</option>
+                                        <option value="Jerseys">{t('inventory.catJerseys')}</option>
+                                        <option value="Medical">{t('inventory.catMedical')}</option>
+                                        <option value="Other">{t('inventory.catOther')}</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">الكمية المتوفرة</label>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('inventory.availableQty')}</label>
                                     <input
                                         type="number"
                                         name="quantity"
@@ -388,26 +388,26 @@ const InventoryManagement = () => {
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">الحالة العامة</label>
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('inventory.overallCondition')}</label>
                                 <select
                                     name="condition"
                                     value={formData.condition}
                                     onChange={handleInputChange}
                                     className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none shadow-sm cursor-pointer appearance-none text-right"
                                 >
-                                    <option value="New">جديد (New)</option>
-                                    <option value="Good">جيد (Good)</option>
-                                    <option value="Fair">متوسط (Fair)</option>
-                                    <option value="Poor">سيء / تالف (Poor)</option>
-                                    <option value="Lost">مفقود (Lost)</option>
+                                    <option value="New">{t('inventory.condNew')} (New)</option>
+                                    <option value="Good">{t('inventory.condGood')} (Good)</option>
+                                    <option value="Fair">{t('inventory.condFair')} (Fair)</option>
+                                    <option value="Poor">{t('inventory.condPoor')} (Poor)</option>
+                                    <option value="Lost">{t('inventory.condLost')} (Lost)</option>
                                 </select>
                             </div>
 
                             <div className="pt-8 flex gap-4 justify-end items-center border-t border-slate-100 mt-4 flex-row-reverse">
                                 <button type="submit" className="flex-1 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-indigo-600/20 hover:shadow-indigo-600/40 transition-all transform active:scale-95">
-                                    {isEditMode ? 'تحديث البيانات' : 'إضافة للمعرض'}
+                                    {isEditMode ? t('inventory.updateData') : t('inventory.addToInventory')}
                                 </button>
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-10 py-5 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">إلغاء</button>
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-10 py-5 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">{t('common.cancel')}</button>
                             </div>
                         </form>
                     </div>
@@ -419,8 +419,8 @@ const InventoryManagement = () => {
                 onConfirm={confirmDelete}
                 onCancel={() => setConfirmDialog({ isOpen: false, id: null })}
                 isRTL={isRTL}
-                title={isRTL ? 'حذف المعدات' : 'Delete Equipment'}
-                message={isRTL ? 'هل أنت متأكد من حذف هذه المعدات؟' : 'Are you sure you want to delete this equipment?'}
+                title={t('inventory.deleteTitle')}
+                message={t('inventory.deleteMessage')}
             />
         </div>
     );

@@ -34,7 +34,8 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'Cairo', 'Noto Sans Arabic', 'system-ui', 'sans-serif'],
+        ar: ['Cairo', 'Noto Sans Arabic', 'Inter', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         'subtle': '0 1px 2px 0 rgba(0, 0, 0, 0.03)',

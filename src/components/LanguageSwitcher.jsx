@@ -57,7 +57,7 @@ const LanguageSwitcher = () => {
                 >
                     {/* Header */}
                     <div className="px-4 py-2.5 border-b" style={{ borderColor: 'rgba(148,163,184,0.1)', background: '#fafbfc' }}>
-                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Language</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{lang === 'ar' ? 'اللغة' : lang === 'fr' ? 'Langue' : 'Language'}</p>
                     </div>
 
                     {languages.map(language => (
