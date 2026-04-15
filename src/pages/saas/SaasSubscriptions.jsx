@@ -213,8 +213,8 @@ export default function SaasSubscriptions() {
         <div className="space-y-8 animate-fade-in">
             <div className="flex justify-between items-end">
                 <div>
-                    <h2 className="text-3xl font-black text-surface-900 tracking-tight">Subscriptions <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">&amp; Billing</span></h2>
-                    <p className="text-surface-500 mt-1 font-medium">Manage billing, plans, and payments for all client academies.</p>
+                    <h2 className="text-3xl font-black text-surface-900 tracking-tight">Academy Plans <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">&amp; Platform Billing</span></h2>
+                    <p className="text-surface-500 mt-1 font-medium">Manage SaaS plans (Free / Pro / Enterprise) for each client academy.</p>
                 </div>
             </div>
 

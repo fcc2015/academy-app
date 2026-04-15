@@ -165,9 +165,9 @@ const SubscriptionsManagement = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3 flex-row-reverse">
-                        تتبع <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-600">الاشتراكات</span>
+                        مدفوعات <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-600">المنخرطين</span>
                     </h1>
-                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">متابعة الالتزامات المالية والتحصيلات الشهرية</p>
+                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">تتبع اشتراكات وتحصيلات اللاعبين والأسر شهريًا</p>
                 </div>
                 <div className="flex gap-3 w-full md:w-auto flex-row-reverse">
                     <button className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-500 px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm flex-row-reverse">
