@@ -30,13 +30,14 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "https://dainty-speculoos-433706.netlify.app",
     "https://jolly-kangaroo-3c3d92.netlify.app",
+    "https://academy-app-mu.vercel.app",
 ]
 
-# For custom academy domains: match any *.netlify.app or custom domain via regex
+# For custom academy domains: match any *.netlify.app or *.vercel.app via regex
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.netlify\.app",
+    allow_origin_regex=r"https://(.*\.netlify\.app|.*\.vercel\.app)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
