@@ -141,10 +141,20 @@ async def create_academy(req: AcademyProvisionRequest):
     try:
         res_academy = await supabase._post("/rest/v1/academies?select=id", academy_data)
     except Exception as e:
-        if "duplicate" in str(e).lower() or "23505" in str(e):
+        err = str(e)
+        if "duplicate" in err.lower() or "23505" in err:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                 detail=f"An academy with this name already exists.")
-        raise
+        # If city/notes/subdomain columns don't exist yet, retry with safe fields only
+        if "does not exist" in err.lower() or "42703" in err:
+            safe_data = {k: v for k, v in academy_data.items()
+                         if k not in ("city", "notes", "subdomain")}
+            try:
+                res_academy = await supabase._post("/rest/v1/academies?select=id", safe_data)
+            except Exception as e2:
+                raise HTTPException(status_code=500, detail=str(e2))
+        else:
+            raise
 
     academy_row = res_academy[0] if isinstance(res_academy, list) else res_academy
     new_academy_id = academy_row["id"]
