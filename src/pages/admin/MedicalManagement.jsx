@@ -9,7 +9,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 const MedicalManagement = () => {
-    const { isRTL, dir } = useLanguage();
+    const { isRTL, dir, t, formatDate } = useLanguage();
     const [records, setRecords] = useState([]);
     const [players, setPlayers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -51,8 +51,8 @@ const MedicalManagement = () => {
             if (!payload.last_medical_checkup) delete payload.last_medical_checkup;
             const res = await authFetch(url, { method: isEdit ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             if (!res.ok) throw new Error();
-            setIsModalOpen(false); fetchAll(); showBanner(isEdit ? 'تم التحديث' : 'تمت الإضافة');
-        } catch { showBanner('خطأ في الحفظ', false); }
+            setIsModalOpen(false); fetchAll(); showBanner(isEdit ? t('ui.updated') : t('ui.added'));
+        } catch { showBanner(t('ui.saveError'), false); }
     };
 
     const handleDelete = (id) => {
@@ -63,7 +63,7 @@ const MedicalManagement = () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
         await authFetch(`${API_URL}/medical/${id}`, { method: 'DELETE' });
-        setRecords(p => p.filter(r => r.id !== id)); showBanner('تم الحذف');
+        setRecords(p => p.filter(r => r.id !== id)); showBanner(t('ui.deleted'));
     };
 
     const filtered = records.filter(r => r.player_name?.toLowerCase().includes(search.toLowerCase()));
@@ -84,22 +84,22 @@ const MedicalManagement = () => {
                 <div>
                     <h2 className={`text-4xl font-black text-slate-800 tracking-tight flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <div className="p-3 bg-rose-500 text-white rounded-2xl shadow-lg shadow-rose-500/30"><Heart size={32}/></div>
-                        الملفات الطبية
+                        {t('medical.title')}
                     </h2>
-                    <p className="text-slate-400 font-bold mt-2 tracking-widest text-sm uppercase">صحة وسلامة اللاعبين - الأمراض المزمنة والطوارئ</p>
+                    <p className="text-slate-400 font-bold mt-2 tracking-widest text-sm uppercase">{t('medical.subtitle')}</p>
                 </div>
                 <button onClick={openAdd} className="flex items-center gap-3 bg-gradient-to-r from-rose-500 to-pink-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl shadow-rose-500/20 active:scale-95 transition-all">
-                    <Plus size={20}/> إضافة ملف
+                    <Plus size={20}/> {t('medical.addFile')}
                 </button>
             </div>
 
             {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 {[
-                    { label: 'إجمالي الملفات', val: records.length, color: 'rose' },
-                    { label: 'لديهم حساسية', val: records.filter(r=>r.allergies).length, color: 'amber' },
-                    { label: 'أمراض مزمنة', val: records.filter(r=>r.chronic_conditions).length, color: 'purple' },
-                    { label: 'لديهم تأمين', val: records.filter(r=>r.insurance_provider).length, color: 'emerald' },
+                    { label: t('medical.totalFiles'), val: records.length, color: 'rose' },
+                    { label: t('medical.hasAllergies'), val: records.filter(r=>r.allergies).length, color: 'amber' },
+                    { label: t('medical.chronicConditions'), val: records.filter(r=>r.chronic_conditions).length, color: 'purple' },
+                    { label: t('medical.hasInsurance'), val: records.filter(r=>r.insurance_provider).length, color: 'emerald' },
                 ].map((c,i) => (
                     <div key={i} className={`bg-${c.color}-50 border border-${c.color}-100 rounded-[2rem] p-5`}>
                         <div className={`text-3xl font-black text-${c.color}-700 mb-1`}>{c.val}</div>
@@ -111,14 +111,14 @@ const MedicalManagement = () => {
             {/* Search */}
             <div className="relative mb-6 max-w-md">
                 <Search className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-300`} size={18}/>
-                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ابحث باسم اللاعب..." className={`w-full ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none shadow-sm`}/>
+                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t('medical.searchPlaceholder')} className={`w-full ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none shadow-sm`}/>
             </div>
 
             {/* Cards */}
             {isLoading ? (
                 <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rose-500"/></div>
             ) : filtered.length === 0 ? (
-                <div className="text-center py-24 text-slate-300 font-black uppercase tracking-widest">لا توجد ملفات طبية</div>
+                <div className="text-center py-24 text-slate-300 font-black uppercase tracking-widest">{t('medical.noRecords')}</div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {filtered.map(r => (
@@ -160,7 +160,7 @@ const MedicalManagement = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in" dir="rtl">
                     <div className="bg-white rounded-[2.5rem] w-full max-w-lg premium-shadow border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
                         <div className="px-8 py-6 border-b border-rose-100 bg-rose-50 flex justify-between items-center flex-row-reverse shrink-0">
-                            <h3 className="font-black text-rose-900 text-xl flex items-center gap-3"><Heart size={22}/> {isEdit ? 'تعديل الملف الطبي' : 'ملف طبي جديد'}</h3>
+                            <h3 className="font-black text-rose-900 text-xl flex items-center gap-3"><Heart size={22}/> {isEdit ? t('medical.editFile') : t('medical.newFile')}</h3>
                             <button onClick={() => setIsModalOpen(false)} className="p-2 text-rose-300 hover:bg-white rounded-full"><X size={20}/></button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-8 space-y-4 text-right overflow-y-auto">
@@ -217,8 +217,8 @@ const MedicalManagement = () => {
                                 <textarea rows="2" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none resize-none text-right"/>
                             </div>
                             <div className="flex gap-4 pt-2 flex-row-reverse">
-                                <button type="submit" className="flex-1 py-4 bg-gradient-to-r from-rose-500 to-pink-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-rose-500/20 active:scale-95 transition-all">{isEdit ? 'حفظ التغييرات' : 'حفظ الملف'}</button>
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-4 text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">إلغاء</button>
+                                <button type="submit" className="flex-1 py-4 bg-gradient-to-r from-rose-500 to-pink-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-rose-500/20 active:scale-95 transition-all">{isEdit ? t('ui.saveChanges') : t('medical.saveFile')}</button>
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-4 text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">{t('common.cancel')}</button>
                             </div>
                         </form>
                     </div>
@@ -230,8 +230,8 @@ const MedicalManagement = () => {
                 onConfirm={confirmDelete}
                 onCancel={() => setConfirmDialog({ isOpen: false, id: null })}
                 isRTL={isRTL}
-                title="حذف السجل الطبي"
-                message="هل أنت متأكد من حذف هذا السجل الطبي؟ لا يمكن التراجع."
+                title={t('medical.deleteTitle')}
+                message={t('medical.deleteMessage')}
             />
         </div>
     );

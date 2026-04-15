@@ -110,6 +110,12 @@ sql_statements = [
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'academies' AND column_name = 'custom_domain') THEN
             ALTER TABLE public.academies ADD COLUMN custom_domain text;
         END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'academies' AND column_name = 'subscription_status') THEN
+            ALTER TABLE public.academies ADD COLUMN subscription_status text DEFAULT 'active';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'academies' AND column_name = 'billing_cycle_start') THEN
+            ALTER TABLE public.academies ADD COLUMN billing_cycle_start timestamptz;
+        END IF;
     END
     $$;
     """,

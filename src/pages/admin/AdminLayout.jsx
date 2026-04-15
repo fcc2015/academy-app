@@ -12,7 +12,7 @@ import SessionWarning from '../../components/SessionWarning';
 import PWAInstallPrompt from '../../components/PWAInstallPrompt';
 
 const AdminLayout = () => {
-    const { isRTL, dir } = useLanguage();
+    const { isRTL, dir, t } = useLanguage();
     const location = useLocation();
     const navigate = useNavigate();
     const [authChecked, setAuthChecked] = useState(false);
@@ -27,7 +27,7 @@ const AdminLayout = () => {
         localStorage.removeItem('role');
         localStorage.removeItem('user_id');
         localStorage.removeItem('token_expires');
-        navigate('/login', { state: { message: 'تم تسجيل الخروج تلقائياً بسبب عدم النشاط' } });
+        navigate('/login', { state: { message: t('ui.autoLogout') } });
     }, [navigate]);
 
     const { showWarning, remainingSeconds, extendSession } = useIdleTimer(handleIdleLogout);
@@ -57,7 +57,7 @@ const AdminLayout = () => {
             <div className="min-h-screen flex items-center justify-center bg-surface-50">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-10 h-10 border-2 border-surface-200 border-t-brand-600 rounded-full animate-spin" />
-                    <p className="text-surface-500 text-xs font-bold uppercase tracking-widest">Vérification...</p>
+                    <p className="text-surface-500 text-xs font-bold uppercase tracking-widest">{t('ui.loading')}</p>
                 </div>
             </div>
         );

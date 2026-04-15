@@ -1,6 +1,5 @@
-import React from 'react';
 import { Outlet, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShieldAlert, Globe, CreditCard, Settings, LayoutDashboard, LogOut, Building2, Zap } from 'lucide-react';
+import { Bell, Globe, CreditCard, Settings, LayoutDashboard, LogOut, Building2, Zap } from 'lucide-react';
 import { isAuthenticated, logout } from '../../api';
 
 export default function SaasLayout() {
@@ -26,6 +25,7 @@ export default function SaasLayout() {
         { name: 'Academies', href: '/saas/academies', icon: Building2 },
         { name: 'Domains', href: '/saas/domains', icon: Globe },
         { name: 'Subscriptions', href: '/saas/subscriptions', icon: CreditCard },
+        { name: 'Notifications', href: '/saas/notifications', icon: Bell },
         { name: 'Settings', href: '/saas/settings', icon: Settings },
     ];
 

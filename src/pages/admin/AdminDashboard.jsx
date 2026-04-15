@@ -247,10 +247,10 @@ const AdminDashboard = () => {
                                     <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
                                         <BarChart3 size={20} />
                                     </div>
-                                    <h3 className="font-extrabold text-slate-800 text-lg tracking-tight">{isRTL ? 'المداخيل — آخر 6 أشهر' : 'Revenus — 6 derniers mois'}</h3>
+                                    <h3 className="font-extrabold text-slate-800 text-lg tracking-tight">{t('ui.revenueChart')}</h3>
                                 </div>
                                 <button onClick={() => navigate('/admin/finances')} className="text-emerald-600 text-[11px] font-black uppercase tracking-widest hover:text-emerald-800 transition-colors bg-emerald-50 px-4 py-2 rounded-xl">
-                                    {isRTL ? 'التفاصيل' : 'Détails'}
+                                    {t('ui.details')}
                                 </button>
                             </div>
                             <div className="p-6" style={{ height: 260 }}>
@@ -266,7 +266,7 @@ const AdminDashboard = () => {
                                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }} width={50} orientation={isRTL ? 'right' : 'left'} />
                                         <Tooltip
                                             contentStyle={{ background: '#1e293b', border: 'none', borderRadius: 12, color: '#fff', fontSize: 13, fontWeight: 700 }}
-                                            formatter={(v) => [`${v.toLocaleString()} ${t('common.currency')}`, isRTL ? 'المداخيل' : 'Revenus']}
+                                            formatter={(v) => [`${v.toLocaleString()} ${t('common.currency')}`, t('ui.revenue')]}
                                         />
                                         <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2.5} fill="url(#revenueGrad)" dot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
                                     </AreaChart>
@@ -401,7 +401,7 @@ const AdminDashboard = () => {
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="text-sm font-black text-slate-800">{t('dashboard.addPlayer')}</h4>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">{isRTL ? 'إضافة عضو جديد للأكاديمية' : 'Register new member'}</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">{t('ui.addMember')}</p>
                                 </div>
                             </button>
 
@@ -414,7 +414,7 @@ const AdminDashboard = () => {
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="text-sm font-black text-slate-800">{t('dashboard.sendNotification')}</h4>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">{isRTL ? 'إرسال إشعار عام للجميع' : 'Send push notification'}</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">{t('ui.sendPush')}</p>
                                 </div>
                             </button>
 
@@ -427,7 +427,7 @@ const AdminDashboard = () => {
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="text-sm font-black text-slate-800">{t('dashboard.createProgram')}</h4>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">{isRTL ? 'جدولة حصة تدريبية' : 'Schedule training session'}</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1">{t('ui.scheduleTraining')}</p>
                                 </div>
                             </button>
                         </div>
@@ -449,37 +449,37 @@ const AdminDashboard = () => {
                         </div>
                         <form onSubmit={handleSendNotification} className="p-8 space-y-6">
                             <div>
-                                <label className="block text-[11px] font-black uppercase text-slate-500 tracking-widest mb-3">{isRTL ? 'عنوان الإعلان' : 'Announcement Title'}</label>
+                                <label className="block text-[11px] font-black uppercase text-slate-500 tracking-widest mb-3">{t('ui.announcementTitle')}</label>
                                 <input 
                                     required 
                                     type="text" 
                                     value={notifData.title} 
                                     onChange={(e) => setNotifData({ ...notifData, title: e.target.value })} 
                                     className="w-full bg-slate-50 border-2 border-slate-100 focus:border-purple-500 focus:bg-white rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all"
-                                    placeholder={isRTL ? 'مثال: عطلة العيد...' : 'e.g. Holiday...'}
+                                    placeholder={t('ui.announcementPlaceholder')}
                                 />
                             </div>
                             <div>
-                                <label className="block text-[11px] font-black uppercase text-slate-500 tracking-widest mb-3">{isRTL ? 'نص الرسالة' : 'Message Text'}</label>
+                                <label className="block text-[11px] font-black uppercase text-slate-500 tracking-widest mb-3">{t('ui.messageText')}</label>
                                 <textarea 
                                     required 
                                     rows="4"
                                     value={notifData.message} 
                                     onChange={(e) => setNotifData({ ...notifData, message: e.target.value })} 
                                     className="w-full bg-slate-50 border-2 border-slate-100 focus:border-purple-500 focus:bg-white rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all resize-none"
-                                    placeholder={isRTL ? 'اكتب تفاصيل الإعلان هنا...' : 'Write details here...'}
+                                    placeholder={t('ui.messagePlaceholder')}
                                 ></textarea>
                             </div>
                             <div>
-                                <label className="block text-[11px] font-black uppercase text-slate-500 tracking-widest mb-3">{isRTL ? 'الفئة المستهدفة' : 'Target Audience'}</label>
+                                <label className="block text-[11px] font-black uppercase text-slate-500 tracking-widest mb-3">{t('ui.targetAudience')}</label>
                                 <select 
                                     value={notifData.target_role} 
                                     onChange={(e) => setNotifData({ ...notifData, target_role: e.target.value })} 
                                     className="w-full bg-slate-50 border-2 border-slate-100 focus:border-purple-500 focus:bg-white rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all appearance-none cursor-pointer"
                                 >
-                                    <option value="">{isRTL ? 'الجميع (All)' : 'Everyone'}</option>
-                                    <option value="parent">{isRTL ? 'أولياء الأمور واللاعبين' : 'Parents & Players'}</option>
-                                    <option value="coach">{isRTL ? 'المدربون والطاقم التقني' : 'Coaches & Staff'}</option>
+                                    <option value="">{t('ui.everyone')}</option>
+                                    <option value="parent">{t('ui.parentsPlayers')}</option>
+                                    <option value="coach">{t('ui.coachesStaff')}</option>
                                 </select>
                             </div>
                             <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">

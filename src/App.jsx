@@ -24,6 +24,7 @@ const SaasAcademies = lazy(() => import('./pages/saas/SaasAcademies'));
 const SaasSubscriptions = lazy(() => import('./pages/saas/SaasSubscriptions'));
 const SaasDomains = lazy(() => import('./pages/saas/SaasDomains'));
 const SaasSettings = lazy(() => import('./pages/saas/SaasSettings'));
+const SaasNotifications = lazy(() => import('./pages/saas/SaasNotifications'));
 
 // Admin
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
@@ -103,6 +104,7 @@ function App() {
             <Route path="domains" element={<SaasDomains />} />
             <Route path="subscriptions" element={<SaasSubscriptions />} />
             <Route path="settings" element={<SaasSettings />} />
+            <Route path="notifications" element={<SaasNotifications />} />
           </Route>
 
           {/* Admin */}
