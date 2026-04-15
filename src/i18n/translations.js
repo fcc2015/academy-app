@@ -49,7 +49,7 @@ const translations = {
         coaches: { ar: 'المدربون', en: 'Coaches', fr: 'Entraîneurs' },
         squads: { ar: 'الفرق', en: 'Squads', fr: 'Équipes' },
         finances: { ar: 'المالية', en: 'Finances', fr: 'Finances' },
-        subscriptions: { ar: 'الاشتراكات', en: 'Subscriptions', fr: 'Abonnements' },
+        subscriptions: { ar: 'مدفوعات المنخرطين', en: 'Member Payments', fr: 'Paiements membres' },
         events: { ar: 'الأحداث (التقويم)', en: 'Events', fr: 'Événements' },
         tournaments: { ar: 'تنظيم الدوريات', en: 'Tournaments', fr: 'Tournois' },
         tryouts: { ar: 'فترة الاختبارات', en: 'Tryouts', fr: 'Détections (Tests)' },
