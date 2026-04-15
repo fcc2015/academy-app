@@ -237,6 +237,101 @@ async def capture_paypal_order(req: CaptureOrderRequest):
         }
 
 
+# ── Manual Payment Verification ──
+
+@router.post("/verify-order/{paypal_order_id}", dependencies=[])
+async def verify_paypal_order(paypal_order_id: str):
+    """
+    Check PayPal order status and capture it if APPROVED.
+    Used for manual verification when automatic capture failed.
+    """
+    token = await get_paypal_access_token()
+    base_url = get_paypal_base_url()
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # 1. Get order status from PayPal
+        order_res = await client.get(
+            f"{base_url}/v2/checkout/orders/{paypal_order_id}",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        )
+        if order_res.status_code != 200:
+            raise HTTPException(status_code=404, detail="Order not found in PayPal.")
+
+        order_data = order_res.json()
+        paypal_status = order_data.get("status")  # CREATED, APPROVED, COMPLETED, VOIDED
+
+        if paypal_status == "COMPLETED":
+            # Already captured — just update DB to completed
+            async with httpx.AsyncClient(timeout=30.0) as db:
+                await db.patch(
+                    f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{paypal_order_id}",
+                    json={"status": "completed"},
+                    headers=supabase.admin_headers,
+                )
+            return {"success": True, "status": "COMPLETED", "message": "Payment already completed — DB updated."}
+
+        if paypal_status != "APPROVED":
+            return {
+                "success": False,
+                "status": paypal_status,
+                "message": f"Cannot capture: order status is {paypal_status}. Customer must approve first.",
+            }
+
+        # 2. Capture the approved order
+        capture_res = await client.post(
+            f"{base_url}/v2/checkout/orders/{paypal_order_id}/capture",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        )
+        if capture_res.status_code not in [200, 201]:
+            raise HTTPException(status_code=502, detail=f"Capture failed: {capture_res.text}")
+
+        capture_data = capture_res.json()
+        capture_status = capture_data.get("status")
+        capture_id = ""
+        try:
+            capture_id = capture_data["purchase_units"][0]["payments"]["captures"][0]["id"]
+        except (KeyError, IndexError):
+            pass
+
+        custom_id = ""
+        try:
+            custom_id = capture_data["purchase_units"][0].get("custom_id", "")
+        except (KeyError, IndexError):
+            pass
+
+        # 3. Update payment_transactions in DB
+        async with httpx.AsyncClient(timeout=30.0) as db:
+            await db.patch(
+                f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{paypal_order_id}",
+                json={
+                    "status": "completed" if capture_status == "COMPLETED" else "failed",
+                    "paypal_capture_id": capture_id,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                },
+                headers=supabase.admin_headers,
+            )
+
+            # 4. Update academy subscription if custom_id has academy_id|plan_id
+            if custom_id and "|" in custom_id:
+                academy_id, plan_id = custom_id.split("|", 1)
+                await db.patch(
+                    f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+                    json={
+                        "subscription_status": "active",
+                        "plan_id": plan_id,
+                        "last_payment_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                    headers=supabase.admin_headers,
+                )
+
+        return {
+            "success": capture_status == "COMPLETED",
+            "status": capture_status,
+            "paypal_capture_id": capture_id,
+            "message": "Payment captured and subscription activated." if capture_status == "COMPLETED" else "Capture failed.",
+        }
+
+
 # ── Get Payment History ──
 
 @router.get("/transactions/{academy_id}", dependencies=[])
