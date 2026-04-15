@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     PAYPAL_CLIENT_ID: Optional[str] = None
     PAYPAL_CLIENT_SECRET: Optional[str] = None
     PAYPAL_SANDBOX: bool = True  # True = sandbox, False = live
-    FRONTEND_URL: str = "https://jolly-kangaroo-3c3d92.netlify.app"
+    FRONTEND_URL: str = "https://academy-app-mu.vercel.app"
 
     # Email / SMTP
     SMTP_HOST: str = "smtp.gmail.com"
