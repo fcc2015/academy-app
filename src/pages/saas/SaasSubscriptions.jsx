@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, History, CheckCircle2, Loader2, Ban, X, Zap, Star, Crown, Clock, DollarSign, RefreshCw, ArrowUpRight, Calculator, Users, UserCog, Dumbbell } from 'lucide-react';
+import { CreditCard, History, CheckCircle2, Loader2, Ban, X, Zap, Star, Crown, Clock, DollarSign, RefreshCw, ArrowUpRight, Calculator, Users, UserCog, Dumbbell, ShieldCheck } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
@@ -83,6 +83,7 @@ export default function SaasSubscriptions() {
     const [assigningPlan, setAssigningPlan] = useState(false);
     const [paymentProcessing, setPaymentProcessing] = useState(null);
     const [showProRata, setShowProRata] = useState(null); // planId being previewed
+    const [verifyingOrder, setVerifyingOrder] = useState(null); // paypal_order_id being verified
 
     useEffect(() => {
         fetchData();
@@ -208,6 +209,28 @@ export default function SaasSubscriptions() {
             console.error("PayPal checkout error:", err);
         } finally {
             setPaymentProcessing(null);
+        }
+    };
+
+    const handleVerifyOrder = async (paypalOrderId) => {
+        setVerifyingOrder(paypalOrderId);
+        try {
+            const res = await authFetch(`${API_URL}/payments/gateway/verify-order/${paypalOrderId}`, {
+                method: 'POST',
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(data.message || 'Payment verified and activated!');
+                // Refresh transactions and academies
+                if (selectedAcademy) await viewHistory(selectedAcademy);
+                fetchData();
+            } else {
+                toast.error(data.message || `Cannot verify: status is ${data.status}`);
+            }
+        } catch (err) {
+            toast.error('Verification request failed.');
+        } finally {
+            setVerifyingOrder(null);
         }
     };
 
@@ -663,15 +686,33 @@ export default function SaasSubscriptions() {
                                                     <p className="text-sm font-semibold text-surface-800">{tx.amount} {tx.currency || 'USD'}</p>
                                                     <p className="text-[10px] text-surface-400">{tx.description || ''}</p>
                                                     <p className="text-[10px] text-surface-400">{tx.created_at ? new Date(tx.created_at).toLocaleString() : '—'}</p>
+                                                    {tx.paypal_order_id && (
+                                                        <p className="text-[10px] text-surface-300 font-mono">#{tx.paypal_order_id.slice(0, 16)}...</p>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <span className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
-                                                tx.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                                tx.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                                'bg-rose-50 text-rose-600 border-rose-200'
-                                            }`}>
-                                                {tx.status}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                                                    tx.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                    tx.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                    'bg-rose-50 text-rose-600 border-rose-200'
+                                                }`}>
+                                                    {tx.status}
+                                                </span>
+                                                {tx.status === 'pending' && tx.paypal_order_id && (
+                                                    <button
+                                                        onClick={() => handleVerifyOrder(tx.paypal_order_id)}
+                                                        disabled={verifyingOrder === tx.paypal_order_id}
+                                                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-60"
+                                                        title="Manually verify this payment with PayPal"
+                                                    >
+                                                        {verifyingOrder === tx.paypal_order_id
+                                                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                            : <ShieldCheck className="w-3 h-3" />}
+                                                        Verify
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
