@@ -87,8 +87,37 @@ export default function SaasSubscriptions() {
     useEffect(() => {
         fetchData();
         const params = new URLSearchParams(window.location.search);
-        if (params.get('payment') === 'success') {
+        const paymentStatus = params.get('payment');
+        const paypalOrderId = params.get('token');       // PayPal returns token=ORDER_ID
+        const academyId = params.get('academy_id');
+        const planId = params.get('plan_id');
+
+        if (paymentStatus === 'success' && paypalOrderId) {
             window.history.replaceState({}, '', '/saas/subscriptions');
+            // Capture the PayPal payment
+            authFetch(`${API_URL}/payments/gateway/capture-order`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    order_id: paypalOrderId,
+                    academy_id: academyId || '',
+                    plan_id: planId || null,
+                })
+            }).then(res => res.json()).then(data => {
+                if (data.success) {
+                    toast.success('Payment confirmed! Subscription activated.');
+                    fetchData();
+                } else {
+                    toast.error('Payment capture failed. Contact support.');
+                }
+            }).catch(() => toast.error('Payment verification failed.'));
+        } else if (paymentStatus === 'success') {
+            window.history.replaceState({}, '', '/saas/subscriptions');
+            toast.success('Payment received! Refreshing...');
+            fetchData();
+        } else if (paymentStatus === 'cancelled') {
+            window.history.replaceState({}, '', '/saas/subscriptions');
+            toast.error('Payment cancelled.');
         }
     }, []);
 

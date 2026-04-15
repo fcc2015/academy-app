@@ -86,7 +86,9 @@ async def create_paypal_order(req: CreateOrderRequest):
         return_url = f"{settings.FRONTEND_URL}/saas-platform?payment=success"
         cancel_url = f"{settings.FRONTEND_URL}/saas-platform?payment=cancelled"
     else:
-        return_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success"
+        aid = req.academy_id or ""
+        pid = req.plan_id or ""
+        return_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success&academy_id={aid}&plan_id={pid}"
         cancel_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=cancelled"
 
     order_payload = {
