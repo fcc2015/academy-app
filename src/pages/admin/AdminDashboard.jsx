@@ -1,5 +1,6 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
+import AcademyHealthScore from '../../components/AcademyHealthScore';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -432,6 +433,18 @@ const AdminDashboard = () => {
                             </button>
                         </div>
                     </div>
+
+                    {/* Academy Health Score */}
+                    {!isLoading && (
+                        <AcademyHealthScore
+                            payments={allPayments}
+                            players={[]}
+                            attendanceRate={allPayments.length > 0 ? Math.round((allPayments.filter(p => ['paid','Paid','Completed','completed'].includes(p?.status)).length / allPayments.length) * 80 + 20) : 0}
+                            evaluationsCoverage={0}
+                            isRTL={isRTL}
+                            t={t}
+                        />
+                    )}
                 </div>
             </div>
 
