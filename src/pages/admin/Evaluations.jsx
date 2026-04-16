@@ -245,7 +245,7 @@ const Evaluations = () => {
                                 </div>
                             </div>
 
-                            {/* Radar Chart — latest evaluation */}
+                            {/* Radar Chart — latest evaluation with progression overlay */}
                             {evaluations.length > 0 && (() => {
                                 const latest = evaluations[0];
                                 const radarData = [
@@ -254,21 +254,47 @@ const Evaluations = () => {
                                     { subject: isRTL ? 'بدني' : 'Physical', value: latest.physical_score, fullMark: 10 },
                                     { subject: isRTL ? 'ذهني' : 'Mental', value: latest.mental_score, fullMark: 10 },
                                 ];
+                                // Add previous evaluation for comparison
+                                const prev = evaluations.length > 1 ? evaluations[1] : null;
+                                if (prev) {
+                                    radarData[0].prev = prev.technical_score;
+                                    radarData[1].prev = prev.tactical_score;
+                                    radarData[2].prev = prev.physical_score;
+                                    radarData[3].prev = prev.mental_score;
+                                }
                                 const avg = ((latest.technical_score + latest.tactical_score + latest.physical_score + latest.mental_score) / 4).toFixed(1);
+                                const prevAvg = prev ? ((prev.technical_score + prev.tactical_score + prev.physical_score + prev.mental_score) / 4).toFixed(1) : null;
+                                const improved = prevAvg ? (avg - prevAvg).toFixed(1) : null;
                                 return (
                                     <div className="bg-white rounded-3xl border border-slate-200 premium-shadow p-6">
                                         <div className={`flex items-center justify-between mb-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
                                             <h3 className={`font-black text-slate-800 uppercase tracking-widest text-xs flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                                                <TrendingUp size={16} className="text-indigo-600" /> {isRTL ? 'آخر تقييم' : 'Latest Evaluation'}
+                                                <TrendingUp size={16} className="text-indigo-600" /> {isRTL ? 'مخطط الأداء' : 'Performance Radar'}
                                             </h3>
-                                            <span className={`text-2xl font-black ${avg >= 8 ? 'text-emerald-600' : avg >= 5 ? 'text-amber-600' : 'text-red-600'}`}>{avg}<span className="text-sm text-slate-400 font-bold">/10</span></span>
+                                            <div className="flex items-center gap-3">
+                                                {improved && (
+                                                    <span className={`text-xs font-black px-2.5 py-1 rounded-lg ${parseFloat(improved) >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                                        {parseFloat(improved) >= 0 ? '↑' : '↓'} {Math.abs(improved)}
+                                                    </span>
+                                                )}
+                                                <span className={`text-2xl font-black ${avg >= 8 ? 'text-emerald-600' : avg >= 5 ? 'text-amber-600' : 'text-red-600'}`}>{avg}<span className="text-sm text-slate-400 font-bold">/10</span></span>
+                                            </div>
                                         </div>
-                                        <div style={{ height: 240 }}>
+                                        {prev && (
+                                            <div className={`flex gap-4 text-[10px] font-bold uppercase tracking-widest mb-1 ${isRTL ? 'flex-row-reverse justify-end' : 'justify-start'}`}>
+                                                <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-indigo-600 inline-block rounded"></span> {isRTL ? 'الحالي' : 'Current'}</span>
+                                                <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-slate-300 inline-block rounded"></span> {isRTL ? 'السابق' : 'Previous'}</span>
+                                            </div>
+                                        )}
+                                        <div style={{ height: 260 }}>
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
                                                     <PolarGrid stroke="#e2e8f0" />
                                                     <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12, fontWeight: 700, fill: '#64748b' }} />
-                                                    <Radar name="Score" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} strokeWidth={2} dot={{ r: 4, fill: '#6366f1' }} />
+                                                    {prev && (
+                                                        <Radar name="Previous" dataKey="prev" stroke="#cbd5e1" fill="#cbd5e1" fillOpacity={0.1} strokeWidth={1.5} strokeDasharray="4 4" />
+                                                    )}
+                                                    <Radar name="Current" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} strokeWidth={2.5} dot={{ r: 5, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }} />
                                                 </RadarChart>
                                             </ResponsiveContainer>
                                         </div>
