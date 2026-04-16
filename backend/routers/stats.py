@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from core.auth_middleware import verify_token
 from services.supabase_client import supabase
 
+import logging
+logger = logging.getLogger("stats")
+
 router = APIRouter(prefix="/stats", tags=["Statistics"], dependencies=[Depends(verify_token)])
 
 @router.get("/dashboard")
@@ -45,7 +48,8 @@ async def get_dashboard_metrics():
             "activities": activities
         }
     except Exception as e:
+        logger.error("Error fetching dashboard stats: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching dashboard stats: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )

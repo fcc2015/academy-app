@@ -1,8 +1,16 @@
 import httpx
 import asyncio
+import logging
 from datetime import datetime, timezone
 from core.config import settings
 from core.context import academy_id_ctx
+
+logger = logging.getLogger("supabase")
+
+# Retry config for transient failures
+_MAX_RETRIES = 3
+_RETRY_BACKOFF = 0.5  # seconds, doubles each retry
+_RETRYABLE_STATUS = {502, 503, 504}
 
 class InjectClient:
     def __init__(self, client, base_url=""):
@@ -80,16 +88,51 @@ class SupabaseHttpClient:
             "Prefer": "return=representation",
         }
         self.client = InjectClient(httpx.AsyncClient(timeout=30.0, headers=self.headers), base_url=self.url)
+
     async def _get(self, endpoint: str):
-        res = await self.client.get(f"{self.url}{endpoint}")
-        res.raise_for_status()
-        return res.json()
+        """GET with automatic retry on transient failures."""
+        url = f"{self.url}{endpoint}"
+        last_exc = None
+        for attempt in range(_MAX_RETRIES):
+            try:
+                res = await self.client.get(url)
+                if res.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES - 1:
+                    logger.warning("Retryable %d on GET %s (attempt %d)", res.status_code, endpoint[:80], attempt + 1)
+                    await asyncio.sleep(_RETRY_BACKOFF * (2 ** attempt))
+                    continue
+                res.raise_for_status()
+                return res.json()
+            except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout) as e:
+                last_exc = e
+                if attempt < _MAX_RETRIES - 1:
+                    logger.warning("Network error on GET %s (attempt %d): %s", endpoint[:80], attempt + 1, type(e).__name__)
+                    await asyncio.sleep(_RETRY_BACKOFF * (2 ** attempt))
+                    continue
+                raise
+        raise last_exc  # Should not reach here
 
     async def _post(self, endpoint: str, data: dict, headers: dict = None):
+        """POST with automatic retry on transient failures."""
         h = {**self.headers, **(headers or {})}
-        res = await self.client.post(f"{self.url}{endpoint}", json=data, headers=h)
-        res.raise_for_status()
-        return res.json()
+        url = f"{self.url}{endpoint}"
+        last_exc = None
+        for attempt in range(_MAX_RETRIES):
+            try:
+                res = await self.client.post(url, json=data, headers=h)
+                if res.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES - 1:
+                    logger.warning("Retryable %d on POST %s (attempt %d)", res.status_code, endpoint[:80], attempt + 1)
+                    await asyncio.sleep(_RETRY_BACKOFF * (2 ** attempt))
+                    continue
+                res.raise_for_status()
+                return res.json()
+            except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout) as e:
+                last_exc = e
+                if attempt < _MAX_RETRIES - 1:
+                    logger.warning("Network error on POST %s (attempt %d): %s", endpoint[:80], attempt + 1, type(e).__name__)
+                    await asyncio.sleep(_RETRY_BACKOFF * (2 ** attempt))
+                    continue
+                raise
+        raise last_exc  # Should not reach here
 
         
     async def sign_in_with_password(self, email, password):

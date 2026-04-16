@@ -1,11 +1,14 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
 from core.auth_middleware import verify_token
-from pydantic import BaseModel
-from typing import Optional, List
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Literal
+import re as _re
 from services.supabase_client import supabase
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
+logger = logging.getLogger("chat")
 router = APIRouter(prefix="/chat", tags=["Chat"], dependencies=[Depends(verify_token)])
 
 
@@ -16,44 +19,58 @@ router = APIRouter(prefix="/chat", tags=["Chat"], dependencies=[Depends(verify_t
 class SendMessageRequest(BaseModel):
     group_id: str
     sender_id: str
-    sender_name: str
-    sender_role: str
-    content: Optional[str] = None
-    image_url: Optional[str] = None
-    message_type: str = "text"
+    sender_name: str = Field(..., max_length=100)
+    sender_role: str = Field(..., max_length=50)
+    content: Optional[str] = Field(None, max_length=5000)
+    image_url: Optional[str] = Field(None, max_length=500)
+    message_type: Literal['text', 'image', 'file', 'system'] = "text"
+
+    @field_validator("content")
+    @classmethod
+    def strip_html(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            return _re.sub(r"<[^>]+>", "", v).strip()
+        return v
 
 class TypingRequest(BaseModel):
     group_id: str
     user_id: str
-    user_name: str
+    user_name: str = Field(..., max_length=100)
     is_typing: bool
 
 class JoinGroupRequest(BaseModel):
     group_id: str
     user_id: str
-    user_name: str
-    user_role: str
+    user_name: str = Field(..., max_length=100)
+    user_role: str = Field(..., max_length=50)
     is_moderator: bool = False
 
 class MuteRequest(BaseModel):
     group_id: str
     target_user_id: str
-    mute_type: str  # 'temporary' | 'permanent' | 'none'
-    mute_minutes: Optional[int] = None
+    mute_type: Literal['temporary', 'permanent', 'none']
+    mute_minutes: Optional[int] = Field(None, ge=1, le=10080)  # max 1 week
 
 class BanRequest(BaseModel):
     group_id: str
     target_user_id: str
-    ban_type: str  # 'temporary' | 'permanent' | 'none'
-    ban_minutes: Optional[int] = None
+    ban_type: Literal['temporary', 'permanent', 'none']
+    ban_minutes: Optional[int] = Field(None, ge=1, le=525960)  # max 1 year
 
 class CreateGroupRequest(BaseModel):
-    name: str
-    description: Optional[str] = None
-    type: str = "group"
-    category: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    type: Literal['group', 'direct', 'announcement'] = "group"
+    category: Optional[str] = Field(None, max_length=50)
     squad_id: Optional[str] = None
     created_by: Optional[str] = None
+
+    @field_validator("name", "description")
+    @classmethod
+    def strip_html(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            return _re.sub(r"<[^>]+>", "", v).strip()
+        return v
 
 
 # ─────────────────────────────────────────────
@@ -478,8 +495,8 @@ async def get_typing(group_id: str, exclude_user: Optional[str] = None):
                 updated = datetime.fromisoformat(t["updated_at"].replace("Z", "+00:00")).replace(tzinfo=None)
                 if (now - updated).total_seconds() < 6:
                     active.append(t)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Could not parse typing indicator timestamp: {e}")
 
         return active
 
@@ -574,8 +591,8 @@ async def _send_system_message_async(group_id: str, content: str):
                 },
                 headers={**supabase.headers, "Prefer": "return=minimal"}
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to send system message to group {group_id}: {e}")
 
 
 # ─────────────────────────────────────────────

@@ -64,6 +64,7 @@ async def login(credentials: UserLogin):
             "role": role
         }
     except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password."
@@ -143,7 +144,7 @@ class PasswordReset(BaseModel):
 
 
 @router.post("/send-otp")
-async def send_otp(req: OTPRequest):
+def send_otp(req: OTPRequest):
     """Send a 6-digit OTP code to the given email."""
     email = req.email.strip().lower()
 
@@ -170,7 +171,7 @@ async def send_otp(req: OTPRequest):
 
 
 @router.post("/verify-otp")
-async def verify_otp(req: OTPVerify):
+def verify_otp(req: OTPVerify):
     """Verify a 6-digit OTP code."""
     email = req.email.strip().lower()
     entry = _otp_store.get(email)

@@ -1,8 +1,11 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 import httpx
 from datetime import datetime, timezone
 from core.auth_middleware import require_role
+
+logger = logging.getLogger("saas_admin")
 from services.supabase_client import supabase
 from urllib.parse import quote
 
@@ -174,7 +177,7 @@ async def create_academy(req: AcademyProvisionRequest):
                 "role": "admin", "academy_id": new_academy_id
             })
         except Exception as e:
-            print(f"Users record (non-critical): {e}")
+            logger.warning(f"Users record (non-critical): {e}")
         await supabase._post("/rest/v1/admins", {
             "user_id": admin_user_id, "email": req.admin_email,
             "full_name": req.admin_name, "status": "active", "academy_id": new_academy_id
@@ -182,11 +185,12 @@ async def create_academy(req: AcademyProvisionRequest):
         return {"success": True, "academy": academy_row, "admin_user_id": admin_user_id}
     except Exception as e:
         error_msg = str(e)
+        logger.error("Failed to provision academy admin: %s", e, exc_info=True)
         if "duplicate" in error_msg.lower() or "23505" in error_msg:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                 detail=f"This email already exists: {req.admin_email}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Academy created, but failed to provision admin: {error_msg}")
+            detail="Academy created, but failed to provision admin. Please contact support.")
 
 
 @router.patch("/academies/{academy_id}")
@@ -228,6 +232,181 @@ async def full_update_academy(academy_id: str, data: AcademyUpdateRequest):
                 return {"success": True, "note": "city/notes columns not yet in DB — only safe fields updated."}
             res.raise_for_status()
     return {"success": True}
+
+
+# ── Delete Academy ──
+
+@router.delete("/academies/{academy_id}")
+async def delete_academy(academy_id: str):
+    """Permanently delete an academy and all associated data."""
+    import asyncio
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # First verify it exists
+        check = await client.get(
+            f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}&select=id,name",
+            headers=supabase.admin_headers
+        )
+        if check.status_code != 200 or not check.json():
+            raise HTTPException(status_code=404, detail="Academy not found.")
+
+        # Delete related data in parallel
+        delete_tasks = []
+        for table in ["players", "coaches", "admins", "squads", "notifications"]:
+            delete_tasks.append(
+                client.delete(
+                    f"{supabase.url}/rest/v1/{table}?academy_id=eq.{academy_id}",
+                    headers=supabase.admin_headers
+                )
+            )
+        delete_tasks.append(
+            client.delete(
+                f"{supabase.url}/rest/v1/payments_gateway?academy_id=eq.{academy_id}",
+                headers=supabase.admin_headers
+            )
+        )
+        await asyncio.gather(*delete_tasks, return_exceptions=True)
+
+        # Finally delete the academy itself
+        res = await client.delete(
+            f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+            headers=supabase.admin_headers
+        )
+        if res.status_code >= 400:
+            raise HTTPException(status_code=500, detail="Failed to delete academy.")
+
+    return {"success": True, "deleted": academy_id}
+
+
+# ── Bulk Status Update ──
+
+class BulkStatusUpdate(BaseModel):
+    academy_ids: list[str]
+    status: str  # "active" or "suspended"
+
+
+@router.patch("/academies-bulk/status")
+async def bulk_update_status(data: BulkStatusUpdate):
+    """Suspend or activate multiple academies at once."""
+    if data.status not in ("active", "suspended"):
+        raise HTTPException(status_code=400, detail="Status must be 'active' or 'suspended'.")
+    if not data.academy_ids:
+        raise HTTPException(status_code=400, detail="No academy IDs provided.")
+
+    import asyncio
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        tasks = [
+            client.patch(
+                f"{supabase.url}/rest/v1/academies?id=eq.{aid}",
+                json={"status": data.status},
+                headers=supabase.admin_headers
+            )
+            for aid in data.academy_ids
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    success = sum(1 for r in results if not isinstance(r, Exception) and r.status_code < 400)
+    return {"success": True, "updated": success, "total": len(data.academy_ids)}
+
+
+# ── Academy Detail View ──
+
+@router.get("/academies/{academy_id}/details")
+async def get_academy_details(academy_id: str):
+    """Get full details for a single academy: info, admins, coaches, players, payments."""
+    import asyncio
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        responses = await asyncio.gather(
+            client.get(
+                f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}&select=*",
+                headers=supabase.admin_headers
+            ),
+            client.get(
+                f"{supabase.url}/rest/v1/admins?academy_id=eq.{academy_id}&select=id,user_id,full_name,email,status,created_at",
+                headers=supabase.admin_headers
+            ),
+            client.get(
+                f"{supabase.url}/rest/v1/coaches?academy_id=eq.{academy_id}&select=id,full_name,email,phone,status,specialty,created_at",
+                headers=supabase.admin_headers
+            ),
+            client.get(
+                f"{supabase.url}/rest/v1/players?academy_id=eq.{academy_id}&select=id,full_name,date_of_birth,position,squad_id,status,created_at&order=created_at.desc",
+                headers=supabase.admin_headers
+            ),
+            client.get(
+                f"{supabase.url}/rest/v1/squads?academy_id=eq.{academy_id}&select=id,name,category,created_at",
+                headers=supabase.admin_headers
+            ),
+            client.get(
+                f"{supabase.url}/rest/v1/payments_gateway?academy_id=eq.{academy_id}&select=*&order=created_at.desc&limit=20",
+                headers=supabase.admin_headers
+            ),
+            return_exceptions=True
+        )
+
+    def safe_json(res, fallback=[]):
+        if isinstance(res, Exception) or res.status_code != 200:
+            return fallback
+        return res.json()
+
+    academies = safe_json(responses[0])
+    if not academies:
+        raise HTTPException(status_code=404, detail="Academy not found.")
+
+    academy = academies[0]
+    admins = safe_json(responses[1])
+    coaches = safe_json(responses[2])
+    players = safe_json(responses[3])
+    squads = safe_json(responses[4])
+    payments = safe_json(responses[5])
+
+    # Enrich with limits and counts
+    plan = academy.get("plan_id") or "free"
+    limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
+
+    # Build recent activity timeline from created_at dates
+    activity = []
+    for p in players[:10]:
+        activity.append({
+            "type": "player_added",
+            "name": p.get("full_name", "Unknown"),
+            "date": p.get("created_at"),
+        })
+    for c in coaches:
+        activity.append({
+            "type": "coach_added",
+            "name": c.get("full_name", "Unknown"),
+            "date": c.get("created_at"),
+        })
+    for pay in payments[:5]:
+        activity.append({
+            "type": "payment",
+            "name": f"{pay.get('amount', 0)} {pay.get('currency', 'MAD')} — {pay.get('status', 'unknown')}",
+            "date": pay.get("created_at"),
+        })
+    # Sort by date desc
+    activity.sort(key=lambda x: x.get("date") or "", reverse=True)
+
+    return {
+        "academy": academy,
+        "admins": admins,
+        "coaches": coaches,
+        "players_count": len(players),
+        "players_recent": players[:20],
+        "squads": squads,
+        "payments": payments,
+        "limits": limits,
+        "activity": activity[:15],
+        "stats": {
+            "total_players": len(players),
+            "total_coaches": len(coaches),
+            "total_admins": len(admins),
+            "total_squads": len(squads),
+            "total_payments": len(payments),
+            "revenue": sum(float(p.get("amount", 0)) for p in payments if p.get("status") == "completed"),
+        }
+    }
 
 
 # ── Domain Management ──
@@ -279,8 +458,8 @@ async def verify_domain(academy_id: str):
         if "netlify" in result.stdout.lower():
             cname_target = "netlify"
             domain_status = "verified"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("nslookup check failed for %s: %s", domain, e)
     if domain_status != "verified":
         try:
             resolved_ip = socket.gethostbyname(domain)
@@ -340,7 +519,7 @@ async def assign_plan(academy_id: str, data: PlanAssignment):
                     headers=supabase.admin_headers
                 )
             except Exception as e:
-                print(f"Payment record (non-critical): {e}")
+                logger.warning(f"Payment record (non-critical): {e}")
 
         return {"success": True, "plan_id": data.plan_id, "billing_cycle_start": now_iso}
 
@@ -376,7 +555,8 @@ async def get_saas_stats():
             "domains_configured": domains_configured,
             "domains_verified": domains_verified,
         }
-    except Exception:
+    except Exception as e:
+        logger.error("SaaS stats fetch failed: %s", e, exc_info=True)
         return {"total_academies": 0, "active_academies": 0, "total_users": 0,
                 "total_mrr": 0, "total_players": 0, "domains_configured": 0, "domains_verified": 0}
 
@@ -487,13 +667,143 @@ async def trigger_usage_notifications(req: NotificationTriggerRequest):
                 )
                 sent.append({"academy": acc["name"], "threshold": threshold, "max_pct": max_pct})
             except Exception as e:
-                print(f"Notification send failed for {acc['name']}: {e}")
+                logger.warning(f"Notification send failed for {acc['name']}: {e}")
 
     return {
         "success": True,
         "notifications_sent": len(sent),
         "details": sent,
         "skipped": skipped,
+    }
+
+
+# ── Analytics ──
+
+@router.get("/analytics")
+async def get_saas_analytics():
+    """Get analytics data for charts: monthly growth, MRR trend, plan & city distribution."""
+    import asyncio
+    from collections import defaultdict
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        responses = await asyncio.gather(
+            client.get(
+                f"{supabase.url}/rest/v1/academies?select=id,created_at,plan_id,city,status",
+                headers=supabase.admin_headers
+            ),
+            client.get(
+                f"{supabase.url}/rest/v1/payments_gateway?select=amount,created_at,status",
+                headers=supabase.admin_headers
+            ),
+            return_exceptions=True
+        )
+
+    academies = (
+        responses[0].json()
+        if not isinstance(responses[0], Exception) and responses[0].status_code == 200
+        else []
+    )
+    payments = (
+        responses[1].json()
+        if not isinstance(responses[1], Exception) and responses[1].status_code == 200
+        else []
+    )
+
+    PLAN_PRICES = {"free": 0, "pro": 499, "enterprise": 999}
+
+    # Monthly academy growth
+    monthly_academies: dict[str, int] = defaultdict(int)
+    for acc in academies:
+        try:
+            dt = datetime.fromisoformat(acc["created_at"].replace("Z", "+00:00"))
+            monthly_academies[dt.strftime("%Y-%m")] += 1
+        except Exception as e:
+            logger.debug("Skipping academy date parse: %s", e)
+
+    # Monthly revenue from completed payments
+    monthly_revenue: dict[str, float] = defaultdict(float)
+    for p in payments:
+        if p.get("status") == "completed":
+            try:
+                dt = datetime.fromisoformat(p["created_at"].replace("Z", "+00:00"))
+                monthly_revenue[dt.strftime("%Y-%m")] += float(p.get("amount", 0))
+            except Exception as e:
+                logger.debug("Skipping payment date parse: %s", e)
+
+    # Plan distribution
+    plan_counts: dict[str, int] = defaultdict(int)
+    for acc in academies:
+        plan_counts[acc.get("plan_id") or "free"] += 1
+
+    # City distribution
+    city_counts: dict[str, int] = defaultdict(int)
+    for acc in academies:
+        city_counts[acc.get("city") or "Other"] += 1
+
+    # Last 12 months labels
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    months = [
+        (now - timedelta(days=30 * i)).strftime("%Y-%m")
+        for i in range(11, -1, -1)
+    ]
+
+    # Cumulative growth (total academies up to each month)
+    sorted_months = sorted(monthly_academies.keys())
+    cumulative = 0
+    cumulative_map: dict[str, int] = {}
+    for m in sorted_months:
+        cumulative += monthly_academies[m]
+        cumulative_map[m] = cumulative
+
+    # Fill forward for months with no new academies
+    last = 0
+    for m in months:
+        if m in cumulative_map:
+            last = cumulative_map[m]
+        else:
+            cumulative_map[m] = last
+
+    growth_data = [
+        {"month": m, "new": monthly_academies.get(m, 0), "total": cumulative_map.get(m, 0)}
+        for m in months
+    ]
+    revenue_data = [
+        {"month": m, "revenue": round(monthly_revenue.get(m, 0), 2)}
+        for m in months
+    ]
+
+    current_mrr = sum(
+        PLAN_PRICES.get(acc.get("plan_id", "free"), 0)
+        for acc in academies
+        if acc.get("status") != "suspended"
+    )
+
+    return {
+        "monthly_growth": growth_data,
+        "monthly_revenue": revenue_data,
+        "plan_distribution": [
+            {"plan": k, "count": v, "price": PLAN_PRICES.get(k, 0)}
+            for k, v in plan_counts.items()
+        ],
+        "city_distribution": [
+            {"city": k, "count": v}
+            for k, v in sorted(city_counts.items(), key=lambda x: -x[1])
+        ],
+        "current_mrr": current_mrr,
+        "total_academies": len(academies),
+        "active_academies": len([a for a in academies if a.get("status") != "suspended"]),
+        "suspended_academies": len([a for a in academies if a.get("status") == "suspended"]),
+        "churn_rate": round(
+            len([a for a in academies if a.get("status") == "suspended"]) / len(academies) * 100
+            if academies else 0,
+            1
+        ),
+        "arpu": round(
+            current_mrr / len([a for a in academies if a.get("status") != "suspended"])
+            if any(a.get("status") != "suspended" for a in academies) else 0,
+            0
+        ),
     }
 
 
@@ -531,7 +841,8 @@ async def get_saas_settings():
                     row.pop("updated_at", None)
                     return row
         return DEFAULT_SETTINGS
-    except Exception:
+    except Exception as e:
+        logger.error("Failed to fetch SaaS settings: %s", e, exc_info=True)
         return DEFAULT_SETTINGS
 
 
@@ -557,4 +868,350 @@ async def update_saas_settings(request: dict):
             res.raise_for_status()
             return {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save settings: {str(e)}")
+        logger.error("Failed to save settings: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+
+
+# ── Email System ──
+
+EMAIL_TEMPLATES = {
+    "welcome": {
+        "name": "Welcome Email",
+        "subject": "Welcome to Academy SaaS Platform! 🎉",
+        "body": "Dear {academy_name},\n\nWelcome to the Academy SaaS Platform! Your academy has been successfully provisioned.\n\n• Admin Login: {login_url}\n• Plan: {plan}\n• Support: support@academy.com\n\nBest regards,\nAcademy SaaS Team",
+        "variables": ["academy_name", "login_url", "plan"],
+    },
+    "payment_receipt": {
+        "name": "Payment Receipt",
+        "subject": "Payment Confirmation — {amount} MAD",
+        "body": "Dear {academy_name},\n\nWe confirm receipt of your payment:\n\n• Amount: {amount} MAD\n• Plan: {plan}\n• Date: {date}\n• Transaction ID: {transaction_id}\n\nThank you for your continued trust.\n\nBest regards,\nAcademy SaaS Team",
+        "variables": ["academy_name", "amount", "plan", "date", "transaction_id"],
+    },
+    "renewal_reminder": {
+        "name": "Renewal Reminder",
+        "subject": "⏰ Subscription Renewal Reminder — {academy_name}",
+        "body": "Dear {academy_name},\n\nYour {plan} subscription is due for renewal on {renewal_date}.\n\nPlease ensure your payment method is up to date to avoid any service interruption.\n\n• Current Plan: {plan}\n• Renewal Date: {renewal_date}\n• Amount: {amount} MAD\n\nBest regards,\nAcademy SaaS Team",
+        "variables": ["academy_name", "plan", "renewal_date", "amount"],
+    },
+    "suspension_notice": {
+        "name": "Suspension Notice",
+        "subject": "⚠️ Academy Suspended — {academy_name}",
+        "body": "Dear {academy_name},\n\nYour academy has been suspended due to {reason}.\n\nTo reactivate your academy, please contact support or update your payment.\n\n• Status: Suspended\n• Reason: {reason}\n• Support: support@academy.com\n\nBest regards,\nAcademy SaaS Team",
+        "variables": ["academy_name", "reason"],
+    },
+    "custom": {
+        "name": "Custom Email",
+        "subject": "{subject}",
+        "body": "{body}",
+        "variables": ["subject", "body"],
+    },
+}
+
+
+class EmailSendRequest(BaseModel):
+    template: str
+    academy_ids: list[str]
+    variables: dict = {}
+    custom_subject: str | None = None
+    custom_body: str | None = None
+
+
+@router.get("/emails/templates")
+def get_email_templates():
+    """Get all available email templates."""
+    return [
+        {"id": k, "name": v["name"], "subject": v["subject"], "variables": v["variables"]}
+        for k, v in EMAIL_TEMPLATES.items()
+    ]
+
+
+@router.post("/emails/send")
+async def send_email(req: EmailSendRequest):
+    """
+    Send email to selected academies.
+    For now, records as notifications (actual SMTP integration can be added later).
+    """
+    template = EMAIL_TEMPLATES.get(req.template)
+    if not template:
+        raise HTTPException(status_code=400, detail="Invalid template.")
+
+    if not req.academy_ids:
+        raise HTTPException(status_code=400, detail="No academies selected.")
+
+    import asyncio
+
+    # Fetch academy details + admin user IDs
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        responses = await asyncio.gather(*[
+            client.get(
+                f"{supabase.url}/rest/v1/academies?id=eq.{aid}&select=id,name,plan_id",
+                headers=supabase.admin_headers
+            )
+            for aid in req.academy_ids
+        ], return_exceptions=True)
+
+        admin_res = await asyncio.gather(*[
+            client.get(
+                f"{supabase.url}/rest/v1/admins?academy_id=eq.{aid}&select=user_id,email&limit=1",
+                headers=supabase.admin_headers
+            )
+            for aid in req.academy_ids
+        ], return_exceptions=True)
+
+    sent = []
+    failed = []
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for i, aid in enumerate(req.academy_ids):
+            try:
+                academy_data = responses[i].json()[0] if not isinstance(responses[i], Exception) and responses[i].status_code == 200 and responses[i].json() else {}
+                admin_data = admin_res[i].json()[0] if not isinstance(admin_res[i], Exception) and admin_res[i].status_code == 200 and admin_res[i].json() else {}
+
+                # Build variables
+                variables = {
+                    "academy_name": academy_data.get("name", "Academy"),
+                    "plan": academy_data.get("plan_id", "free"),
+                    "login_url": "https://academy.com/login",
+                    "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    **req.variables,
+                }
+
+                if req.template == "custom":
+                    subject = req.custom_subject or "Message from Academy SaaS"
+                    body = req.custom_body or ""
+                else:
+                    subject = template["subject"]
+                    body = template["body"]
+                    for k, v in variables.items():
+                        subject = subject.replace(f"{{{k}}}", str(v))
+                        body = body.replace(f"{{{k}}}", str(v))
+
+                # Store as notification (+ would send via SMTP if configured)
+                notif_data = {
+                    "title": f"📧 {subject}",
+                    "message": body[:500],
+                    "type": "email",
+                    "target_role": "admin",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+                if admin_data.get("user_id"):
+                    notif_data["user_id"] = admin_data["user_id"]
+
+                await client.post(
+                    f"{supabase.url}/rest/v1/notifications",
+                    json=notif_data,
+                    headers=supabase.admin_headers
+                )
+                sent.append({
+                    "academy": academy_data.get("name", aid),
+                    "email": admin_data.get("email", "—"),
+                })
+            except Exception as e:
+                failed.append({"academy_id": aid, "error": str(e)})
+
+    return {
+        "success": True,
+        "sent": len(sent),
+        "failed": len(failed),
+        "details": sent,
+        "errors": failed,
+    }
+
+
+# ── Invoice Generation ──
+
+from fastapi.responses import HTMLResponse
+
+
+@router.get("/invoices/{academy_id}/{payment_id}", response_class=HTMLResponse)
+async def generate_invoice(academy_id: str, payment_id: str):
+    """Generate a printable HTML invoice for a specific payment."""
+    import asyncio
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        academy_req, payment_req = await asyncio.gather(
+            client.get(
+                f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}&select=*",
+                headers=supabase.admin_headers
+            ),
+            client.get(
+                f"{supabase.url}/rest/v1/payments_gateway?id=eq.{payment_id}&select=*",
+                headers=supabase.admin_headers
+            ),
+            return_exceptions=True,
+        )
+
+    academy = academy_req.json()[0] if not isinstance(academy_req, Exception) and academy_req.status_code == 200 and academy_req.json() else None
+    payment = payment_req.json()[0] if not isinstance(payment_req, Exception) and payment_req.status_code == 200 and payment_req.json() else None
+
+    if not academy:
+        raise HTTPException(status_code=404, detail="Academy not found.")
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found.")
+
+    inv_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    pay_date = payment.get("created_at", "")[:10] if payment.get("created_at") else inv_date
+    inv_number = f"INV-{pay_date.replace('-', '')}-{payment_id[:6].upper()}"
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice {inv_number}</title>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f8f9fb; color: #1e293b; }}
+  .invoice {{ max-width: 800px; margin: 40px auto; background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); overflow: hidden; }}
+  .header {{ background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 40px; }}
+  .header h1 {{ font-size: 28px; font-weight: 900; margin-bottom: 4px; }}
+  .header p {{ font-size: 13px; opacity: 0.8; }}
+  .body {{ padding: 40px; }}
+  .meta {{ display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 40px; }}
+  .meta-block h3 {{ font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; margin-bottom: 8px; font-weight: 700; }}
+  .meta-block p {{ font-size: 14px; color: #334155; line-height: 1.7; }}
+  .meta-block p strong {{ color: #0f172a; }}
+  table {{ width: 100%; border-collapse: collapse; margin-bottom: 32px; }}
+  th {{ text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; padding: 12px 16px; border-bottom: 2px solid #e2e8f0; }}
+  td {{ padding: 16px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }}
+  .total-row td {{ border-bottom: none; padding-top: 20px; }}
+  .total-row td:last-child {{ font-size: 22px; font-weight: 900; color: #6366f1; }}
+  .footer {{ text-align: center; padding: 24px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 11px; }}
+  .badge {{ display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }}
+  .badge-paid {{ background: #ecfdf5; color: #059669; }}
+  .badge-pending {{ background: #fffbeb; color: #d97706; }}
+  @media print {{
+    body {{ background: white; }}
+    .invoice {{ box-shadow: none; margin: 0; border-radius: 0; }}
+    .no-print {{ display: none !important; }}
+  }}
+</style>
+</head>
+<body>
+<div class="no-print" style="text-align:center;padding:16px;">
+  <button onclick="window.print()" style="padding:10px 28px;background:#6366f1;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;">
+    🖨️ Print / Save as PDF
+  </button>
+</div>
+<div class="invoice">
+  <div class="header">
+    <h1>INVOICE</h1>
+    <p>{inv_number}</p>
+  </div>
+  <div class="body">
+    <div class="meta">
+      <div class="meta-block">
+        <h3>Billed To</h3>
+        <p><strong>{academy.get('name', 'Academy')}</strong><br>
+        {academy.get('city', '')}<br>
+        {academy.get('subdomain', '')}.academy.com</p>
+      </div>
+      <div class="meta-block" style="text-align:right;">
+        <h3>Invoice Details</h3>
+        <p><strong>Invoice #:</strong> {inv_number}<br>
+        <strong>Date:</strong> {pay_date}<br>
+        <strong>Status:</strong> <span class="badge {'badge-paid' if payment.get('status') == 'completed' else 'badge-pending'}">{(payment.get('status', 'pending')).upper()}</span></p>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Description</th><th>Plan</th><th style="text-align:right;">Amount</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>{payment.get('description', 'Subscription Payment')}</td>
+          <td>{academy.get('plan_id', 'pro').upper()}</td>
+          <td style="text-align:right;font-weight:700;">{payment.get('amount', 0)} {payment.get('currency', 'MAD')}</td>
+        </tr>
+        <tr class="total-row">
+          <td></td>
+          <td style="font-weight:700;color:#64748b;">TOTAL</td>
+          <td style="text-align:right;">{payment.get('amount', 0)} {payment.get('currency', 'MAD')}</td>
+        </tr>
+      </tbody>
+    </table>
+    {f'<p style="font-size:12px;color:#94a3b8;">Transaction ID: {payment.get("paypal_order_id", "—")}</p>' if payment.get('paypal_order_id') else ''}
+  </div>
+  <div class="footer">
+    Academy SaaS Platform &mdash; support@academy.com<br>
+    This is a computer-generated invoice.
+  </div>
+</div>
+</body></html>"""
+
+    return HTMLResponse(content=html)
+
+
+# ── Login As (Impersonation) ──
+
+from core.config import settings as app_settings
+
+
+@router.post("/impersonate/{academy_id}")
+async def impersonate_academy(academy_id: str):
+    """
+    Generate an impersonation session for an academy's primary admin.
+    Uses Supabase Admin API to generate a magic link or return user credentials.
+    """
+    # 1. Find the primary admin for this academy
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        admin_res = await client.get(
+            f"{supabase.url}/rest/v1/admins?academy_id=eq.{academy_id}&select=user_id,email,full_name&limit=1",
+            headers=supabase.admin_headers
+        )
+
+    if admin_res.status_code != 200 or not admin_res.json():
+        raise HTTPException(status_code=404, detail="No admin found for this academy.")
+
+    admin = admin_res.json()[0]
+    user_id = admin.get("user_id")
+    email = admin.get("email")
+
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Admin has no linked user ID.")
+
+    # 2. Use Supabase Admin API to generate a magic link (or use generateLink)
+    service_key = app_settings.SUPABASE_SERVICE_ROLE_KEY or app_settings.SUPABASE_KEY
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # Generate a magic link via Supabase Admin
+        link_res = await client.post(
+            f"{supabase.url}/auth/v1/admin/generate_link",
+            json={
+                "type": "magiclink",
+                "email": email,
+                "options": {
+                    "redirect_to": f"{app_settings.FRONTEND_URL}/admin"
+                }
+            },
+            headers={
+                "apikey": app_settings.SUPABASE_KEY,
+                "Authorization": f"Bearer {service_key}",
+                "Content-Type": "application/json",
+            }
+        )
+
+    if link_res.status_code >= 400:
+        # Fallback: just return admin info for manual login
+        return {
+            "success": True,
+            "method": "manual",
+            "admin": {
+                "email": email,
+                "full_name": admin.get("full_name", ""),
+                "user_id": user_id,
+            },
+            "message": "Magic link generation unavailable. Use the admin credentials to login manually.",
+        }
+
+    link_data = link_res.json()
+
+    return {
+        "success": True,
+        "method": "magic_link",
+        "admin": {
+            "email": email,
+            "full_name": admin.get("full_name", ""),
+        },
+        "action_link": link_data.get("action_link", ""),
+        "redirect_url": f"{app_settings.FRONTEND_URL}/admin",
+    }

@@ -1,10 +1,10 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
 
 class CouponCreate(BaseModel):
-    code: str
-    discount_type: str # 'percentage' or 'fixed'
-    discount_value: float
+    code: str = Field(..., min_length=3, max_length=50, pattern=r"^[A-Z0-9_\-]+$")
+    discount_type: Literal['percentage', 'fixed']
+    discount_value: float = Field(..., gt=0)
     is_active: bool = True
 
 class CouponResponse(BaseModel):
@@ -19,4 +19,4 @@ class CouponResponse(BaseModel):
         from_attributes = True
 
 class CouponValidate(BaseModel):
-    code: str
+    code: str = Field(..., min_length=3, max_length=50, pattern=r"^[A-Z0-9_\-]+$")

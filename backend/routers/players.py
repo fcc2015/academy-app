@@ -1,6 +1,10 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
-from core.auth_middleware import verify_token, require_role
+from core.auth_middleware import verify_token, require_role, assert_parent_owns_player
+from core.context import user_id_ctx, role_ctx
 from typing import List
+
+logger = logging.getLogger("players")
 from schemas.users import PlayerCreate, PlayerResponse, UserBase
 from services.supabase_client import supabase
 from urllib.parse import quote
@@ -8,7 +12,7 @@ from urllib.parse import quote
 router = APIRouter(prefix="/players", tags=["Players Engine"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[PlayerResponse])
-async def get_all_players():
+async def get_all_players(user: dict = Depends(require_role("admin", "coach", "super_admin"))):
     try:
         raw_players = await supabase.get_players()
         # Players table now stores full_name directly – no join needed
@@ -17,9 +21,10 @@ async def get_all_players():
                 p['full_name'] = p.get('users', {}).get('full_name', 'Unknown') if isinstance(p.get('users'), dict) else 'Unknown'
         return raw_players
     except Exception as e:
+        logger.error("Error fetching players: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching players: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.post("/", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
@@ -61,7 +66,7 @@ async def create_player(player: PlayerCreate):
                 "target_role": "Admin"
             })
         except Exception as e:
-            print(f"Failed to generate notification: {e}")
+            logger.warning(f"Failed to generate notification: {e}")
 
         result = response[0]
         result["full_name"] = player.full_name
@@ -70,7 +75,7 @@ async def create_player(player: PlayerCreate):
         raise
     except Exception as e:
         error_msg = str(e)
-        print(f"DEBUG ERROR creating player: {error_msg}")
+        logger.error("Error creating player: %s", e, exc_info=True)
         if "duplicate" in error_msg.lower() or "23505" in error_msg:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -78,7 +83,7 @@ async def create_player(player: PlayerCreate):
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating player: {error_msg}"
+            detail="An internal error occurred. Please try again."
         )
 
 
@@ -96,9 +101,10 @@ async def update_player(user_id: str, player: PlayerCreate):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Error updating player: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating player: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.delete("/{user_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
@@ -107,14 +113,21 @@ async def delete_player(user_id: str):
         await supabase.delete_player(user_id)
         return {"message": f"Player {user_id} deleted successfully."}
     except Exception as e:
+        logger.error("Error deleting player: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting player: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.get("/parent/{parent_id}", response_model=List[PlayerResponse])
 async def get_players_by_parent(parent_id: str):
     """Returns players linked to a specific parent_id"""
+    # Parents can only fetch their own children — admins/coaches can fetch any parent's
+    current_role = role_ctx.get()
+    current_user = user_id_ctx.get()
+    if current_role == "parent" and current_user != parent_id:
+        raise HTTPException(status_code=403, detail="Access denied — you can only view your own children.")
+
     try:
         from core.config import settings
         res = await supabase.client.get(
@@ -129,7 +142,8 @@ async def get_players_by_parent(parent_id: str):
                 p['full_name'] = 'Unknown'
         return data
     except Exception as e:
+        logger.error("Error fetching parent players: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching parent players: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )

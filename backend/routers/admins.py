@@ -7,6 +7,9 @@ from urllib.parse import quote
 import secrets
 import string
 
+import logging
+logger = logging.getLogger("admins")
+
 router = APIRouter(prefix="/admins", tags=["Admins"], dependencies=[Depends(verify_token)])
 
 def generate_temp_password(length=10):
@@ -19,9 +22,10 @@ async def get_all_admins():
         response = await supabase.get_admins()
         return response
     except Exception as e:
+        logger.error("Error fetching admins: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching admins: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.post("/", response_model=AdminResponse)
@@ -69,6 +73,7 @@ async def create_admin(admin: AdminCreate):
         raise
     except Exception as e:
         error_msg = str(e)
+        logger.error("Error creating admin: %s", e, exc_info=True)
         if "duplicate" in error_msg.lower() or "23505" in error_msg:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -76,7 +81,7 @@ async def create_admin(admin: AdminCreate):
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating admin: {error_msg}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.put("/{admin_id}")
@@ -86,9 +91,10 @@ async def update_admin(admin_id: str, admin: AdminCreate):
         response = await supabase.update_admin(admin_id, admin_dict)
         return response[0] if isinstance(response, list) else response
     except Exception as e:
+        logger.error("Error updating admin: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating admin: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.delete("/{admin_id}")
@@ -99,7 +105,8 @@ async def delete_admin(admin_id: str):
         await supabase.delete_admin(admin_id)
         return {"message": "Admin deleted successfully"}
     except Exception as e:
+        logger.error("Error deleting admin: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting admin: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )

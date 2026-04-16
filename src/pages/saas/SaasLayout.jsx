@@ -1,5 +1,6 @@
 import { Outlet, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Globe, CreditCard, Settings, LayoutDashboard, LogOut, Building2, Zap } from 'lucide-react';
+import SectionErrorBoundary from '../../components/SectionErrorBoundary';
+import { Bell, Globe, CreditCard, Settings, LayoutDashboard, LogOut, Building2, Zap, BarChart3, Ticket, Mail } from 'lucide-react';
 import { isAuthenticated, logout } from '../../api';
 
 export default function SaasLayout() {
@@ -22,9 +23,12 @@ export default function SaasLayout() {
 
     const navigation = [
         { name: 'Dashboard', href: '/saas/dashboard', icon: LayoutDashboard },
+        { name: 'Analytics', href: '/saas/analytics', icon: BarChart3 },
         { name: 'Academies', href: '/saas/academies', icon: Building2 },
         { name: 'Domains', href: '/saas/domains', icon: Globe },
         { name: 'Academy Plans', href: '/saas/subscriptions', icon: CreditCard },
+        { name: 'Coupons', href: '/saas/coupons', icon: Ticket },
+        { name: 'Emails', href: '/saas/emails', icon: Mail },
         { name: 'Notifications', href: '/saas/notifications', icon: Bell },
         { name: 'Settings', href: '/saas/settings', icon: Settings },
     ];
@@ -87,7 +91,9 @@ export default function SaasLayout() {
             {/* Main Content */}
             <main className="flex-1 overflow-auto">
                 <div className="page-container">
+                    <SectionErrorBoundary name="Page">
                     <Outlet />
+                    </SectionErrorBoundary>
                 </div>
             </main>
         </div>

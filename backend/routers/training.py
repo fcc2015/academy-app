@@ -5,6 +5,9 @@ from pydantic import BaseModel
 from datetime import datetime, date
 from services.supabase_client import supabase
 
+import logging
+logger = logging.getLogger("training")
+
 router = APIRouter(prefix="/training", tags=["Training"], dependencies=[Depends(verify_token)])
 
 class TrainingSessionBase(BaseModel):
@@ -35,28 +38,38 @@ class TrainingSessionUpdate(BaseModel):
 @router.get("/")
 async def get_training_sessions():
     try: return await supabase.get_training_sessions()
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.get("/coach/{coach_id}")
 async def get_sessions_by_coach(coach_id: str):
     try: return await supabase.get_training_sessions_by_coach(coach_id)
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.post("/")
 async def create_training_session(session: TrainingSessionCreate):
     try:
         data = session.model_dump(mode='json')
         return await supabase.insert_training_session(data)
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.patch("/{session_id}")
 async def update_training_session(session_id: str, session: TrainingSessionUpdate):
     try:
         data = session.model_dump(exclude_unset=True, mode='json')
         return await supabase.update_training_session(session_id, data)
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.delete("/{session_id}")
 async def delete_training_session(session_id: str):
     try: return await supabase.delete_training_session(session_id)
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")

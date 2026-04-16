@@ -25,6 +25,10 @@ const SaasSubscriptions = lazy(() => import('./pages/saas/SaasSubscriptions'));
 const SaasDomains = lazy(() => import('./pages/saas/SaasDomains'));
 const SaasSettings = lazy(() => import('./pages/saas/SaasSettings'));
 const SaasNotifications = lazy(() => import('./pages/saas/SaasNotifications'));
+const SaasAnalytics = lazy(() => import('./pages/saas/SaasAnalytics'));
+const SaasAcademyDetail = lazy(() => import('./pages/saas/SaasAcademyDetail'));
+const SaasCoupons = lazy(() => import('./pages/saas/SaasCoupons'));
+const SaasEmails = lazy(() => import('./pages/saas/SaasEmails'));
 
 // Admin
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
@@ -101,10 +105,14 @@ function App() {
             <Route index element={<Navigate to="/saas/dashboard" replace />} />
             <Route path="dashboard" element={<SaasDashboard />} />
             <Route path="academies" element={<SaasAcademies />} />
+            <Route path="academies/:academyId" element={<SaasAcademyDetail />} />
             <Route path="domains" element={<SaasDomains />} />
             <Route path="subscriptions" element={<SaasSubscriptions />} />
             <Route path="settings" element={<SaasSettings />} />
             <Route path="notifications" element={<SaasNotifications />} />
+            <Route path="analytics" element={<SaasAnalytics />} />
+            <Route path="coupons" element={<SaasCoupons />} />
+            <Route path="emails" element={<SaasEmails />} />
           </Route>
 
           {/* Admin */}

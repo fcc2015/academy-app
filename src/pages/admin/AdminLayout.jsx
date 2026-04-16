@@ -1,4 +1,5 @@
 import React from 'react';
+import SectionErrorBoundary from '../../components/SectionErrorBoundary';
 import { Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/layout/AdminSidebar';
 import BottomNav from '../../components/layout/BottomNav';
@@ -89,12 +90,16 @@ const AdminLayout = () => {
 
                 {isChatPage ? (
                     <main className="flex-1 overflow-hidden">
-                        <Outlet />
+                            <SectionErrorBoundary name="Page">
+                            <Outlet />
+                            </SectionErrorBoundary>
                     </main>
                 ) : (
                     <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 pb-28 lg:pb-10">
                         <div className="max-w-7xl mx-auto w-full">
+                                <SectionErrorBoundary name="Page">
                             <Outlet />
+                            </SectionErrorBoundary>
                         </div>
                     </main>
                 )}

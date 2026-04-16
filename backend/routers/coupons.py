@@ -4,6 +4,9 @@ from typing import List
 from schemas.coupons import CouponCreate, CouponResponse
 from services.supabase_client import supabase
 
+import logging
+logger = logging.getLogger("coupons")
+
 router = APIRouter(prefix="/coupons", tags=["Coupons"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[CouponResponse])
@@ -12,9 +15,10 @@ async def get_all_coupons():
         response = await supabase.get_coupons()
         return response
     except Exception as e:
+        logger.error("Error fetching coupons: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching coupons: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.post("/", response_model=CouponResponse)
@@ -23,9 +27,10 @@ async def create_coupon(coupon: CouponCreate):
         response = await supabase.insert_coupon(coupon.model_dump())
         return response[0]
     except Exception as e:
+        logger.error("Error creating coupon: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating coupon: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.get("/validate/{code}", response_model=CouponResponse)
@@ -38,9 +43,10 @@ async def validate_coupon(code: str):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Error validating coupon: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error validating coupon: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.patch("/{coupon_id}/toggle", response_model=CouponResponse)
@@ -49,9 +55,10 @@ async def toggle_coupon(coupon_id: str, is_active: bool = Query(...)):
         response = await supabase.update_coupon_status(coupon_id, is_active)
         return response[0]
     except Exception as e:
+        logger.error("Error updating coupon: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating coupon: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.delete("/{coupon_id}")
@@ -60,7 +67,8 @@ async def delete_coupon(coupon_id: str):
         await supabase.delete_coupon(coupon_id)
         return {"success": True, "message": "Coupon deleted."}
     except Exception as e:
+        logger.error("Error deleting coupon: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting coupon: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )

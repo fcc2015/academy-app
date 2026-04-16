@@ -1,7 +1,10 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from core.auth_middleware import verify_token
 from schemas.settings import AcademySettingsUpdate, AcademySettingsResponse
 from services.supabase_client import supabase
+
+logger = logging.getLogger("settings")
 
 router = APIRouter(prefix="/settings", tags=["Settings"], dependencies=[Depends(verify_token)])
 
@@ -13,9 +16,10 @@ async def get_settings():
             raise HTTPException(status_code=404, detail="Settings not found")
         return response
     except Exception as e:
+        logger.error("Error fetching settings: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching settings: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.patch("/{settings_id}", response_model=AcademySettingsResponse)
@@ -32,12 +36,13 @@ async def update_settings(settings_id: str, settings: AcademySettingsUpdate):
             # If it fails, try again without the new fields
             new_fields = ["season_start", "season_end"]
             filtered_dict = {k: v for k, v in settings_dict.items() if k not in new_fields}
-            print(f"Update failed once, retrying with filtered fields. Error: {e}")
+            logger.warning(f"Settings update failed once, retrying with filtered fields: {e}")
             response = await supabase.update_academy_settings(settings_id, filtered_dict)
             return response[0]
             
     except Exception as e:
+        logger.error("Error updating settings: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating settings: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )

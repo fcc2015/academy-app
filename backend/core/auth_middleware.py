@@ -97,3 +97,26 @@ def require_role(*allowed_roles: str):
             )
         return user
     return _check
+
+
+async def assert_parent_owns_player(parent_user_id: str, player_user_id: str) -> None:
+    """
+    Raises 403 if the given parent does not own (is not linked to) the given player.
+    Used to prevent parents from accessing other parents' children data server-side.
+    """
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/players"
+                f"?parent_id=eq.{parent_user_id}&user_id=eq.{player_user_id}&select=user_id",
+                headers=supabase.admin_headers,
+            )
+            if res.status_code == 200 and res.json():
+                return  # ownership confirmed
+    except Exception:
+        pass
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Access denied — you can only access your own child's data.",
+    )

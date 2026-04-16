@@ -10,6 +10,9 @@ import csv
 import io
 from datetime import datetime
 
+import logging
+logger = logging.getLogger("exports")
+
 router = APIRouter(prefix="/exports", tags=["Exports"], dependencies=[Depends(verify_token)])
 
 
@@ -44,7 +47,8 @@ async def export_players_csv():
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.get("/payments/csv")
@@ -76,7 +80,8 @@ async def export_payments_csv():
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.get("/attendance/csv")
@@ -120,4 +125,5 @@ async def export_attendance_csv(squad_id: Optional[str] = Query(None)):
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")

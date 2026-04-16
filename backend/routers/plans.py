@@ -3,6 +3,9 @@ from core.auth_middleware import verify_token
 from services.supabase_client import supabase
 from schemas.plans import SubscriptionPlanCreate, SubscriptionPlanUpdate
 
+import logging
+logger = logging.getLogger("plans")
+
 router = APIRouter(prefix="/plans", tags=["Subscription Plans"], dependencies=[Depends(verify_token)])
 
 
@@ -12,7 +15,8 @@ async def get_all_plans():
         data = await supabase.get_plans()
         return data
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An internal error occurred. Please try again.")
 
 
 @router.get("/public")
@@ -22,7 +26,8 @@ async def get_public_plans():
         data = await supabase.get_plans(active_only=True)
         return data
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An internal error occurred. Please try again.")
 
 
 @router.post("/")
@@ -33,7 +38,8 @@ async def create_plan(plan: SubscriptionPlanCreate):
         data = await supabase.insert_plan(payload)
         return data
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An internal error occurred. Please try again.")
 
 
 @router.patch("/{plan_id}")
@@ -42,7 +48,8 @@ async def update_plan(plan_id: str, plan: SubscriptionPlanUpdate):
         data = await supabase.update_plan(plan_id, plan.model_dump(exclude_none=True))
         return data
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An internal error occurred. Please try again.")
 
 
 @router.delete("/{plan_id}")
@@ -51,4 +58,5 @@ async def delete_plan(plan_id: str):
         await supabase.delete_plan(plan_id)
         return {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An internal error occurred. Please try again.")

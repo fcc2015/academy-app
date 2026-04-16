@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import {
     Loader2, Plus, Ban, CheckCircle2, X, Pencil, Save,
-    MapPin, SlidersHorizontal, Building2, ChevronRight, Users
+    MapPin, SlidersHorizontal, Building2, ChevronRight, Users, Search,
+    Trash2, Download, Check
 } from 'lucide-react';
 
 // Moroccan cities for rollout pipeline
@@ -48,6 +50,14 @@ export default function SaasAcademies() {
 
     // Filter
     const [cityFilter, setCityFilter] = useState('All');
+    const [search, setSearch] = useState('');
+
+    // Bulk selection
+    const [selected, setSelected] = useState(new Set());
+
+    // Delete
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     const fetchAcademies = async () => {
         try {
@@ -73,9 +83,18 @@ export default function SaasAcademies() {
 
     // Filtered academies
     const filtered = useMemo(() => {
-        if (cityFilter === 'All') return academies;
-        return academies.filter(a => cityOf(a) === cityFilter);
-    }, [academies, cityFilter]);
+        let list = cityFilter === 'All' ? academies : academies.filter(a => cityOf(a) === cityFilter);
+        if (search.trim()) {
+            const q = search.trim().toLowerCase();
+            list = list.filter(a =>
+                (a.name || '').toLowerCase().includes(q) ||
+                (a.subdomain || '').toLowerCase().includes(q) ||
+                (a.custom_domain || '').toLowerCase().includes(q) ||
+                (a.notes || '').toLowerCase().includes(q)
+            );
+        }
+        return list;
+    }, [academies, cityFilter, search]);
 
     // ── Create ──
     const handleCreate = async (e) => {
@@ -155,19 +174,105 @@ export default function SaasAcademies() {
         }
     };
 
+    // ── Delete ──
+    const handleDelete = async () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        try {
+            const res = await authFetch(`${API_URL}/saas/academies/${deleteTarget.id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setAcademies(prev => prev.filter(a => a.id !== deleteTarget.id));
+                setSelected(prev => { const s = new Set(prev); s.delete(deleteTarget.id); return s; });
+            }
+        } finally {
+            setDeleting(false);
+            setDeleteTarget(null);
+        }
+    };
+
+    // ── Bulk action ──
+    const handleBulk = async (newStatus) => {
+        if (selected.size === 0) return;
+        setActionLoading('bulk');
+        try {
+            const res = await authFetch(`${API_URL}/saas/academies-bulk/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ academy_ids: [...selected], status: newStatus }),
+            });
+            if (res.ok) {
+                setAcademies(prev => prev.map(a => selected.has(a.id) ? { ...a, status: newStatus } : a));
+                setSelected(new Set());
+            }
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    // ── Export CSV ──
+    const exportCSV = () => {
+        const rows = [['Name', 'City', 'Plan', 'Status', 'Players', 'Coaches', 'Admins', 'Created']];
+        filtered.forEach(a => {
+            rows.push([
+                a.name || '', a.city || '', a.plan_id || 'free', a.status || 'active',
+                a.players_count || 0, a.coaches_count || 0, a.admins_count || 0,
+                a.created_at ? new Date(a.created_at).toLocaleDateString() : ''
+            ]);
+        });
+        const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `academies_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // ── Toggle selection ──
+    const toggleSelect = (id) => {
+        setSelected(prev => {
+            const s = new Set(prev);
+            s.has(id) ? s.delete(id) : s.add(id);
+            return s;
+        });
+    };
+    const toggleAll = () => {
+        if (selected.size === filtered.length) {
+            setSelected(new Set());
+        } else {
+            setSelected(new Set(filtered.map(a => a.id)));
+        }
+    };
+
     const cityColors = (city) => CITY_COLORS[city] || CITY_COLORS.Other;
 
     return (
         <div className="space-y-8 animate-fade-in">
             {/* Header */}
-            <div className="flex justify-between items-end">
+            <div className="flex justify-between items-end gap-4">
                 <div>
                     <h2 className="page-title">Academies Management</h2>
                     <p className="page-subtitle">Gradual rollout by city — Casablanca → Rabat → Tanger → ...</p>
                 </div>
-                <button onClick={() => setShowCreate(true)} className="btn btn-brand">
-                    <Plus size={16} /> Add Academy
-                </button>
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Search academies..."
+                            className="input pl-9 w-56 text-sm"
+                        />
+                    </div>
+                    <button onClick={exportCSV} className="btn btn-secondary" title="Export CSV">
+                        <Download size={16} /> Export
+                    </button>
+                    <button onClick={() => setShowCreate(true)} className="btn btn-brand">
+                        <Plus size={16} /> Add Academy
+                    </button>
+                </div>
             </div>
 
             {/* ── Rollout Pipeline ── */}
@@ -228,6 +333,34 @@ export default function SaasAcademies() {
                 })}
             </div>
 
+            {/* ── Bulk Action Bar ── */}
+            {selected.size > 0 && (
+                <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 animate-fade-in">
+                    <span className="text-sm font-bold text-indigo-700">{selected.size} selected</span>
+                    <div className="flex-1" />
+                    <button
+                        onClick={() => handleBulk('active')}
+                        disabled={actionLoading === 'bulk'}
+                        className="btn text-xs px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                    >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Activate All
+                    </button>
+                    <button
+                        onClick={() => handleBulk('suspended')}
+                        disabled={actionLoading === 'bulk'}
+                        className="btn text-xs px-3 py-1.5 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"
+                    >
+                        <Ban className="w-3.5 h-3.5" /> Suspend All
+                    </button>
+                    <button
+                        onClick={() => setSelected(new Set())}
+                        className="btn text-xs px-3 py-1.5 bg-surface-100 text-surface-600 border border-surface-200 hover:bg-surface-200"
+                    >
+                        <X className="w-3.5 h-3.5" /> Clear
+                    </button>
+                </div>
+            )}
+
             {/* ── Table ── */}
             {loading ? (
                 <div className="py-20 text-center text-emerald-500"><Loader2 className="w-8 h-8 mx-auto animate-spin" /></div>
@@ -236,6 +369,15 @@ export default function SaasAcademies() {
                     <table className="table-premium w-full text-left">
                         <thead>
                             <tr>
+                                <th className="w-10">
+                                    <button onClick={toggleAll} className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                        selected.size === filtered.length && filtered.length > 0
+                                            ? 'bg-indigo-500 border-indigo-500 text-white'
+                                            : 'border-surface-300 hover:border-surface-400'
+                                    }`}>
+                                        {selected.size === filtered.length && filtered.length > 0 && <Check className="w-3 h-3" />}
+                                    </button>
+                                </th>
                                 <th>Academy</th>
                                 <th>City</th>
                                 <th>Plan</th>
@@ -253,7 +395,16 @@ export default function SaasAcademies() {
                                     const city = cityOf(acc);
                                     const c = cityColors(city);
                                     return (
-                                        <tr key={acc.id}>
+                                        <tr key={acc.id} className={selected.has(acc.id) ? 'bg-indigo-50/50' : ''}>
+                                            <td>
+                                                <button onClick={() => toggleSelect(acc.id)} className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                                    selected.has(acc.id)
+                                                        ? 'bg-indigo-500 border-indigo-500 text-white'
+                                                        : 'border-surface-300 hover:border-surface-400'
+                                                }`}>
+                                                    {selected.has(acc.id) && <Check className="w-3 h-3" />}
+                                                </button>
+                                            </td>
                                             <td>
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-sm"
@@ -261,7 +412,7 @@ export default function SaasAcademies() {
                                                         {(acc.name || 'A').charAt(0).toUpperCase()}
                                                     </div>
                                                     <div>
-                                                        <p className="font-semibold text-surface-900 text-sm">{acc.name || 'Unnamed'}</p>
+                                                        <Link to={`/saas/academies/${acc.id}`} className="font-semibold text-surface-900 text-sm hover:text-indigo-600 transition-colors">{acc.name || 'Unnamed'}</Link>
                                                         {acc.notes && <p className="text-[10px] text-surface-400 truncate max-w-[160px]">{acc.notes}</p>}
                                                     </div>
                                                 </div>
@@ -307,7 +458,7 @@ export default function SaasAcademies() {
                                                 {new Date(acc.created_at).toLocaleDateString()}
                                             </td>
                                             <td className="text-right">
-                                                <div className="flex items-center gap-2 justify-end">
+                                                <div className="flex items-center gap-1.5 justify-end">
                                                     <button
                                                         onClick={() => openEdit(acc)}
                                                         className="p-1.5 rounded-lg bg-surface-100 text-surface-600 hover:bg-surface-200 border border-surface-200 transition-colors"
@@ -327,6 +478,13 @@ export default function SaasAcademies() {
                                                         {actionLoading === acc.id
                                                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                                             : acc.status === 'suspended' ? 'Activate' : 'Suspend'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setDeleteTarget(acc)}
+                                                        className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition-colors"
+                                                        title="Delete academy"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
                                                 </div>
                                             </td>
@@ -517,6 +675,33 @@ export default function SaasAcademies() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Delete Confirmation Modal ── */}
+            {deleteTarget && (
+                <div className="modal-backdrop">
+                    <div className="modal-content max-w-md">
+                        <div className="p-6 text-center space-y-4">
+                            <div className="w-14 h-14 rounded-full bg-red-100 text-red-500 flex items-center justify-center mx-auto">
+                                <Trash2 className="w-7 h-7" />
+                            </div>
+                            <h3 className="text-lg font-bold text-surface-900">Delete Academy?</h3>
+                            <p className="text-sm text-surface-500">
+                                This will <span className="font-bold text-red-600">permanently delete</span>{' '}
+                                <span className="font-bold text-surface-900">{deleteTarget.name}</span>{' '}
+                                and all its data (players, coaches, payments, squads).
+                            </p>
+                            <p className="text-xs text-surface-400">This action cannot be undone.</p>
+                        </div>
+                        <div className="p-4 border-t border-surface-100 flex gap-3 justify-center">
+                            <button onClick={() => setDeleteTarget(null)} className="btn btn-secondary px-6">Cancel</button>
+                            <button onClick={handleDelete} disabled={deleting}
+                                className="btn px-6 bg-red-600 text-white hover:bg-red-700 border-0">
+                                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete Permanently'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
