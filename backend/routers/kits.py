@@ -5,6 +5,9 @@ from pydantic import BaseModel
 from datetime import date
 from services.supabase_client import supabase
 
+import logging
+logger = logging.getLogger("kits")
+
 router = APIRouter(prefix="/kits", tags=["Kits"], dependencies=[Depends(verify_token)])
 
 class KitAssignmentBase(BaseModel):
@@ -35,12 +38,16 @@ class KitAssignmentUpdate(BaseModel):
 @router.get("/")
 async def get_kit_assignments():
     try: return await supabase.get_kit_assignments()
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.get("/player/{player_id}")
 async def get_kits_by_player(player_id: str):
     try: return await supabase.get_kit_assignments_by_player(player_id)
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.post("/")
 async def create_kit_assignment(item: KitAssignmentCreate):
@@ -49,7 +56,9 @@ async def create_kit_assignment(item: KitAssignmentCreate):
         if data.get('assigned_date'): data['assigned_date'] = str(data['assigned_date'])
         if data.get('returned_date'): data['returned_date'] = str(data['returned_date'])
         return await supabase.insert_kit_assignment(data)
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.patch("/{item_id}")
 async def update_kit_assignment(item_id: str, item: KitAssignmentUpdate):
@@ -58,9 +67,13 @@ async def update_kit_assignment(item_id: str, item: KitAssignmentUpdate):
         if data.get('assigned_date'): data['assigned_date'] = str(data['assigned_date'])
         if data.get('returned_date'): data['returned_date'] = str(data['returned_date'])
         return await supabase.update_kit_assignment(item_id, data)
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.delete("/{item_id}")
 async def delete_kit_assignment(item_id: str):
     try: return await supabase.delete_kit_assignment(item_id)
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")

@@ -1,6 +1,9 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
-from core.auth_middleware import verify_token
+from core.auth_middleware import verify_token, assert_parent_owns_player
 from typing import List
+
+logger = logging.getLogger("finances")
 from datetime import date, timedelta
 from schemas.finances import PaymentCreate, PaymentResponse, SubscriptionCreate, SubscriptionResponse
 from services.supabase_client import supabase
@@ -27,15 +30,21 @@ async def get_all_payments(user: dict = Depends(require_role("admin", "coach", "
     try:
         return await supabase.get_payments()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"خطأ في جلب الدفعات: {str(e)}")
+        logger.error("خطأ في جلب الدفعات: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.get("/payments/player/{player_id}")
 async def get_payments_by_player(player_id: str):
+    current_role = role_ctx.get()
+    current_user = user_id_ctx.get()
+    if current_role == "parent":
+        await assert_parent_owns_player(current_user, player_id)
     try:
         return await supabase.get_payments_by_player(player_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching player payments: {str(e)}")
+        logger.error("Error fetching player payments: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.get("/payments/user/{user_id}")
@@ -64,7 +73,8 @@ async def get_payments_by_user(user_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"خطأ في جلب دفعات المستخدم: {str(e)}")
+        logger.error("خطأ في جلب دفعات المستخدم: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.post("/payments")
@@ -89,13 +99,14 @@ async def create_payment(payment: PaymentCreate, user: dict = Depends(require_ro
                 await supabase.insert_notification({"user_id": payment.user_id, "title": title, "message": msg, "type": notif_type})
             await supabase.insert_notification({"title": f"Payment {payment.status}", "message": f"{payment.amount} MAD — {payment.status}", "type": "admin_alert", "target_role": "Admin"})
         except Exception as e:
-            print(f"Notification error: {e}")
+            logger.warning(f"Notification error: {e}")
 
         return response[0]
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"خطأ في حفظ الدفعة: {str(e)}")
+        logger.error("خطأ في حفظ الدفعة: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.post("/payments/parent")
@@ -128,13 +139,14 @@ async def create_parent_payment(payment: PaymentCreate):
                 "target_role": "Admin"
             })
         except Exception as e:
-            print(f"خطأ في الإشعار: {e}")
+            logger.warning(f"Notification error: {e}")
         
         return response[0]
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"خطأ في إرسال إثبات الدفع: {str(e)}")
+        logger.error("خطأ في إرسال إثبات الدفع: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.delete("/payments/{payment_id}")
@@ -144,7 +156,8 @@ async def delete_payment(payment_id: str, user: dict = Depends(require_role("adm
         await supabase.delete_payment(payment_id)
         return {"message": "Payment deleted successfully"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting payment: {str(e)}")
+        logger.error("Error deleting payment: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.patch("/payments/{payment_id}")
@@ -169,11 +182,12 @@ async def update_payment(payment_id: str, payment: PaymentCreate, user: dict = D
                     await supabase.insert_notification({"user_id": payment.user_id, "title": title, "message": msg, "type": notif_type})
                 await supabase.insert_notification({"title": f"Payment {payment.status} (Updated)", "message": f"{payment.amount} MAD — {payment.status}", "type": "admin_alert", "target_role": "Admin"})
             except Exception as e:
-                print(f"Notification error: {e}")
+                logger.warning(f"Notification error: {e}")
 
         return response[0] if response else {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating payment: {str(e)}")
+        logger.error("Error updating payment: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 # =========================================================
@@ -181,7 +195,7 @@ async def update_payment(payment_id: str, payment: PaymentCreate, user: dict = D
 # =========================================================
 
 @router.get("/subscriptions")
-async def get_all_subscriptions():
+async def get_all_subscriptions(user: dict = Depends(require_role("admin", "coach", "super_admin"))):
     try:
         subs = await supabase.get_subscriptions()
         academy_settings = await supabase.get_academy_settings() or {}
@@ -197,11 +211,16 @@ async def get_all_subscriptions():
                 s["alert_status_realtime"] = get_alert_status(nd, season_end)
         return subs
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching subscriptions: {str(e)}")
+        logger.error("Error fetching subscriptions: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.get("/subscriptions/player/{player_id}")
 async def get_subscription_by_player(player_id: str):
+    current_role = role_ctx.get()
+    current_user = user_id_ctx.get()
+    if current_role == "parent":
+        await assert_parent_owns_player(current_user, player_id)
     try:
         sub = await supabase.get_subscription_by_player(player_id)
         if sub and sub.get("next_due_date"):
@@ -209,7 +228,8 @@ async def get_subscription_by_player(player_id: str):
             sub["days_until_due"] = (nd - date.today()).days
         return sub or {}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.post("/subscriptions")
@@ -263,7 +283,7 @@ async def create_subscription(sub: SubscriptionCreate):
                     "notes": f"Prorata {prorata_days} jours"
                 })
             except Exception as e:
-                print(f"Prorata payment creation error: {e}")
+                logger.warning(f"Prorata payment creation error: {e}")
 
         # Notify admin
         try:
@@ -274,13 +294,14 @@ async def create_subscription(sub: SubscriptionCreate):
                 "target_role": "Admin"
             })
         except Exception as e:
-            print(f"Notification error: {e}")
+            logger.warning(f"Notification error: {e}")
 
         return result
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating subscription: {str(e)}")
+        logger.error("Error creating subscription: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.patch("/subscriptions/{sub_id}")
@@ -291,7 +312,8 @@ async def update_subscription(sub_id: str, data: dict):
         result = await supabase.update_subscription(sub_id, data)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating subscription: {str(e)}")
+        logger.error("Error updating subscription: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.delete("/subscriptions/{sub_id}")
@@ -300,7 +322,8 @@ async def delete_subscription(sub_id: str):
         await supabase.delete_subscription(sub_id)
         return {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting subscription: {str(e)}")
+        logger.error("Error deleting subscription: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 # =========================================================
@@ -357,25 +380,26 @@ async def run_alert_check():
                             "user_id": sub["user_id"]
                         })
                 except Exception as e:
-                    print(f"Notification error for sub {sub_id}: {e}")
+                    logger.warning(f"Notification error for sub {sub_id}: {e}")
 
             # Auto-update player status if suspended/terminated
             if alert == "terminated":
                 try:
                     await supabase.update_subscription(sub_id, {"status": "terminated", "alert_status": "terminated"})
                 except Exception as e:
-                    print(f"Auto-terminate error: {e}")
+                    logger.warning(f"Auto-terminate error: {e}")
             else:
                 try:
                     await supabase.update_subscription_alert_status(sub_id, alert)
                 except Exception as e:
-                    print(f"Alert status update error: {e}")
+                    logger.warning(f"Alert status update error: {e}")
 
             alerts_sent.append({"sub_id": sub_id, "player": player_name, "new_alert": alert})
 
         return {"success": True, "alerts_sent": len(alerts_sent), "details": alerts_sent}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Alert check failed: {str(e)}")
+        logger.error("Alert check failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.post("/subscriptions/{sub_id}/generate-invoice")
@@ -424,7 +448,8 @@ async def generate_invoice(sub_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating invoice: {str(e)}")
+        logger.error("Error generating invoice: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.post("/test-notification/{user_id}")
@@ -439,4 +464,5 @@ async def send_test_notification(user_id: str):
         })
         return {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error sending test notification: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")

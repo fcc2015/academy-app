@@ -2,8 +2,11 @@
 Audit logging service — tracks all important actions.
 Call log_action() from routers after CRUD operations.
 """
+import logging
 from services.supabase_client import supabase
 from datetime import datetime, timezone
+
+logger = logging.getLogger("audit")
 
 
 async def log_action(
@@ -36,4 +39,4 @@ async def log_action(
         await supabase._post("/rest/v1/audit_logs", log_entry)
     except Exception as e:
         # Audit logging should never break the main flow
-        print(f"[AUDIT] Failed to log: {action} on {entity} - {e}")
+        logger.warning("Failed to log audit: %s on %s — %s", action, entity, e)

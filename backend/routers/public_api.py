@@ -1,8 +1,12 @@
+import logging
 from fastapi import APIRouter, HTTPException, status, Depends
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
+import re
 from services.supabase_client import supabase
 from core.auth_middleware import require_role
+
+logger = logging.getLogger("public_api")
 from urllib.parse import quote
 import httpx
 
@@ -10,9 +14,9 @@ router = APIRouter(prefix="/public", tags=["Public"])
 
 
 class SetupAcademyRequest(BaseModel):
-    academy_name: str
-    country: Optional[str] = None
-    city: Optional[str] = None
+    academy_name: str = Field(..., min_length=2, max_length=100)
+    country: Optional[str] = Field(None, max_length=100)
+    city: Optional[str] = Field(None, max_length=100)
 
 @router.post("/setup-academy")
 async def setup_academy_for_google_user(req: SetupAcademyRequest, user: dict = Depends(require_role("player", "parent", "admin", "coach", "super_admin"))):
@@ -36,7 +40,7 @@ async def setup_academy_for_google_user(req: SetupAcademyRequest, user: dict = D
             headers=supabase.admin_headers
         )
         if res.status_code not in [200, 201]:
-            raise HTTPException(status_code=500, detail=f"Erreur création académie: {res.text}")
+            raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
         academy_row = res.json()
         if isinstance(academy_row, list):
             academy_row = academy_row[0]
@@ -62,10 +66,15 @@ async def setup_academy_for_google_user(req: SetupAcademyRequest, user: dict = D
 # ── Self-Service Academy Registration (Free Plan) ──
 
 class RegisterAcademyRequest(BaseModel):
-    academy_name: str
-    admin_name: str
+    academy_name: str = Field(..., min_length=2, max_length=100)
+    admin_name: str = Field(..., min_length=2, max_length=100)
     admin_email: EmailStr
-    admin_password: str
+    admin_password: str = Field(..., min_length=6, max_length=128)
+
+    @field_validator("academy_name", "admin_name")
+    @classmethod
+    def strip_html(cls, v: str) -> str:
+        return re.sub(r"<[^>]+>", "", v).strip()
 
 
 @router.post("/register-academy")
@@ -95,8 +104,8 @@ async def register_academy(req: RegisterAcademyRequest):
                 )
     except HTTPException:
         raise
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Academy name duplicate check failed (non-critical): %s", e)
 
     # --- Duplicate Check: Admin Email ---
     try:
@@ -112,11 +121,10 @@ async def register_academy(req: RegisterAcademyRequest):
                 )
     except HTTPException:
         raise
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Admin email duplicate check failed (non-critical): %s", e)
 
     # 1. Create the Academy record with free plan
-    import re
     subdomain = re.sub(r'[^a-z0-9-]', '', req.academy_name.lower().replace(' ', '-')).strip('-')
     if not subdomain:
         subdomain = f"academy-{int(__import__('time').time())}"
@@ -135,7 +143,7 @@ async def register_academy(req: RegisterAcademyRequest):
                 headers=supabase.admin_headers
             )
             if res.status_code not in [200, 201]:
-                raise HTTPException(status_code=500, detail=f"Échec de création de l'académie: {res.text}")
+                raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
             academy_row = res.json()
             if isinstance(academy_row, list):
                 academy_row = academy_row[0]
@@ -143,7 +151,8 @@ async def register_academy(req: RegisterAcademyRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur création académie: {str(e)}")
+        logger.error("Erreur création académie: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
     # 2. Provision the Admin User via Supabase Auth Admin API
     try:
@@ -163,12 +172,13 @@ async def register_academy(req: RegisterAcademyRequest):
                     f"{supabase.url}/rest/v1/academies?id=eq.{new_academy_id}",
                     headers=supabase.admin_headers
                 )
-        except Exception:
-            pass
+        except Exception as rollback_err:
+            logger.warning("Academy rollback failed: %s", rollback_err)
         error_msg = str(e)
+        logger.error("Admin user creation failed: %s", e, exc_info=True)
         if "already been registered" in error_msg.lower() or "duplicate" in error_msg.lower():
             raise HTTPException(status_code=409, detail="Cet email est déjà enregistré.")
-        raise HTTPException(status_code=500, detail=f"Échec de création du compte admin: {error_msg}")
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
     # 3. Create public.users record
     try:
@@ -184,7 +194,7 @@ async def register_academy(req: RegisterAcademyRequest):
                 headers=supabase.admin_headers
             )
     except Exception as e:
-        print(f"[register-academy] Users record (non-critical): {e}")
+        logger.warning(f"[register-academy] Users record (non-critical): {e}")
 
     # 4. Create public.admins record
     try:
@@ -201,7 +211,7 @@ async def register_academy(req: RegisterAcademyRequest):
                 headers=supabase.admin_headers
             )
     except Exception as e:
-        print(f"[register-academy] Admins record (non-critical): {e}")
+        logger.warning(f"[register-academy] Admins record (non-critical): {e}")
 
     # 5. Create default academy_settings
     try:
@@ -217,7 +227,7 @@ async def register_academy(req: RegisterAcademyRequest):
                 headers=supabase.admin_headers
             )
     except Exception as e:
-        print(f"[register-academy] Settings record (non-critical): {e}")
+        logger.warning(f"[register-academy] Settings record (non-critical): {e}")
 
     return {
         "success": True,
@@ -227,15 +237,22 @@ async def register_academy(req: RegisterAcademyRequest):
     }
 
 class PublicRequest(BaseModel):
-    type: str # 'contact' | 'registration'
-    name: str
-    email: Optional[str] = None
-    player_name: Optional[str] = None
-    birth_date: Optional[str] = None
-    address: Optional[str] = None
-    plan_name: Optional[str] = None
-    phone: Optional[str] = None
-    message: Optional[str] = None
+    type: str = Field(..., pattern=r"^(contact|registration)$")
+    name: str = Field(..., min_length=2, max_length=100)
+    email: Optional[EmailStr] = None
+    player_name: Optional[str] = Field(None, max_length=100)
+    birth_date: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    address: Optional[str] = Field(None, max_length=300)
+    plan_name: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
+    message: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator("name", "player_name", "address", "message")
+    @classmethod
+    def strip_html(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            return re.sub(r"<[^>]+>", "", v).strip()
+        return v
 
 @router.post("/requests")
 async def create_public_request(request: PublicRequest):
@@ -263,16 +280,17 @@ async def create_public_request(request: PublicRequest):
             })
         except Exception as e:
             err_details = getattr(e, "response", None)
-            print(f"FAILED TO INSERT NOTIFICATION FROM PUBLIC API: {e}")
+            logger.warning(f"Failed to insert notification from public API: {e}")
             if err_details:
-                print(f"Details: {err_details.text}")
+                logger.warning(f"Notification error details: {err_details.text}")
             pass # ignore notification failure
             
         return {"success": True, "message": "Request received successfully."}
     except Exception as e:
+        logger.error("Error saving request: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error saving request: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.get("/admin/requests", dependencies=[Depends(require_role("admin", "super_admin", "staff"))])
@@ -281,9 +299,10 @@ async def fetch_public_requests(request_status: str = "active"):
         data = await supabase.get_public_requests(status=request_status)
         return data
     except Exception as e:
+        logger.error("Error fetching requests: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching requests: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 class RequestUpdate(BaseModel):
@@ -295,9 +314,10 @@ async def update_request_status(request_id: str, update: RequestUpdate):
         data = await supabase.update_public_request_status(request_id, update.status)
         return data
     except Exception as e:
+        logger.error("Error updating request: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating request: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.delete("/admin/requests/{request_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
@@ -306,7 +326,8 @@ async def delete_public_request(request_id: str):
         data = await supabase.delete_public_request(request_id)
         return data
     except Exception as e:
+        logger.error("Error deleting request: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting request: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )

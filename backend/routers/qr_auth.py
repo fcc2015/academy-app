@@ -41,7 +41,7 @@ class QRAuthorizeRequest(BaseModel):
 
 # ─── 1. إنشاء جلسة QR (اللابتوب) ──────────────────────────
 @router.post("/create-session")
-async def create_qr_session():
+def create_qr_session():
     """اللابتوب يطلب session_id جديد لعرض QR Code"""
     session_id = str(uuid.uuid4())
     
@@ -59,7 +59,7 @@ async def create_qr_session():
 
 # ─── 2. تأكيد الجلسة (الهاتف) ───────────────────────────────
 @router.post("/authorize")
-async def authorize_qr_session(
+def authorize_qr_session(
     request: QRAuthorizeRequest,
     current_user: dict = Depends(get_current_user)
 ):
@@ -91,7 +91,7 @@ async def authorize_qr_session(
 
 # ─── 3. فحص حالة الجلسة (اللابتوب — polling) ────────────────
 @router.get("/check-session/{session_id}")
-async def check_qr_session(session_id: str):
+def check_qr_session(session_id: str):
     """اللابتوب يسأل كل ثانية: واش تم السكان؟"""
     session = qr_sessions.get(session_id)
     

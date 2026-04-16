@@ -1,20 +1,20 @@
-from pydantic import BaseModel
-from typing import Optional, List
+from pydantic import BaseModel, Field
+from typing import Optional, List, Literal
 from datetime import date as date_type, datetime
 
 class AttendanceBase(BaseModel):
     squad_id: str
     player_id: str
     date: date_type
-    status: str = 'present' # present, absent, late, excused
-    notes: Optional[str] = None
+    status: Literal['present', 'absent', 'late', 'excused'] = 'present'
+    notes: Optional[str] = Field(None, max_length=500)
 
 class AttendanceCreate(AttendanceBase):
     pass
 
 class AttendanceUpdate(BaseModel):
-    status: Optional[str] = None
-    notes: Optional[str] = None
+    status: Optional[Literal['present', 'absent', 'late', 'excused']] = None
+    notes: Optional[str] = Field(None, max_length=500)
 
 class AttendanceResponse(AttendanceBase):
     id: str
@@ -27,8 +27,8 @@ class AttendanceResponse(AttendanceBase):
 
 class AttendanceBulkItem(BaseModel):
     player_id: str
-    status: str
-    notes: Optional[str] = None
+    status: Literal['present', 'absent', 'late', 'excused']
+    notes: Optional[str] = Field(None, max_length=500)
 
 class AttendanceBulkCreate(BaseModel):
     squad_id: str

@@ -1,17 +1,27 @@
 import time
+import uuid
 import logging
 from collections import defaultdict
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from core.config import settings
+from core.context import request_id_ctx
 from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin, payments_gateway, tournaments, tryouts, qr_auth
 
-# ─── Logging ────────────────────────────────────────────────
+# ─── Structured Logging with Request ID ─────────────────────
+class RequestIdFilter(logging.Filter):
+    """Injects request_id from context into every log record."""
+    def filter(self, record):
+        record.request_id = request_id_ctx.get("-")
+        return True
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    format="%(asctime)s %(levelname)s [%(name)s] [%(request_id)s] %(message)s",
 )
+# Add filter to root logger so all child loggers inherit it
+logging.getLogger().addFilter(RequestIdFilter())
 logger = logging.getLogger("academy")
 
 app = FastAPI(
@@ -45,7 +55,7 @@ app.add_middleware(
 )
 
 
-# ─── Security Headers ──────────────────────────────────────
+# ─── Security Headers (with CSP) ──────────────────────────
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -54,11 +64,58 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        # Content Security Policy — restricts where resources can load from
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://www.paypal.com https://www.sandbox.paypal.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: blob: https:; "
+            "connect-src 'self' https://*.supabase.co https://api.paypal.com https://api.sandbox.paypal.com; "
+            "frame-src https://www.paypal.com https://www.sandbox.paypal.com; "
+            "object-src 'none'; "
+            "base-uri 'self';"
+        )
         if not settings.DEV_MODE:
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ─── Request ID Middleware ─────────────────────────────────
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Generates a unique request ID for every incoming request.
+    Sets it in context for structured logging and returns it as a header."""
+    async def dispatch(self, request: Request, call_next):
+        rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
+        request_id_ctx.set(rid)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        return response
+
+app.add_middleware(RequestIdMiddleware)
+
+
+# ─── Audit Logging (track mutating ops) ────────────────────
+class AuditLogMiddleware(BaseHTTPMiddleware):
+    """Log all mutating API calls for security audit trail."""
+    AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if request.method in self.AUDIT_METHODS:
+            client_ip = request.client.host if request.client else "unknown"
+            # Extract user info from auth header (don't decode, just log presence)
+            has_auth = "Authorization" in request.headers
+            logger.info(
+                f"AUDIT | {request.method} {request.url.path} | "
+                f"IP={client_ip} | Auth={'yes' if has_auth else 'no'} | "
+                f"Status={response.status_code}"
+            )
+        return response
+
+app.add_middleware(AuditLogMiddleware)
 
 
 # ─── Rate Limiting (in-memory, per-IP) ─────────────────────
@@ -67,18 +124,34 @@ _RATE_LIMIT = 100        # max requests per window
 _RATE_WINDOW = 60.0      # seconds
 _AUTH_RATE_LIMIT = 5      # max login attempts per window
 _AUTH_RATE_WINDOW = 900.0 # 15 minutes
+_SENSITIVE_RATE_LIMIT = 10  # for registration, password reset, etc.
+_SENSITIVE_RATE_WINDOW = 300.0  # 5 minutes
+_CLEANUP_INTERVAL = 300.0  # clean stale entries every 5 min
+_last_cleanup = time.time()
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        global _last_cleanup
         client_ip = request.client.host if request.client else "unknown"
         now = time.time()
         path = request.url.path
 
-        # Stricter limit for auth endpoints
+        # Periodic cleanup of old rate store entries (prevent memory leak)
+        if now - _last_cleanup > _CLEANUP_INTERVAL:
+            stale = [k for k, v in _rate_store.items() if not v or now - max(v) > 1800]
+            for k in stale:
+                del _rate_store[k]
+            _last_cleanup = now
+
+        # Determine rate limit tier
         if path.startswith("/auth/login"):
             key = f"auth:{client_ip}"
             limit = _AUTH_RATE_LIMIT
             window = _AUTH_RATE_WINDOW
+        elif path.startswith(("/auth/register", "/auth/reset", "/public/register")):
+            key = f"sensitive:{client_ip}"
+            limit = _SENSITIVE_RATE_LIMIT
+            window = _SENSITIVE_RATE_WINDOW
         else:
             key = f"api:{client_ip}"
             limit = _RATE_LIMIT

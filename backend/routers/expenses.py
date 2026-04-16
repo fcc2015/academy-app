@@ -5,6 +5,9 @@ from pydantic import BaseModel
 from datetime import date
 from services.supabase_client import supabase
 
+import logging
+logger = logging.getLogger("expenses")
+
 router = APIRouter(prefix="/expenses", tags=["Expenses"], dependencies=[Depends(verify_token)])
 
 class ExpenseBase(BaseModel):
@@ -32,7 +35,9 @@ class ExpenseUpdate(BaseModel):
 @router.get("/")
 async def get_expenses():
     try: return await supabase.get_expenses()
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.post("/")
 async def create_expense(expense: ExpenseCreate):
@@ -40,16 +45,22 @@ async def create_expense(expense: ExpenseCreate):
         data = expense.model_dump(mode='json')
         result = await supabase.insert_expense(data)
         return result[0] if isinstance(result, list) and result else result
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.patch("/{expense_id}")
 async def update_expense(expense_id: str, expense: ExpenseUpdate):
     try:
         data = expense.model_dump(exclude_unset=True, mode='json')
         return await supabase.update_expense(expense_id, data)
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")
 
 @router.delete("/{expense_id}")
 async def delete_expense(expense_id: str):
     try: return await supabase.delete_expense(expense_id)
-    except Exception as e: raise HTTPException(500, detail=str(e))
+    except Exception as e:
+        logger.error("Error: %s", e, exc_info=True)
+        raise HTTPException(500, detail="An internal error occurred. Please try again.")

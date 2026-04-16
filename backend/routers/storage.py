@@ -8,6 +8,9 @@ from services.supabase_client import supabase
 import uuid
 import base64
 
+import logging
+logger = logging.getLogger("storage")
+
 router = APIRouter(prefix="/storage", tags=["Storage"], dependencies=[Depends(verify_token)])
 
 ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
@@ -38,7 +41,8 @@ async def upload_profile_image(
         url = await supabase.upload_file("avatars", file_path, content, file.content_type)
         return {"url": url, "path": file_path}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur upload: {str(e)}")
+        logger.error("Erreur upload: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.post("/upload/document")
@@ -63,7 +67,8 @@ async def upload_document(
         url = await supabase.upload_file("documents", file_path, content, file.content_type)
         return {"url": url, "path": file_path, "filename": file.filename}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur upload: {str(e)}")
+        logger.error("Erreur upload: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 @router.delete("/delete")
@@ -76,4 +81,5 @@ async def delete_file(
         await supabase.delete_file(bucket, path)
         return {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur suppression: {str(e)}")
+        logger.error("Erreur suppression: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")

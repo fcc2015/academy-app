@@ -1,18 +1,18 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from uuid import UUID
 
 
 class SubscriptionPlanBase(BaseModel):
-    name: str
-    description: Optional[str] = None
-    monthly_price: Optional[float] = None
-    annual_price: Optional[float] = None
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=1000)
+    monthly_price: Optional[float] = Field(None, ge=0)
+    annual_price: Optional[float] = Field(None, ge=0)
     billing_cycles: Optional[List[str]] = ['monthly']
     features: Optional[List[str]] = []
     is_active: Optional[bool] = True
-    color: Optional[str] = 'gold'
-    sort_order: Optional[int] = 0
+    color: Optional[str] = Field('gold', max_length=50)
+    sort_order: Optional[int] = Field(0, ge=0)
 
 
 class SubscriptionPlanCreate(SubscriptionPlanBase):
@@ -20,15 +20,15 @@ class SubscriptionPlanCreate(SubscriptionPlanBase):
 
 
 class SubscriptionPlanUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    monthly_price: Optional[float] = None
-    annual_price: Optional[float] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=1000)
+    monthly_price: Optional[float] = Field(None, ge=0)
+    annual_price: Optional[float] = Field(None, ge=0)
     billing_cycles: Optional[List[str]] = None
     features: Optional[List[str]] = None
     is_active: Optional[bool] = None
-    color: Optional[str] = None
-    sort_order: Optional[int] = None
+    color: Optional[str] = Field(None, max_length=50)
+    sort_order: Optional[int] = Field(None, ge=0)
 
 
 class SubscriptionPlanOut(SubscriptionPlanBase):

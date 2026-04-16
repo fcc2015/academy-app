@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     PAYPAL_CLIENT_ID: Optional[str] = None
     PAYPAL_CLIENT_SECRET: Optional[str] = None
     PAYPAL_SANDBOX: bool = True  # True = sandbox, False = live
+    PAYPAL_WEBHOOK_ID: Optional[str] = None  # Required for webhook signature verification
     FRONTEND_URL: str = "https://academy-app-mu.vercel.app"
 
     # Email / SMTP

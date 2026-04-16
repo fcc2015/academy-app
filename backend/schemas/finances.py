@@ -1,23 +1,27 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
 from datetime import datetime, date
 
+PaymentStatus = Literal['Completed', 'Pending', 'Cancelled', 'Refunded']
+PaymentMethod = Literal['Cash', 'Card', 'Transfer', 'Online', 'Other']
+BillingType = Literal['monthly', 'annual', 'hybrid', 'prorata']
+AlertStatus = Literal['none', 'due_soon', 'overdue', 'paid']
 
 class PaymentCreate(BaseModel):
     user_id: str
-    amount: float
+    amount: float = Field(..., gt=0)
     payment_date: Optional[datetime] = None
-    status: str = "Completed"
-    payment_method: str = "Cash"
-    notes: Optional[str] = None
+    status: PaymentStatus = "Completed"
+    payment_method: PaymentMethod = "Cash"
+    notes: Optional[str] = Field(None, max_length=1000)
     # New fields
-    billing_type: Optional[str] = "monthly"
+    billing_type: Optional[BillingType] = "monthly"
     due_date: Optional[date] = None
     period_start: Optional[date] = None
     period_end: Optional[date] = None
-    invoice_number: Optional[str] = None
-    amount_due: Optional[float] = None
-    alert_status: Optional[str] = "none"
+    invoice_number: Optional[str] = Field(None, max_length=100)
+    amount_due: Optional[float] = Field(None, ge=0)
+    alert_status: Optional[AlertStatus] = "none"
     player_id: Optional[str] = None
 
 
@@ -31,11 +35,11 @@ class PaymentResponse(PaymentCreate):
 class SubscriptionCreate(BaseModel):
     player_id: str
     user_id: Optional[str] = None
-    billing_type: str = "monthly"  # monthly, annual, hybrid, prorata
+    billing_type: BillingType = "monthly"
     start_date: date
-    monthly_amount: float
-    annual_amount: Optional[float] = None
-    notes: Optional[str] = None
+    monthly_amount: float = Field(..., gt=0)
+    annual_amount: Optional[float] = Field(None, gt=0)
+    notes: Optional[str] = Field(None, max_length=1000)
 
 
 class SubscriptionResponse(BaseModel):
@@ -57,19 +61,21 @@ class SubscriptionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+ExpenseCategory = Literal['Salaires', 'Équipement', 'Loyer', 'Transport', 'Autre']
+
 class ExpenseBase(BaseModel):
-    amount: float
-    category: str # 'Salaires', 'Équipement', 'Loyer', 'Transport', 'Autre'
-    description: Optional[str] = None
+    amount: float = Field(..., gt=0)
+    category: ExpenseCategory
+    description: Optional[str] = Field(None, max_length=1000)
     expense_date: Optional[date] = None
 
 class ExpenseCreate(ExpenseBase):
     created_by: Optional[str] = None
 
 class ExpenseUpdate(BaseModel):
-    amount: Optional[float] = None
-    category: Optional[str] = None
-    description: Optional[str] = None
+    amount: Optional[float] = Field(None, gt=0)
+    category: Optional[ExpenseCategory] = None
+    description: Optional[str] = Field(None, max_length=1000)
     expense_date: Optional[date] = None
 
 class ExpenseResponse(ExpenseBase):

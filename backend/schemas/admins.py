@@ -1,12 +1,12 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, Dict
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, Dict, Literal
 
 class AdminCreate(BaseModel):
-    full_name: str
+    full_name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
     permissions: Dict[str, bool]
-    status: Optional[str] = "Active"
-    admin_type: Optional[str] = "admin"  # admin | employee | accountant
+    status: Optional[Literal['Active', 'Inactive', 'Suspended']] = "Active"
+    admin_type: Optional[Literal['admin', 'employee', 'accountant']] = "admin"
 
 class AdminResponse(BaseModel):
     id: str

@@ -2,8 +2,11 @@
 PayPal Payment Gateway integration for Academy SaaS.
 Handles subscription payments from client academies.
 """
+import logging
 from fastapi import APIRouter, HTTPException, Request, status
-from pydantic import BaseModel
+
+logger = logging.getLogger("payments_gateway")
+from pydantic import BaseModel, Field
 from typing import Optional
 from core.config import settings
 from services.supabase_client import supabase
@@ -22,17 +25,17 @@ router = APIRouter(
 
 class CreateOrderRequest(BaseModel):
     academy_id: Optional[str] = None   # Optional for public landing page
-    plan_id: str
-    amount: float
-    currency: str = "USD"
-    description: str = "Academy SaaS Subscription"
-    source: Optional[str] = None       # e.g. 'saas_landing'
+    plan_id: str = Field(..., min_length=1, max_length=100)
+    amount: float = Field(..., gt=0, le=100_000)
+    currency: str = Field("USD", pattern=r"^[A-Z]{3}$")
+    description: str = Field("Academy SaaS Subscription", max_length=500)
+    source: Optional[str] = Field(None, max_length=50)
 
 
 class CaptureOrderRequest(BaseModel):
-    order_id: str
-    academy_id: str
-    plan_id: str | None = None
+    order_id: str = Field(..., min_length=1, max_length=100)
+    academy_id: str = Field(..., min_length=1, max_length=100)
+    plan_id: str | None = Field(None, max_length=100)
 
 
 # ── PayPal Auth Helper ──
@@ -61,7 +64,7 @@ async def get_paypal_access_token() -> str:
             data="grant_type=client_credentials"
         )
         if res.status_code != 200:
-            print(f"⚠️ PayPal auth failed: {res.status_code} - {res.text}")
+            logger.error(f"PayPal auth failed: {res.status_code} - {res.text}")
             raise HTTPException(status_code=502, detail="Failed to authenticate with PayPal")
         return res.json()["access_token"]
 
@@ -122,7 +125,7 @@ async def create_paypal_order(req: CreateOrderRequest):
         )
 
         if res.status_code not in [200, 201]:
-            print(f"⚠️ PayPal order creation failed: {res.status_code} - {res.text}")
+            logger.error(f"PayPal order creation failed: {res.status_code} - {res.text}")
             raise HTTPException(status_code=502, detail=f"PayPal order creation failed: {res.text}")
 
         order = res.json()
@@ -145,9 +148,9 @@ async def create_paypal_order(req: CreateOrderRequest):
                         headers=supabase.admin_headers
                     )
                     if save_res.status_code not in [200, 201]:
-                        print(f"⚠️ DB save response: {save_res.status_code} - {save_res.text}")
+                        logger.warning(f"DB save response: {save_res.status_code} - {save_res.text}")
             except Exception as e:
-                print(f"⚠️ Failed to save transaction record: {e}")
+                logger.warning(f"Failed to save transaction record: {e}")
 
         # Return the approval URL for frontend redirect
         approve_link = next(
@@ -180,7 +183,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
         )
 
         if res.status_code not in [200, 201]:
-            print(f"⚠️ PayPal capture failed: {res.status_code} - {res.text}")
+            logger.error(f"PayPal capture failed: {res.status_code} - {res.text}")
             raise HTTPException(status_code=502, detail=f"PayPal capture failed: {res.text}")
 
         capture_data = res.json()
@@ -207,7 +210,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                     headers=supabase.admin_headers
                 )
         except Exception as e:
-            print(f"⚠️ Failed to update transaction: {e}")
+            logger.warning(f"Failed to update transaction: {e}")
 
         # If successful, update academy subscription status
         if capture_status == "COMPLETED":
@@ -227,7 +230,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                         headers=supabase.admin_headers
                     )
             except Exception as e:
-                print(f"⚠️ Failed to update academy subscription: {e}")
+                logger.warning(f"Failed to update academy subscription: {e}")
 
         return {
             "success": capture_status == "COMPLETED",
@@ -283,7 +286,7 @@ async def verify_paypal_order(paypal_order_id: str):
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         )
         if capture_res.status_code not in [200, 201]:
-            raise HTTPException(status_code=502, detail=f"Capture failed: {capture_res.text}")
+            raise HTTPException(status_code=502, detail="Payment capture failed. Please try again.")
 
         capture_data = capture_res.json()
         capture_status = capture_data.get("status")
@@ -350,12 +353,76 @@ async def get_payment_transactions(academy_id: str):
         return []
 
 
+# ── PayPal Webhook Signature Verification ──
+
+async def verify_paypal_webhook_signature(request: Request, raw_body: bytes) -> bool:
+    """
+    Verify PayPal webhook signature using PayPal's verify-webhook-signature API.
+    Returns True if valid, False otherwise.
+    Skips verification if PAYPAL_WEBHOOK_ID is not configured (logs a warning).
+    """
+    webhook_id = settings.PAYPAL_WEBHOOK_ID
+    if not webhook_id:
+        logger.warning("PAYPAL_WEBHOOK_ID not set — skipping webhook signature verification (set it in .env for production)")
+        return True
+
+    transmission_id = request.headers.get("PAYPAL-TRANSMISSION-ID", "")
+    transmission_time = request.headers.get("PAYPAL-TRANSMISSION-TIME", "")
+    cert_url = request.headers.get("PAYPAL-CERT-URL", "")
+    auth_algo = request.headers.get("PAYPAL-AUTH-ALGO", "")
+    transmission_sig = request.headers.get("PAYPAL-TRANSMISSION-SIG", "")
+
+    if not all([transmission_id, transmission_time, cert_url, auth_algo, transmission_sig]):
+        logger.warning("Webhook missing PayPal signature headers — rejecting")
+        return False
+
+    try:
+        token = await get_paypal_access_token()
+        base_url = get_paypal_base_url()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            res = await client.post(
+                f"{base_url}/v1/notifications/verify-webhook-signature",
+                json={
+                    "auth_algo": auth_algo,
+                    "cert_url": cert_url,
+                    "transmission_id": transmission_id,
+                    "transmission_sig": transmission_sig,
+                    "transmission_time": transmission_time,
+                    "webhook_id": webhook_id,
+                    "webhook_event": raw_body.decode("utf-8"),
+                },
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+            )
+            if res.status_code == 200:
+                verification_status = res.json().get("verification_status", "")
+                return verification_status == "SUCCESS"
+            logger.error(f"PayPal webhook verification API returned {res.status_code}: {res.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Webhook signature verification error: {e}")
+        return False
+
+
 # ── PayPal Webhook (for async notifications) ──
 
 @router.post("/webhook")
 async def paypal_webhook(request: Request):
-    """Handle PayPal webhook events (IPN-style notifications)."""
-    body = await request.json()
+    """Handle PayPal webhook events — verifies signature before processing."""
+    raw_body = await request.body()
+
+    # Verify signature first — reject forged requests
+    if not await verify_paypal_webhook_signature(request, raw_body):
+        logger.warning(f"Rejected PayPal webhook with invalid signature from {request.client.host if request.client else 'unknown'}")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    try:
+        body = __import__("json").loads(raw_body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
     event_type = body.get("event_type", "")
 
     if event_type == "PAYMENT.CAPTURE.COMPLETED":
@@ -375,7 +442,7 @@ async def paypal_webhook(request: Request):
                         headers=supabase.admin_headers
                     )
             except Exception as e:
-                print(f"⚠️ Webhook handler error: {e}")
+                logger.error(f"Webhook handler error: {e}")
 
     return {"status": "ok"}
 
@@ -383,7 +450,7 @@ async def paypal_webhook(request: Request):
 # ── Health Check ──
 
 @router.get("/status")
-async def payment_status():
+def payment_status():
     """Check PayPal gateway configuration status."""
     has_credentials = bool(settings.PAYPAL_CLIENT_ID and settings.PAYPAL_CLIENT_SECRET)
     return {

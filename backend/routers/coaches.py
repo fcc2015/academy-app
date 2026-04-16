@@ -1,8 +1,11 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from core.auth_middleware import verify_token, require_role
 from typing import List
 from schemas.coaches import CoachCreate, CoachResponse
 from services.supabase_client import supabase
+
+logger = logging.getLogger("coaches")
 from urllib.parse import quote
 import secrets
 import string
@@ -16,9 +19,10 @@ async def get_all_coaches():
         response = await supabase.get_coaches()
         return response
     except Exception as e:
+        logger.error("Error fetching coaches: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching coaches: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 def generate_temp_password(length=10):
@@ -59,7 +63,7 @@ async def create_coach(coach: CoachCreate):
         raise
     except Exception as e:
         error_msg = str(e)
-        print(f"DEBUG ERROR creating coach: {error_msg}")
+        logger.error("Error creating coach: %s", e, exc_info=True)
         if "duplicate" in error_msg.lower() or "23505" in error_msg:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -67,7 +71,7 @@ async def create_coach(coach: CoachCreate):
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating coach: {error_msg}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.put("/{coach_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
@@ -77,9 +81,10 @@ async def update_coach(coach_id: str, coach: CoachCreate):
         response = await supabase.update_coach(coach_id, coach_dict)
         return response[0] if isinstance(response, list) else response
     except Exception as e:
+        logger.error("Error updating coach: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating coach: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )
 
 @router.delete("/{coach_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
@@ -88,7 +93,8 @@ async def delete_coach(coach_id: str):
         await supabase.delete_coach(coach_id)
         return {"message": "Coach deleted successfully"}
     except Exception as e:
+        logger.error("Error deleting coach: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting coach: {str(e)}"
+            detail="An internal error occurred. Please try again."
         )

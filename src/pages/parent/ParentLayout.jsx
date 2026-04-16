@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import SectionErrorBoundary from '../../components/SectionErrorBoundary';
 import { Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -152,12 +153,16 @@ const ParentLayout = () => {
 
                 {location.pathname.includes('/chat') ? (
                     <div className="flex-1 overflow-hidden" dir={dir}>
-                        <Outlet />
+                        <SectionErrorBoundary name="Page">
+                            <Outlet />
+                            </SectionErrorBoundary>
                     </div>
                 ) : (
                     <div className="flex-1 overflow-auto bg-slate-50/50 p-4 lg:p-8">
                         <div className="max-w-7xl mx-auto">
+                            <SectionErrorBoundary name="Page">
                             <Outlet />
+                            </SectionErrorBoundary>
                         </div>
                     </div>
                 )}
