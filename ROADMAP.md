@@ -112,7 +112,7 @@
 - [x] Recent activity feed (timeline style with icons)
 - [x] Quick actions bar (sidebar panel with 3 quick links)
 - [x] Notification center (NotificationsDropdown component)
-- [ ] Academy health score widget
+- [x] Academy health score widget (ring chart + 4 breakdown bars: payments 40%, attendance 30%, players 15%, evaluations 15%)
 
 ### 3.3 Player Profile Redesign
 - [ ] Photo upload with crop
