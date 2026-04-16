@@ -116,7 +116,7 @@
 
 ### 3.3 Player Profile Redesign
 - [ ] Photo upload with crop
-- [ ] Performance radar chart
+- [x] Performance radar chart (progression overlay comparing current vs previous evaluation + improvement indicator)
 - [ ] Attendance heatmap calendar
 - [ ] Payment history timeline
 - [ ] Medical card (expandable)
@@ -134,7 +134,7 @@
 - [x] Micro-interactions (hover-lift, premium-shadow, pulse-glow, stagger-children)
 - [x] Skeleton loaders for all data-fetching pages (Skeleton.jsx)
 - [x] Toast notifications instead of inline alerts (Toast.jsx + ToastProvider)
-- [ ] Smooth dark mode transition
+- [x] Smooth dark mode transition (CSS variables + .dark overrides for bg/text/border/input/shadows + 0.3s transition)
 - [x] Empty states with illustrations (EmptyState component in Skeleton.jsx)
 
 ### 3.6 RTL & Internationalization
