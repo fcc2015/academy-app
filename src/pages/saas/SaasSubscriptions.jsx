@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, History, CheckCircle2, Loader2, Ban, X, Zap, Star, Crown, Clock, DollarSign, RefreshCw, ArrowUpRight, Calculator, Users, UserCog, Dumbbell, ShieldCheck } from 'lucide-react';
+import { CreditCard, History, CheckCircle2, Loader2, Ban, X, Zap, Star, Crown, Clock, DollarSign, RefreshCw, ArrowUpRight, Calculator, Users, UserCog, Dumbbell, ShieldCheck, Bell, Send } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
@@ -84,6 +84,9 @@ export default function SaasSubscriptions() {
     const [paymentProcessing, setPaymentProcessing] = useState(null);
     const [showProRata, setShowProRata] = useState(null); // planId being previewed
     const [verifyingOrder, setVerifyingOrder] = useState(null); // paypal_order_id being verified
+    const [daysAhead, setDaysAhead] = useState(7);
+    const [sendingReminders, setSendingReminders] = useState(false);
+    const [reminderResult, setReminderResult] = useState(null);
 
     useEffect(() => {
         fetchData();
@@ -251,6 +254,33 @@ export default function SaasSubscriptions() {
         }
     };
 
+    const handleSendReminders = async () => {
+        setSendingReminders(true);
+        setReminderResult(null);
+        try {
+            const res = await authFetch(`${API_URL}/saas/renewals/trigger`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ days_ahead: daysAhead }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setReminderResult(data);
+                if (data.reminders_sent > 0) {
+                    toast.success(`${data.reminders_sent} reminder(s) sent!`);
+                } else {
+                    toast.success('No renewals due — nothing to send.');
+                }
+            } else {
+                toast.error('Failed to trigger reminders.');
+            }
+        } catch (err) {
+            toast.error('Network error.');
+        } finally {
+            setSendingReminders(false);
+        }
+    };
+
     const activeCount = academies.filter(a => a.status !== 'suspended').length;
     const suspendedCount = academies.filter(a => a.status === 'suspended').length;
 
@@ -304,6 +334,74 @@ export default function SaasSubscriptions() {
                     </div>
                     <p className="text-4xl font-black relative z-10 tabular-nums">{suspendedCount}</p>
                 </div>
+            </div>
+
+            {/* Renewal Reminders */}
+            <div className="premium-card p-6">
+                <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100">
+                            <Bell className="w-5 h-5 text-amber-600" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-extrabold text-surface-900">Renewal Reminders</h3>
+                            <p className="text-xs text-surface-400 mt-0.5">Notify paid academies whose subscription renews soon</p>
+                        </div>
+                    </div>
+                    {reminderResult && (
+                        <div className="flex items-center gap-3 text-xs font-bold">
+                            <span className="px-2.5 py-1 rounded-lg bg-surface-100 text-surface-600">
+                                {reminderResult.checked} checked
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+                                {reminderResult.due_soon} due soon
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {reminderResult.reminders_sent} sent
+                            </span>
+                        </div>
+                    )}
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <label className="text-xs font-bold text-surface-600 uppercase tracking-wider whitespace-nowrap">Send if renewing within</label>
+                        <select
+                            value={daysAhead}
+                            onChange={e => setDaysAhead(Number(e.target.value))}
+                            className="input w-28 text-sm"
+                            disabled={sendingReminders}
+                        >
+                            <option value={3}>3 days</option>
+                            <option value={7}>7 days</option>
+                            <option value={14}>14 days</option>
+                            <option value={30}>30 days</option>
+                        </select>
+                    </div>
+                    <button
+                        onClick={handleSendReminders}
+                        disabled={sendingReminders}
+                        className="btn flex items-center gap-2 px-5 py-2 bg-amber-500 text-white hover:bg-amber-600 border-0 font-bold text-sm"
+                    >
+                        {sendingReminders
+                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+                            : <><Send className="w-4 h-4" /> Send Reminders</>
+                        }
+                    </button>
+                </div>
+                {reminderResult?.academies?.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-surface-100">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-surface-400 mb-2">Reminded academies</p>
+                        <div className="flex flex-wrap gap-2">
+                            {reminderResult.academies.map((a, i) => (
+                                <span key={i} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800">
+                                    <Clock className="w-3 h-3" />
+                                    {a.name}
+                                    <span className="text-amber-500 font-normal">· {a.days_until === 0 ? 'today' : `${a.days_until}d`}</span>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Plan Cards — Premium Redesign */}

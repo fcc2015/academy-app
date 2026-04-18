@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
+
+// WebSocket URL derived from API_URL (http→ws, https→wss)
+const WS_URL = API_URL.replace(/^http/, 'ws');
 import {
     Search, Send, Image, Users, ArrowLeft, RefreshCw,
     Shield, User, Loader2, X, MoreVertical, CheckCheck,
@@ -109,6 +112,7 @@ export default function ChatManagement() {
     const typingTimer = useRef(null);
     const fileRef     = useRef(null);
     const pollRef     = useRef(null);
+    const wsRef       = useRef(null);
 
     // ── Fetch groups
     const fetchGroups = useCallback(async () => {
@@ -169,13 +173,58 @@ export default function ChatManagement() {
         if (!activeGroup) return;
         fetchMessages();
         fetchMembers();
-        clearInterval(pollRef.current);
-        pollRef.current = setInterval(() => {
-            fetchMessages(true);
-            fetchTyping();
-        }, 2500);
-        return () => clearInterval(pollRef.current);
-    }, [activeGroup, fetchMessages, fetchMembers, fetchTyping]);
+
+        // ── WebSocket: real-time messages & typing ──
+        const ws = new WebSocket(`${WS_URL}/chat/ws/${activeGroup.id}`);
+        wsRef.current = ws;
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'message') {
+                    const msg = data.message;
+                    setMessages(prev => {
+                        if (prev.find(m => m.id === msg.id)) return prev;
+                        setLastMsgMap(lm => ({ ...lm, [activeGroup.id]: msg }));
+                        return [...prev, msg];
+                    });
+                } else if (data.type === 'typing') {
+                    if (data.user_id === myUserId) return;
+                    setTyping(prev => {
+                        const without = prev.filter(t => t.user_id !== data.user_id);
+                        return data.is_typing
+                            ? [...without, { user_id: data.user_id, user_name: data.user_name }]
+                            : without;
+                    });
+                    // Auto-clear stale typing indicator after 6s
+                    if (data.is_typing) {
+                        setTimeout(() => {
+                            setTyping(prev => prev.filter(t => t.user_id !== data.user_id));
+                        }, 6000);
+                    }
+                }
+            } catch { /* ignore malformed frames */ }
+        };
+
+        // Fallback: poll when WS drops unexpectedly
+        ws.onclose = (e) => {
+            if (wsRef.current === ws) wsRef.current = null;
+            if (e.code !== 1000) { // not intentional close
+                clearInterval(pollRef.current);
+                pollRef.current = setInterval(() => {
+                    fetchMessages(true);
+                    fetchTyping();
+                }, 2500);
+            }
+        };
+
+        return () => {
+            clearInterval(pollRef.current);
+            ws.close(1000);
+            if (wsRef.current === ws) wsRef.current = null;
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeGroup?.id]);
 
     useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -208,7 +257,14 @@ export default function ChatManagement() {
                 const e = await res.json();
                 setError(e.detail || 'Erreur envoi');
                 setTimeout(() => setError(''), 4000);
-            } else { fetchMessages(true); }
+            } else {
+                // WS will deliver the message in real-time;
+                // only fall back to polling fetch if WS is unavailable
+                const ws = wsRef.current;
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    fetchMessages(true);
+                }
+            }
         } catch { setError('Erreur réseau'); setTimeout(() => setError(''), 4000); }
     };
 
@@ -228,7 +284,10 @@ export default function ChatManagement() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ group_id: activeGroup.id, sender_id: myUserId, sender_name: myName, sender_role: myRole, image_url: url, message_type: 'image' })
             });
-            fetchMessages(true);
+            const ws = wsRef.current;
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                fetchMessages(true);
+            }
         } catch { setError('Échec upload image'); setTimeout(() => setError(''), 4000); }
         finally { setSendingImg(false); }
     };
@@ -236,11 +295,18 @@ export default function ChatManagement() {
     // ── Typing
     const updateTyping = (isTyping) => {
         if (!activeGroup) return;
-        authFetch(`${API_URL}/chat/typing`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ group_id: activeGroup.id, user_id: myUserId, user_name: myName, is_typing: isTyping })
-        }).catch(() => {});
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            // Send via WebSocket (zero-latency, no HTTP overhead)
+            ws.send(JSON.stringify({ type: 'typing', user_id: myUserId, user_name: myName, is_typing: isTyping }));
+        } else {
+            // Fallback to HTTP when WS is not available
+            authFetch(`${API_URL}/chat/typing`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ group_id: activeGroup.id, user_id: myUserId, user_name: myName, is_typing: isTyping })
+            }).catch(() => {});
+        }
     };
     const clearTyping = () => { clearTimeout(typingTimer.current); updateTyping(false); };
     const handleInput = (e) => {

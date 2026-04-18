@@ -36,3 +36,11 @@ backend/__pycache__/
 .netlify
 
 .vercel
+
+# Android release artifacts
+*.aab
+FootballAcademy.apk
+FootballAcademy-release.aab
+android/keystore.properties
+*.jks
+*.keystore

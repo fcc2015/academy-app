@@ -1,5 +1,6 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from core.auth_middleware import verify_token
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Literal
@@ -10,6 +11,117 @@ from urllib.parse import quote
 
 logger = logging.getLogger("chat")
 router = APIRouter(prefix="/chat", tags=["Chat"], dependencies=[Depends(verify_token)])
+
+
+# ─────────────────────────────────────────────
+# WebSocket Connection Manager
+# ─────────────────────────────────────────────
+
+class ConnectionManager:
+    """Tracks active WebSocket connections per chat group."""
+    def __init__(self):
+        self.rooms: dict[str, set] = {}
+
+    async def connect(self, group_id: str, websocket: WebSocket):
+        await websocket.accept()
+        if group_id not in self.rooms:
+            self.rooms[group_id] = set()
+        self.rooms[group_id].add(websocket)
+        logger.debug(f"WS connect: group={group_id} total={len(self.rooms[group_id])}")
+
+    def disconnect(self, group_id: str, websocket: WebSocket):
+        if group_id in self.rooms:
+            self.rooms[group_id].discard(websocket)
+            if not self.rooms[group_id]:
+                del self.rooms[group_id]
+
+    async def broadcast(self, group_id: str, data: dict):
+        """Send JSON to all connected clients in the group, drop dead connections."""
+        if group_id not in self.rooms:
+            return
+        dead = set()
+        for ws in list(self.rooms[group_id]):
+            try:
+                await ws.send_json(data)
+            except Exception:
+                dead.add(ws)
+        for ws in dead:
+            self.rooms[group_id].discard(ws)
+
+manager = ConnectionManager()
+
+# WS router — no global auth dependency (verified manually inside handler)
+ws_router = APIRouter(prefix="/chat", tags=["Chat WS"])
+
+
+async def _verify_ws_token(websocket: WebSocket) -> dict | None:
+    """Read access_token from httpOnly cookie and verify with Supabase."""
+    from core.config import settings
+    token = websocket.cookies.get("access_token")
+    if not token:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(
+                f"{settings.SUPABASE_URL}/auth/v1/user",
+                headers={"apikey": settings.SUPABASE_KEY, "Authorization": f"Bearer {token}"},
+            )
+            if res.status_code != 200:
+                return None
+            user = res.json()
+            user_id = user.get("id")
+            db_res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=role,academy_id",
+                headers=supabase.admin_headers,
+            )
+            role, academy_id = "parent", None
+            if db_res.status_code == 200 and db_res.json():
+                row = db_res.json()[0]
+                role = row.get("role", "parent")
+                academy_id = row.get("academy_id")
+            return {"user_id": user_id, "role": role, "academy_id": academy_id}
+    except Exception as e:
+        logger.warning(f"WS auth error: {e}")
+        return None
+
+
+@ws_router.websocket("/ws/{group_id}")
+async def websocket_chat(websocket: WebSocket, group_id: str):
+    """
+    Real-time WebSocket endpoint for a chat group.
+    - Auth: reads access_token httpOnly cookie (no CSRF needed for WS).
+    - Receives: { type: "typing", user_id, user_name, is_typing } | { type: "ping" }
+    - Broadcasts typing events to all others in the group.
+    - New messages are broadcast by the HTTP POST /chat/messages endpoint.
+    """
+    user = await _verify_ws_token(websocket)
+    if not user:
+        await websocket.close(code=4001)
+        return
+
+    await manager.connect(group_id, websocket)
+    logger.info(f"WS connected: user={user['user_id']} group={group_id}")
+    try:
+        while True:
+            data = await websocket.receive_json()
+            event_type = data.get("type")
+
+            if event_type == "typing":
+                await manager.broadcast(group_id, {
+                    "type": "typing",
+                    "user_id": data.get("user_id"),
+                    "user_name": data.get("user_name"),
+                    "is_typing": data.get("is_typing", False),
+                })
+            elif event_type == "ping":
+                await websocket.send_json({"type": "pong"})
+
+    except WebSocketDisconnect:
+        manager.disconnect(group_id, websocket)
+        logger.info(f"WS disconnected: user={user['user_id']} group={group_id}")
+    except Exception as e:
+        logger.warning(f"WS error user={user['user_id']} group={group_id}: {e}")
+        manager.disconnect(group_id, websocket)
 
 
 # ─────────────────────────────────────────────
@@ -425,7 +537,13 @@ async def send_message(req: SendMessageRequest):
         )
         res.raise_for_status()
         result = res.json()
-        return result[0] if result else {}
+        message = result[0] if result else {}
+
+        # Broadcast to all WebSocket clients in the group
+        if message:
+            await manager.broadcast(req.group_id, {"type": "message", "message": message})
+
+        return message
 
 
 @router.delete("/messages/{message_id}")

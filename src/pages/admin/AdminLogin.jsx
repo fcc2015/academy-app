@@ -1,12 +1,16 @@
 import { API_URL } from '../../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, Sparkles, QrCode } from 'lucide-react';
+import { Shield, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, Sparkles, QrCode, KeyRound, Fingerprint } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { isAuthenticated } from '../../api';
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-
+import {
+    isBiometricAvailable,
+    hasBiometricCredentials,
+    loginWithBiometric,
+    saveBiometricCredentials,
+    clearBiometricCredentials,
+} from '../../native/biometric';
 
 // Rate-limiting store (in-memory, reset on refresh)
 const loginAttempts = { count: 0, lockedUntil: null };
@@ -16,10 +20,16 @@ const AdminLogin = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [googleLoading, setGoogleLoading] = useState(false);
     const [error, setError] = useState('');
     const [isLocked, setIsLocked] = useState(false);
     const [lockSecondsLeft, setLockSecondsLeft] = useState(0);
+    // Biometric state
+    const [biometricReady, setBiometricReady] = useState(false);
+    const [biometricLoading, setBiometricLoading] = useState(false);
+    // 2FA state
+    const [step, setStep] = useState('credentials'); // 'credentials' | 'totp'
+    const [tempToken, setTempToken] = useState('');
+    const [totpCode, setTotpCode] = useState('');
     const navigate = useNavigate();
     const { t, isRTL, dir } = useLanguage();
 
@@ -44,6 +54,16 @@ const AdminLogin = () => {
         };
         checkLock();
         const interval = setInterval(checkLock, 1000);
+
+        // Check biometric availability
+        (async () => {
+            const available = await isBiometricAvailable();
+            if (available) {
+                const hasCreds = await hasBiometricCredentials();
+                setBiometricReady(hasCreds);
+            }
+        })();
+
         return () => clearInterval(interval);
     }, []);
 
@@ -63,7 +83,8 @@ const AdminLogin = () => {
             const res = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ email, password }),
+                credentials: 'include', // Receive httpOnly cookie from server
             });
 
             const data = await res.json();
@@ -84,22 +105,34 @@ const AdminLogin = () => {
             loginAttempts.count = 0;
             loginAttempts.lockedUntil = null;
 
-            // Store token first
-            localStorage.setItem('token', data.access_token);
-            localStorage.setItem('user_id', data.user_id);
-            localStorage.setItem('token_expires', Date.now() + 24 * 60 * 60 * 1000);
+            // 2FA required — show TOTP step
+            if (data.requires_2fa && data.temp_token) {
+                setTempToken(data.temp_token);
+                setStep('totp');
+                return;
+            }
 
-            // Always verify role from DB (not just from token metadata)
+            // Token is now in httpOnly cookie — only store non-sensitive data
+            localStorage.setItem('user_id', data.user_id);
+
+            // Offer to save credentials for biometric login next time
+            const bioAvailable = await isBiometricAvailable();
+            if (bioAvailable) {
+                await saveBiometricCredentials(email, password);
+                setBiometricReady(true);
+            }
+
+            // Always verify role from DB (cookie is sent automatically)
             let role = data.role;
             try {
                 const roleRes = await fetch(`${API_URL}/auth/role`, {
-                    headers: { Authorization: `Bearer ${data.access_token}` }
+                    credentials: 'include',
                 });
                 if (roleRes.ok) {
                     const roleData = await roleRes.json();
                     if (roleData.role) role = roleData.role;
                 }
-            } catch (e) { /* use token role as fallback */ }
+            } catch (e) { /* use login role as fallback */ }
 
             localStorage.setItem('role', role);
 
@@ -116,15 +149,72 @@ const AdminLogin = () => {
         }
     };
 
-    const handleGoogleLogin = async () => {
-        setGoogleLoading(true);
+    const handleTotpVerify = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
         try {
-            const redirectTo = `${window.location.origin}/auth/callback`;
-            const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
-            window.location.href = oauthUrl;
-        } catch {
-            setGoogleLoading(false);
-            setError(isRTL ? 'فشل الاتصال بـ Google' : 'Connexion Google échouée');
+            const res = await fetch(`${API_URL}/auth/2fa/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ temp_token: tempToken, code: totpCode }),
+                credentials: 'include',
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Invalid code');
+
+            localStorage.setItem('user_id', data.user_id);
+            localStorage.setItem('role', data.role);
+
+            if (data.role === 'super_admin') navigate('/saas/dashboard');
+            else if (data.role === 'admin') navigate('/admin/dashboard');
+            else navigate('/coach/dashboard');
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBiometricLogin = async () => {
+        setBiometricLoading(true);
+        setError('');
+        try {
+            const creds = await loginWithBiometric();
+            if (!creds) return; // cancelled
+
+            // Auto-fill and submit with saved credentials
+            const res = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: creds.username, password: creds.password }),
+                credentials: 'include',
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                // Saved creds no longer valid — clear them
+                await clearBiometricCredentials();
+                setBiometricReady(false);
+                throw new Error(data.detail || 'Biometric login failed');
+            }
+
+            if (data.requires_2fa && data.temp_token) {
+                setTempToken(data.temp_token);
+                setStep('totp');
+                return;
+            }
+
+            localStorage.setItem('user_id', data.user_id);
+            const role = data.role;
+            localStorage.setItem('role', role);
+            if (role === 'super_admin') navigate('/saas/dashboard');
+            else if (role === 'admin') navigate('/admin/dashboard');
+            else if (role === 'coach') navigate('/coach/dashboard');
+            else navigate('/parent/dashboard');
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setBiometricLoading(false);
         }
     };
 
@@ -175,8 +265,70 @@ const AdminLogin = () => {
                         backdropFilter: 'blur(24px)',
                     }}>
 
-                    {/* Locked state */}
-                    {isLocked ? (
+                    {/* ── 2FA TOTP step ── */}
+                    {step === 'totp' ? (
+                        <form onSubmit={handleTotpVerify} className="space-y-5">
+                            <div className="text-center mb-2">
+                                <div className="w-14 h-14 mx-auto mb-3 rounded-2xl flex items-center justify-center"
+                                    style={{ background: 'rgba(79,70,229,0.15)', border: '1px solid rgba(79,70,229,0.3)' }}>
+                                    <KeyRound size={24} className="text-indigo-400" />
+                                </div>
+                                <h3 className="text-white font-black text-base">
+                                    {isRTL ? 'رمز المصادقة الثنائية' : 'Code d\'authentification'}
+                                </h3>
+                                <p className="text-indigo-300/60 text-xs mt-1">
+                                    {isRTL ? 'أدخل الرمز من تطبيق المصادقة' : 'Entrez le code de votre application'}
+                                </p>
+                            </div>
+
+                            {error && (
+                                <div className="flex items-center gap-3 p-4 rounded-xl text-sm font-semibold"
+                                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5' }}>
+                                    <AlertCircle size={16} className="shrink-0" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={6}
+                                required
+                                autoFocus
+                                placeholder="000000"
+                                value={totpCode}
+                                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                                className="w-full py-4 text-center text-2xl font-black tracking-[0.4em] text-white rounded-xl outline-none transition-all"
+                                style={{
+                                    background: 'rgba(255,255,255,0.06)',
+                                    border: '1.5px solid rgba(255,255,255,0.1)',
+                                    letterSpacing: '0.4em',
+                                }}
+                                onFocus={e => e.target.style.borderColor = 'rgba(99,102,241,0.7)'}
+                                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                            />
+
+                            <button
+                                type="submit"
+                                disabled={loading || totpCode.length !== 6}
+                                className="w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest text-white transition-all flex items-center justify-center gap-3"
+                                style={{
+                                    background: (loading || totpCode.length !== 6) ? 'rgba(79,70,229,0.4)' : 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                                    boxShadow: (loading || totpCode.length !== 6) ? 'none' : '0 8px 32px rgba(79,70,229,0.4)',
+                                }}
+                            >
+                                {loading ? <Loader2 size={18} className="animate-spin" /> : <Shield size={18} />}
+                                {loading
+                                    ? (isRTL ? 'جاري التحقق...' : 'Vérification...')
+                                    : (isRTL ? 'تحقق' : 'Vérifier')}
+                            </button>
+
+                            <button type="button" onClick={() => { setStep('credentials'); setError(''); setTotpCode(''); }}
+                                className="w-full text-xs font-semibold text-indigo-400/60 hover:text-indigo-300 transition-colors">
+                                {isRTL ? '← رجوع' : '← Retour'}
+                            </button>
+                        </form>
+                    ) : /* ── Locked state ── */ isLocked ? (
                         <div className="text-center py-8">
                             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
                                 <Lock size={28} className="text-red-400" />
@@ -306,12 +458,11 @@ const AdminLogin = () => {
                                 <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
                             </div>
 
-                            {/* ── Google Sign-In ── */}
+                            {/* ── Parent Signup Link ── */}
                             <button
                                 type="button"
-                                onClick={handleGoogleLogin}
-                                disabled={googleLoading}
-                                className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-3 transition-all duration-200 ${isRTL ? 'flex-row-reverse' : ''}`}
+                                onClick={() => navigate('/parent/signup')}
+                                className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${isRTL ? 'flex-row-reverse' : ''}`}
                                 style={{
                                     background: 'rgba(255,255,255,0.06)',
                                     border: '1.5px solid rgba(255,255,255,0.12)',
@@ -320,17 +471,8 @@ const AdminLogin = () => {
                                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
                                 onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
                             >
-                                {googleLoading ? (
-                                    <Loader2 size={18} className="animate-spin" />
-                                ) : (
-                                    <svg width="18" height="18" viewBox="0 0 48 48">
-                                        <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.2l6.8-6.8C35.6 2.4 30.1 0 24 0 14.7 0 6.7 5.4 2.9 13.3l7.9 6.1C12.5 13.2 17.8 9.5 24 9.5z"/>
-                                        <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.6 5.9c4.4-4.1 7-10.1 7-17.1z"/>
-                                        <path fill="#FBBC05" d="M10.8 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.1C1 16.5 0 20.1 0 24s1 7.5 2.9 10.7l7.9-6.1z"/>
-                                        <path fill="#34A853" d="M24 48c6.1 0 11.2-2 14.9-5.4l-7.6-5.9c-2 1.4-4.6 2.2-7.3 2.2-6.2 0-11.5-3.7-13.2-9l-7.9 6.1C6.7 42.6 14.7 48 24 48z"/>
-                                    </svg>
-                                )}
-                                {isRTL ? 'تسجيل الدخول بـ Google' : 'Continuer avec Google'}
+                                <Sparkles size={16} />
+                                {isRTL ? 'إنشاء حساب ولي أمر جديد' : "S'inscrire en tant que parent"}
                             </button>
 
                             {/* ── QR Code Login ── */}
@@ -349,6 +491,29 @@ const AdminLogin = () => {
                                 <QrCode size={18} />
                                 {isRTL ? '📱 سجل الدخول بـ QR Code' : '📱 Connexion par QR Code'}
                             </button>
+
+                            {/* ── Biometric Login ── */}
+                            {biometricReady && (
+                                <button
+                                    type="button"
+                                    onClick={handleBiometricLogin}
+                                    disabled={biometricLoading}
+                                    className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-3 transition-all duration-200 ${isRTL ? 'flex-row-reverse' : ''}`}
+                                    style={{
+                                        background: 'rgba(16,185,129,0.1)',
+                                        border: '1.5px solid rgba(16,185,129,0.3)',
+                                        color: 'rgba(110,231,183,0.9)',
+                                    }}
+                                    onMouseEnter={e => { if (!biometricLoading) e.currentTarget.style.background = 'rgba(16,185,129,0.18)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.1)'; }}
+                                >
+                                    {biometricLoading
+                                        ? <Loader2 size={18} className="animate-spin" />
+                                        : <Fingerprint size={18} />
+                                    }
+                                    {isRTL ? '🔐 تسجيل بالبصمة' : '🔐 Connexion par empreinte'}
+                                </button>
+                            )}
                         </form>
                     )}
                 </div>

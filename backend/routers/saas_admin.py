@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from pydantic import BaseModel, EmailStr
 import httpx
 from datetime import datetime, timezone
@@ -37,6 +37,7 @@ class AcademyUpdateRequest(BaseModel):
     status: str | None = None
     primary_color: str | None = None
     custom_domain: str | None = None
+    logo_url: str | None = None
 
 class DomainAssignment(BaseModel):
     custom_domain: str
@@ -49,6 +50,9 @@ class PlanAssignment(BaseModel):
 
 class NotificationTriggerRequest(BaseModel):
     thresholds: list[int] = [50, 75, 90, 100]
+
+class RenewalReminderRequest(BaseModel):
+    days_ahead: int = 7  # Send reminders for academies renewing within N days
 
 # ── Plan limits (must match frontend PLANS) ──
 PLAN_LIMITS = {
@@ -232,6 +236,36 @@ async def full_update_academy(academy_id: str, data: AcademyUpdateRequest):
                 return {"success": True, "note": "city/notes columns not yet in DB — only safe fields updated."}
             res.raise_for_status()
     return {"success": True}
+
+
+# ── Logo Upload ──
+
+@router.post("/academies/{academy_id}/logo")
+async def upload_academy_logo(academy_id: str, file: UploadFile = File(...)):
+    """Upload a logo image for an academy (JPEG/PNG/WebP/SVG, max 2MB)."""
+    allowed = {"image/jpeg", "image/png", "image/webp", "image/svg+xml"}
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Only JPEG, PNG, WebP or SVG allowed.")
+
+    content = await file.read()
+    if len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max 2MB.")
+
+    ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "png"
+    file_path = f"logos/academy_{academy_id}.{ext}"
+
+    url = await supabase.upload_file("avatars", file_path, content, file.content_type)
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        res = await client.patch(
+            f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+            json={"logo_url": url},
+            headers={**supabase.admin_headers, "Prefer": "return=minimal"}
+        )
+        if res.status_code >= 400:
+            logger.warning("Could not persist logo_url to academies table: %s", res.text)
+
+    return {"logo_url": url}
 
 
 # ── Delete Academy ──
@@ -804,6 +838,116 @@ async def get_saas_analytics():
             if any(a.get("status") != "suspended" for a in academies) else 0,
             0
         ),
+    }
+
+
+# ── Renewal Reminders ──
+
+def _next_renewal_date(billing_start_str: str):
+    """Return the next monthly renewal date after today."""
+    import calendar
+    from datetime import date
+    try:
+        start = datetime.fromisoformat(billing_start_str.replace("Z", "+00:00")).date()
+    except Exception:
+        return None
+    today = date.today()
+    year, month, day = start.year, start.month, start.day
+    while True:
+        month += 1
+        if month > 12:
+            month = 1
+            year += 1
+        max_day = calendar.monthrange(year, month)[1]
+        candidate = date(year, month, min(day, max_day))
+        if candidate > today:
+            return candidate
+
+PLAN_PRICES = {"free": 0, "pro": 499, "enterprise": 999}
+
+@router.post("/renewals/trigger")
+async def trigger_renewal_reminders(req: RenewalReminderRequest):
+    """
+    Check all paid active academies and send renewal reminders to those
+    whose subscription renews within `days_ahead` days.
+    """
+    from datetime import date
+    import asyncio
+    today = date.today()
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        res = await client.get(
+            f"{supabase.url}/rest/v1/academies?select=id,name,plan_id,billing_cycle_start,status&status=neq.suspended",
+            headers=supabase.admin_headers
+        )
+        academies = res.json() if res.status_code == 200 else []
+
+    due_soon = []
+    for acc in academies:
+        if acc.get("plan_id", "free") == "free":
+            continue
+        billing_start = acc.get("billing_cycle_start")
+        if not billing_start:
+            continue
+        renewal = _next_renewal_date(billing_start)
+        if renewal is None:
+            continue
+        days_until = (renewal - today).days
+        if 0 <= days_until <= req.days_ahead:
+            due_soon.append({
+                "id": acc["id"],
+                "name": acc["name"],
+                "plan_id": acc.get("plan_id", "free"),
+                "renewal_date": renewal.isoformat(),
+                "days_until": days_until,
+            })
+
+    sent = []
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # Fetch admin user_ids in parallel
+        admin_responses = await asyncio.gather(*[
+            client.get(
+                f"{supabase.url}/rest/v1/admins?academy_id=eq.{acc['id']}&select=user_id&limit=1",
+                headers=supabase.admin_headers
+            )
+            for acc in due_soon
+        ], return_exceptions=True)
+
+        for i, acc in enumerate(due_soon):
+            price = PLAN_PRICES.get(acc["plan_id"], 0)
+            days_label = "today" if acc["days_until"] == 0 else f"in {acc['days_until']} day(s)"
+            notif_data = {
+                "title": f"⏰ Renewal Reminder — {acc['name']}",
+                "message": (
+                    f"Your {acc['plan_id'].capitalize()} plan renews {days_label} "
+                    f"({acc['renewal_date']}, {price} MAD). "
+                    "Please ensure your payment is ready to avoid service interruption."
+                ),
+                "type": "renewal_reminder",
+                "target_role": "admin",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            ar = admin_responses[i]
+            if not isinstance(ar, Exception) and ar.status_code == 200 and ar.json():
+                notif_data["user_id"] = ar.json()[0]["user_id"]
+
+            try:
+                await client.post(
+                    f"{supabase.url}/rest/v1/notifications",
+                    json=notif_data,
+                    headers=supabase.admin_headers
+                )
+                sent.append(acc)
+            except Exception as e:
+                logger.warning("Failed to send renewal reminder for %s: %s", acc["name"], e)
+
+    return {
+        "success": True,
+        "checked": len(academies),
+        "due_soon": len(due_soon),
+        "reminders_sent": len(sent),
+        "days_ahead": req.days_ahead,
+        "academies": sent,
     }
 
 

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import Literal
+from typing import Literal, Optional
 
 # --- AUTH SCHEMAS ---
 class UserLogin(BaseModel):
@@ -42,3 +42,13 @@ class TokenResponse(BaseModel):
     token_type: str = "Bearer"
     user_id: str
     role: str
+
+class LoginResponse(BaseModel):
+    """Returned by /auth/login.
+    - Normal login: user_id + role set, requires_2fa=False
+    - 2FA required: requires_2fa=True + temp_token, no user_id/role yet
+    """
+    user_id: Optional[str] = None
+    role: Optional[str] = None
+    requires_2fa: bool = False
+    temp_token: Optional[str] = None

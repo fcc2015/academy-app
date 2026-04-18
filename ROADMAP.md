@@ -43,17 +43,17 @@
 ## Phase 1: Security Hardening (Priority: CRITICAL)
 
 ### 1.1 Authentication & Session Security
-- [ ] Move JWT from localStorage to httpOnly cookies (XSS protection)
-- [ ] Add refresh token rotation (short-lived access + long-lived refresh)
+- [x] Move JWT from localStorage to httpOnly cookies (XSS protection)
+- [x] Add refresh token rotation (short-lived access + long-lived refresh)
 - [x] Server-side rate limiting on `/auth/login` (5 attempts → 15min lockout per IP)
 - [x] Email verification code on registration (6-digit OTP via email)
 - [x] Password reset flow with email OTP
-- [ ] Add 2FA/MFA option for admin accounts
-- [ ] Session invalidation on password change
+- [x] Add 2FA/MFA option for admin accounts
+- [x] Session invalidation on password change
 
 ### 1.2 API Security
 - [x] CORS: whitelist only known frontend domains (remove `allow_origins=["*"]`)
-- [ ] Add CSRF tokens for state-changing requests
+- [x] Add CSRF tokens for state-changing requests
 - [x] Input validation on ALL endpoints (Pydantic validators — scores 0-10, amounts > 0, Literal enums, length limits, HTML strip)
 - [x] Rate limiting: 100 req/min per IP, 30 per user
 - [x] Remove hardcoded Supabase anon key from AuthCallback.jsx
@@ -64,7 +64,7 @@
 - [ ] Encrypt medical data at rest (PII)
 - [x] Audit logging for all mutating operations (AuditLogMiddleware in main.py)
 - [x] PayPal webhook signature verification (verify_paypal_webhook_signature via PayPal API, PAYPAL_WEBHOOK_ID in .env)
-- [ ] API versioning (`/v1/` prefix)
+- [x] API versioning (`/v1/` prefix)
 - [x] Mask sensitive data in error messages (43+ str(e) leaks fixed, logger.error + safe message pattern across all 30 routers)
 
 ---
@@ -77,7 +77,7 @@
 - [x] 422 error not showing real Supabase error message
 - [x] SaaS login page redirecting parent/coach users
 - [x] Client-side only data filtering → server-side parent isolation (assert_parent_owns_player on all data endpoints)
-- [ ] Chat messages: HTTP polling instead of WebSocket (messages delayed)
+- [x] Chat messages: HTTP polling instead of WebSocket (messages delayed)
 - [x] Exception swallowing (`except: pass`) → replaced with logger.warning/error across all routers
 
 ### 2.2 Backend Stability
@@ -115,11 +115,11 @@
 - [x] Academy health score widget (ring chart + 4 breakdown bars: payments 40%, attendance 30%, players 15%, evaluations 15%)
 
 ### 3.3 Player Profile Redesign
-- [ ] Photo upload with crop
+- [x] Photo upload with crop
 - [x] Performance radar chart (progression overlay comparing current vs previous evaluation + improvement indicator)
-- [ ] Attendance heatmap calendar
-- [ ] Payment history timeline
-- [ ] Medical card (expandable)
+- [x] Attendance heatmap calendar
+- [x] Payment history timeline
+- [x] Medical card (expandable)
 - [x] FUT-style player card (FUTCard.jsx + PlayerBadgeModal.jsx)
 
 ### 3.4 Forms & Tables
@@ -149,13 +149,13 @@
 ## Phase 4: Mobile App (React Native / Capacitor)
 
 ### 4.1 Option A: Capacitor (Recommended for MVP)
-- [ ] Wrap existing React web app with Capacitor
-- [ ] Add native splash screen & app icon
-- [ ] Push notifications (Firebase Cloud Messaging)
-- [ ] QR code scanner (native camera)
-- [ ] Biometric authentication (fingerprint/face)
-- [ ] Offline data caching (SQLite)
-- [ ] App Store + Google Play submission
+- [x] Wrap existing React web app with Capacitor
+- [x] Add native splash screen & app icon
+- [x] Push notifications (Firebase Cloud Messaging)
+- [x] QR code scanner (native camera)
+- [x] Biometric authentication (fingerprint/face)
+- [x] Offline data caching (SQLite)
+- [x] App Store + Google Play submission
 
 ### 4.2 Option B: React Native (Long-term)
 - [ ] Shared API layer with web app
@@ -241,16 +241,16 @@
 - [ ] Move from Render free tier to paid (no cold starts)
 - [ ] Add Redis for caching + rate limiting
 - [ ] Background job queue (Celery or ARQ)
-- [ ] WebSocket for real-time chat (replace HTTP polling)
+- [x] WebSocket for real-time chat (replace HTTP polling)
 - [ ] Database connection pooling (Supavisor)
 - [ ] API response caching (frequently accessed data)
 
 ### 7.2 Monitoring & Observability
-- [ ] Sentry for error tracking (frontend + backend)
+- [x] Sentry for error tracking (frontend + backend)
 - [ ] Uptime monitoring (UptimeRobot / Better Stack)
 - [ ] Performance monitoring (response times, slow queries)
 - [ ] Alerting: Slack/Discord webhook on critical errors
-- [ ] Request logging with correlation IDs
+- [x] Request logging with correlation IDs
 
 ### 7.3 CI/CD Pipeline
 - [ ] GitHub Actions: lint → test → build → deploy

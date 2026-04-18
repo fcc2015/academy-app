@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from core.auth_middleware import verify_token, require_role, assert_parent_owns_player
 from core.context import user_id_ctx, role_ctx
 from typing import List
@@ -147,3 +147,47 @@ async def get_players_by_parent(parent_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred. Please try again."
         )
+
+
+# ─── Photo Upload ──────────────────────────────────────────
+
+@router.post("/upload-photo", dependencies=[Depends(require_role("admin", "super_admin"))])
+async def upload_player_photo(file: UploadFile = File(...)):
+    """
+    Upload a player photo to Supabase Storage (bucket: player-photos).
+    Accepts JPEG/PNG, max 2 MB. Returns the public URL.
+    """
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are allowed.")
+
+    content = await file.read()
+    if len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image too large. Maximum size is 2 MB.")
+
+    import httpx, uuid
+    from core.config import settings
+
+    filename = f"players/{uuid.uuid4()}.jpg"
+    upload_headers = {
+        "apikey": settings.SUPABASE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_KEY}",
+        "Content-Type": "image/jpeg",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.post(
+                f"{settings.SUPABASE_URL}/storage/v1/object/player-photos/{filename}",
+                content=content,
+                headers=upload_headers,
+            )
+        if res.status_code not in [200, 201]:
+            logger.error(f"Supabase Storage upload failed: {res.status_code} {res.text}")
+            raise HTTPException(status_code=500, detail="Photo upload failed.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Photo upload error: {e}")
+        raise HTTPException(status_code=500, detail="Photo upload failed.")
+
+    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/player-photos/{filename}"
+    return {"url": public_url}

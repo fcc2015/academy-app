@@ -14,10 +14,12 @@ const loginAttempts = { count: 0, lockedUntil: null };
 (function clearNonAdminSession() {
     const role = localStorage.getItem('role');
     if (role && role !== 'admin' && role !== 'super_admin') {
-        localStorage.removeItem('token');
         localStorage.removeItem('role');
         localStorage.removeItem('user_id');
-        localStorage.removeItem('token_expires');
+        localStorage.removeItem('token');         // legacy cleanup
+        localStorage.removeItem('token_expires'); // legacy cleanup
+        // Clear httpOnly cookie via backend (fire-and-forget)
+        fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
     }
 })();
 
@@ -71,10 +73,11 @@ const SaasLogin = () => {
             else if (role === 'admin') { navigate('/admin/dashboard', { replace: true }); return; }
             // parent/coach have no business here — clear their session
             else if (role === 'coach' || role === 'parent') {
-                localStorage.removeItem('token');
                 localStorage.removeItem('role');
                 localStorage.removeItem('user_id');
-                localStorage.removeItem('token_expires');
+                localStorage.removeItem('token');         // legacy cleanup
+                localStorage.removeItem('token_expires'); // legacy cleanup
+                fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
             }
         }
 
@@ -101,7 +104,8 @@ const SaasLogin = () => {
             const res = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ email, password }),
+                credentials: 'include', // Receive httpOnly cookie from server
             });
             const data = await res.json();
             if (!res.ok) {
@@ -116,10 +120,9 @@ const SaasLogin = () => {
             }
             loginAttempts.count = 0;
             loginAttempts.lockedUntil = null;
-            localStorage.setItem('token', data.access_token);
+            // Token is now in httpOnly cookie — only store non-sensitive data
             localStorage.setItem('role', data.role);
             localStorage.setItem('user_id', data.user_id);
-            localStorage.setItem('token_expires', Date.now() + 24 * 60 * 60 * 1000);
             if (data.role === 'super_admin') {
                 navigate('/saas/dashboard');
             } else if (data.role === 'admin') {
@@ -216,14 +219,14 @@ const SaasLogin = () => {
                 const loginRes = await fetch(`${API}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: regForm.admin_email, password: regForm.admin_password })
+                    body: JSON.stringify({ email: regForm.admin_email, password: regForm.admin_password }),
+                    credentials: 'include', // Receive httpOnly cookie
                 });
                 const loginData = await loginRes.json();
-                if (loginRes.ok && loginData.access_token) {
-                    localStorage.setItem('token', loginData.access_token);
+                if (loginRes.ok && loginData.user_id) {
+                    // Token is in httpOnly cookie — store only non-sensitive data
                     localStorage.setItem('role', loginData.role);
                     localStorage.setItem('user_id', loginData.user_id);
-                    localStorage.setItem('token_expires', Date.now() + 24 * 60 * 60 * 1000);
                     setTimeout(() => { navigate('/admin/dashboard'); }, 1500);
                 } else {
                     setTimeout(() => {
