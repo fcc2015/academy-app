@@ -156,8 +156,8 @@ async def login(credentials: UserLogin, response: Response):
             **cookie_kwargs,
         )
 
-        # Return only user_id + role — token stays in cookie, not exposed to JS
-        return {"user_id": user_id, "role": role}
+        # Return tokens in body (cross-domain) + cookies (same-domain backup)
+        return {"user_id": user_id, "role": role, "access_token": token, "refresh_token": refresh_token}
 
     except HTTPException:
         raise
@@ -186,11 +186,18 @@ async def logout(response: Response):
 @router.post("/refresh")
 async def refresh_access_token(request: Request, response: Response):
     """
-    Exchange a valid refresh_token cookie for a new access_token + refresh_token.
-    Called automatically by the frontend when a 401 is received.
+    Exchange a valid refresh_token for a new access_token + refresh_token.
+    Accepts refresh_token from cookie OR request body (cross-domain support).
     """
     import httpx
+    # Try cookie first, then request body
     stored_refresh = request.cookies.get("refresh_token")
+    if not stored_refresh:
+        try:
+            body = await request.json()
+            stored_refresh = body.get("refresh_token")
+        except Exception:
+            pass
     if not stored_refresh:
         raise HTTPException(status_code=401, detail="No refresh token. Please login again.")
 
@@ -232,7 +239,7 @@ async def refresh_access_token(request: Request, response: Response):
         csrf_token = generate_csrf_token()
         response.set_cookie(key=CSRF_COOKIE_NAME, value=csrf_token, httponly=False, **ck)
 
-        return {"refreshed": True}
+        return {"refreshed": True, "access_token": new_access, "refresh_token": new_refresh}
 
     except HTTPException:
         raise
@@ -304,7 +311,7 @@ async def verify_2fa_login(req: TwoFAVerifyLogin, response: Response):
         csrf_token = generate_csrf_token()
         response.set_cookie(key=CSRF_COOKIE_NAME, value=csrf_token, httponly=False, **ck)
 
-        return LoginResponse(user_id=pending["user_id"], role=pending["role"])
+        return LoginResponse(user_id=pending["user_id"], role=pending["role"], access_token=pending["token"], refresh_token=stored_refresh)
 
     except HTTPException:
         raise

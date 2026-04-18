@@ -2,9 +2,10 @@ import { API_URL } from './config';
 
 /**
  * Authenticated fetch wrapper with retry logic and network error handling.
- * - Sends httpOnly cookie automatically via credentials: 'include'
+ * - Sends JWT via Authorization header (cross-domain safe)
+ * - Also sends cookies as fallback via credentials: 'include'
  * - Retries on 502/503/504 and network errors (up to 2 retries)
- * - Handles 401 by redirecting to login
+ * - Handles 401 by attempting token refresh, then redirecting to login
  * - Throws user-friendly errors for timeout/network failures
  */
 
@@ -27,13 +28,37 @@ async function tryRefreshToken() {
 
   _isRefreshing = true;
   try {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) {
+      _refreshQueue.forEach(resolve => resolve(false));
+      return false;
+    }
+
     const res = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
       credentials: 'include',
     });
-    const ok = res.ok;
-    _refreshQueue.forEach(resolve => resolve(ok));
-    return ok;
+
+    if (res.ok) {
+      const data = await res.json();
+      // Store new tokens from response body
+      if (data.access_token) {
+        localStorage.setItem('token', data.access_token);
+      }
+      if (data.refresh_token) {
+        localStorage.setItem('refresh_token', data.refresh_token);
+      }
+      _refreshQueue.forEach(resolve => resolve(true));
+      return true;
+    }
+
+    _refreshQueue.forEach(resolve => resolve(false));
+    return false;
   } catch {
     _refreshQueue.forEach(resolve => resolve(false));
     return false;
@@ -53,15 +78,6 @@ function fetchWithTimeout(url, options, timeout = FETCH_TIMEOUT) {
     .finally(() => clearTimeout(id));
 }
 
-/**
- * Read the CSRF token from the readable csrf_token cookie.
- * Returns null if not found (e.g. not logged in yet).
- */
-function getCsrfToken() {
-  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
 export async function authFetch(url, options = {}) {
   const headers = {
     ...(options.headers || {}),
@@ -72,13 +88,10 @@ export async function authFetch(url, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
-  // Auto-add CSRF token for mutating requests (cookie-based auth requires this)
-  const method = (options.method || 'GET').toUpperCase();
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-    const csrfToken = getCsrfToken();
-    if (csrfToken) {
-      headers['X-CSRF-Token'] = csrfToken;
-    }
+  // Add Bearer token from localStorage (cross-domain safe — not blocked like cookies)
+  const token = localStorage.getItem('token');
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   let lastError = null;
@@ -88,7 +101,7 @@ export async function authFetch(url, options = {}) {
       const res = await fetchWithTimeout(url, {
         ...options,
         headers,
-        credentials: 'include', // Send httpOnly cookie automatically
+        credentials: 'include', // Also send cookies as fallback
       });
 
       // On 401: try refresh first, retry once, then logout
@@ -97,7 +110,12 @@ export async function authFetch(url, options = {}) {
         if (!currentPath.includes('/login') && currentPath !== '/') {
           const refreshed = await tryRefreshToken();
           if (refreshed) {
-            // Retry the original request with fresh cookies
+            // Update the Authorization header with the new token
+            const newToken = localStorage.getItem('token');
+            if (newToken) {
+              headers['Authorization'] = `Bearer ${newToken}`;
+            }
+            // Retry the original request with fresh token
             return fetchWithTimeout(url, { ...options, headers, credentials: 'include' });
           }
           logout();
@@ -149,20 +167,20 @@ export class NetworkError extends Error {
 
 /**
  * Check if the current session is valid.
- * Token is httpOnly — not readable from JS. Check role presence instead.
+ * Checks for both role and token presence.
  */
 export function isAuthenticated() {
-  return !!localStorage.getItem('role');
+  return !!localStorage.getItem('role') && !!localStorage.getItem('token');
 }
 
 /**
  * Clear all auth data and redirect to login.
- * Calls backend to clear the httpOnly cookie, then clears localStorage.
+ * Calls backend to clear cookies (fire-and-forget), then clears localStorage.
  */
 export function logout() {
   const role = localStorage.getItem('role');
 
-  // Clear server-side httpOnly cookie (fire-and-forget)
+  // Clear server-side cookies (fire-and-forget)
   fetch(`${API_URL}/auth/logout`, {
     method: 'POST',
     credentials: 'include',
@@ -171,8 +189,9 @@ export function logout() {
   // Clear client-side storage
   localStorage.removeItem('role');
   localStorage.removeItem('user_id');
-  // Legacy cleanup (token was stored here before httpOnly migration)
   localStorage.removeItem('token');
+  localStorage.removeItem('refresh_token');
+  // Legacy cleanup
   localStorage.removeItem('token_expires');
 
   // Redirect to appropriate login
