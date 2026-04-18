@@ -18,15 +18,17 @@ async def verify_token(request: Request):
     Reads token from httpOnly cookie first, falls back to Authorization header.
     Resolves role from the database (public.users + admins table), NOT user_metadata.
     """
-    # 1. Try httpOnly cookie (preferred — set on login)
-    token = request.cookies.get("access_token")
-    using_cookie = token is not None
+    # 1. Try Authorization header first (cross-domain safe, works with Vercel+Render)
+    token = None
+    using_cookie = False
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
 
-    # 2. Fallback: Authorization header (Google OAuth callback, QR auth, etc.)
+    # 2. Fallback: httpOnly cookie (same-domain setups)
     if not token:
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
+        token = request.cookies.get("access_token")
+        using_cookie = token is not None
 
     if not token:
         raise HTTPException(
