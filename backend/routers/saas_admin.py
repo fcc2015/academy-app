@@ -120,81 +120,119 @@ async def get_academies():
 
 @router.post("/academies")
 async def create_academy(req: AcademyProvisionRequest):
-    """Provision a new client academy and its root admin."""
-    existing_name = await supabase._get(f"/rest/v1/academies?name=eq.{quote(req.name)}&select=id")
-    if existing_name:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"An academy with this name already exists. | واحد الأكاديمية بهاد الاسم ديجا كاينة: {req.name}"
+    """Provision a new client academy and its root admin.
+    Uses service_role (admin_headers) for all DB writes — super_admin bypasses RLS."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # Dedup checks
+        r = await client.get(
+            f"{supabase.url}/rest/v1/academies?name=eq.{quote(req.name)}&select=id",
+            headers=supabase.admin_headers,
         )
-    existing_email = await supabase._get(f"/rest/v1/admins?email=eq.{quote(str(req.admin_email))}&select=id")
-    if existing_email:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"This email is already used by another admin. | هاد الإيميل ديجا مستعمل من طرف أدمين آخر: {req.admin_email}"
+        if r.status_code == 200 and r.json():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"An academy with this name already exists. | واحد الأكاديمية بهاد الاسم ديجا كاينة: {req.name}",
+            )
+        r = await client.get(
+            f"{supabase.url}/rest/v1/admins?email=eq.{quote(str(req.admin_email))}&select=id",
+            headers=supabase.admin_headers,
         )
-    academy_data = {
-        "name": req.name,
-        "custom_domain": req.custom_domain,
-        "domain_status": "pending" if req.custom_domain else None,
-        "status": "active",
-    }
-    if req.city:
-        academy_data["city"] = req.city
-    if req.notes:
-        academy_data["notes"] = req.notes
-    if req.subdomain:
-        academy_data["subdomain"] = req.subdomain
-    try:
-        res_academy = await supabase._post("/rest/v1/academies?select=id", academy_data)
-    except Exception as e:
-        err = str(e)
-        if "duplicate" in err.lower() or "23505" in err:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                detail=f"An academy with this name already exists.")
-        # If city/notes/subdomain columns don't exist yet, retry with safe fields only
-        if "does not exist" in err.lower() or "42703" in err:
-            safe_data = {k: v for k, v in academy_data.items()
-                         if k not in ("city", "notes", "subdomain")}
-            try:
-                res_academy = await supabase._post("/rest/v1/academies?select=id", safe_data)
-            except Exception as e2:
-                raise HTTPException(status_code=500, detail=str(e2))
-        else:
-            raise
+        if r.status_code == 200 and r.json():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"This email is already used by another admin. | هاد الإيميل ديجا مستعمل من طرف أدمين آخر: {req.admin_email}",
+            )
 
-    academy_row = res_academy[0] if isinstance(res_academy, list) else res_academy
-    new_academy_id = academy_row["id"]
+        academy_data = {
+            "name": req.name,
+            "custom_domain": req.custom_domain,
+            "domain_status": "pending" if req.custom_domain else None,
+            "status": "active",
+        }
+        if req.city:
+            academy_data["city"] = req.city
+        if req.notes:
+            academy_data["notes"] = req.notes
+        if req.subdomain:
+            academy_data["subdomain"] = req.subdomain
 
-    try:
-        auth_res = await supabase.admin_create_user(
-            email=req.admin_email,
-            password=req.admin_password,
-            role="admin",
-            full_name=req.admin_name,
-            academy_id=new_academy_id
-        )
-        admin_user_id = auth_res.get("id")
+        async def insert_academy(payload):
+            return await client.post(
+                f"{supabase.url}/rest/v1/academies?select=id",
+                json=payload,
+                headers=supabase.admin_headers,
+            )
+
+        res = await insert_academy(academy_data)
+        if res.status_code >= 400:
+            body = res.text
+            if "23505" in body or "duplicate" in body.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="An academy with this name or subdomain already exists.",
+                )
+            if "42703" in body or "does not exist" in body.lower():
+                safe_data = {k: v for k, v in academy_data.items() if k not in ("city", "notes", "subdomain")}
+                res = await insert_academy(safe_data)
+                if res.status_code >= 400:
+                    logger.error("Academy insert failed even after fallback: %s %s", res.status_code, res.text)
+                    raise HTTPException(status_code=500, detail=f"DB error: {res.text[:200]}")
+            else:
+                logger.error("Academy insert failed: %s %s", res.status_code, res.text)
+                raise HTTPException(status_code=500, detail=f"DB error: {res.text[:200]}")
+
+        rows = res.json()
+        academy_row = rows[0] if isinstance(rows, list) else rows
+        new_academy_id = academy_row["id"]
+
         try:
-            await supabase._post("/rest/v1/users", {
-                "id": admin_user_id, "full_name": req.admin_name,
-                "role": "admin", "academy_id": new_academy_id
-            })
+            auth_res = await supabase.admin_create_user(
+                email=req.admin_email,
+                password=req.admin_password,
+                role="admin",
+                full_name=req.admin_name,
+                academy_id=new_academy_id,
+            )
+            admin_user_id = auth_res.get("id")
+
+            u_res = await client.post(
+                f"{supabase.url}/rest/v1/users",
+                json={
+                    "id": admin_user_id, "full_name": req.admin_name,
+                    "role": "admin", "academy_id": new_academy_id,
+                },
+                headers=supabase.admin_headers,
+            )
+            if u_res.status_code >= 400:
+                logger.warning("users insert non-critical: %s %s", u_res.status_code, u_res.text)
+
+            a_res = await client.post(
+                f"{supabase.url}/rest/v1/admins",
+                json={
+                    "user_id": admin_user_id, "email": req.admin_email,
+                    "full_name": req.admin_name, "status": "active", "academy_id": new_academy_id,
+                },
+                headers=supabase.admin_headers,
+            )
+            if a_res.status_code >= 400:
+                logger.error("admins insert failed: %s %s", a_res.status_code, a_res.text)
+                raise HTTPException(status_code=500, detail=f"Admin record insert failed: {a_res.text[:200]}")
+
+            return {"success": True, "academy": academy_row, "admin_user_id": admin_user_id}
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.warning(f"Users record (non-critical): {e}")
-        await supabase._post("/rest/v1/admins", {
-            "user_id": admin_user_id, "email": req.admin_email,
-            "full_name": req.admin_name, "status": "active", "academy_id": new_academy_id
-        })
-        return {"success": True, "academy": academy_row, "admin_user_id": admin_user_id}
-    except Exception as e:
-        error_msg = str(e)
-        logger.error("Failed to provision academy admin: %s", e, exc_info=True)
-        if "duplicate" in error_msg.lower() or "23505" in error_msg:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                detail=f"This email already exists: {req.admin_email}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Academy created, but failed to provision admin. Please contact support.")
+            error_msg = str(e)
+            logger.error("Failed to provision academy admin: %s", e, exc_info=True)
+            if "duplicate" in error_msg.lower() or "23505" in error_msg:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"This email already exists: {req.admin_email}",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Academy created, but failed to provision admin: {error_msg[:200]}",
+            )
 
 
 @router.patch("/academies/{academy_id}")
