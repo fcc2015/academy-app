@@ -55,6 +55,9 @@ export default function SaasAcademies() {
     // Bulk selection
     const [selected, setSelected] = useState(new Set());
 
+    // Logo upload
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+
     // Delete
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
@@ -130,9 +133,34 @@ export default function SaasAcademies() {
             city: acc.city || '',
             notes: acc.notes || '',
             primary_color: acc.primary_color || '',
+            logo_url: acc.logo_url || '',
             status: acc.status || 'active',
         });
         setSaveError('');
+    };
+
+    const handleLogoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !editAcademy) return;
+        setUploadingLogo(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await authFetch(`${API_URL}/saas/academies/${editAcademy.id}/logo`, {
+                method: 'POST',
+                body: formData,
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setEditForm(f => ({ ...f, logo_url: data.logo_url }));
+                setAcademies(prev => prev.map(a => a.id === editAcademy.id ? { ...a, logo_url: data.logo_url } : a));
+            }
+        } catch (err) {
+            console.error('Logo upload failed:', err);
+        } finally {
+            setUploadingLogo(false);
+            e.target.value = '';
+        }
     };
 
     const handleSave = async () => {
@@ -407,10 +435,14 @@ export default function SaasAcademies() {
                                             </td>
                                             <td>
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-sm"
-                                                        style={{ background: acc.primary_color || '#6366f1' }}>
-                                                        {(acc.name || 'A').charAt(0).toUpperCase()}
-                                                    </div>
+                                                    {acc.logo_url ? (
+                                                        <img src={acc.logo_url} alt={acc.name} className="w-9 h-9 rounded-xl object-cover shadow-sm border border-surface-100" />
+                                                    ) : (
+                                                        <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-sm"
+                                                            style={{ background: acc.primary_color || '#6366f1' }}>
+                                                            {(acc.name || 'A').charAt(0).toUpperCase()}
+                                                        </div>
+                                                    )}
                                                     <div>
                                                         <Link to={`/saas/academies/${acc.id}`} className="font-semibold text-surface-900 text-sm hover:text-indigo-600 transition-colors">{acc.name || 'Unnamed'}</Link>
                                                         {acc.notes && <p className="text-[10px] text-surface-400 truncate max-w-[160px]">{acc.notes}</p>}
@@ -520,6 +552,38 @@ export default function SaasAcademies() {
                             {saveError && (
                                 <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-sm">{saveError}</div>
                             )}
+                            {/* Logo Upload */}
+                            <div>
+                                <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Logo</label>
+                                <div className="flex items-center gap-4">
+                                    {editForm.logo_url ? (
+                                        <img src={editForm.logo_url} alt="logo" className="w-16 h-16 rounded-2xl object-cover border border-surface-200 shadow-sm" />
+                                    ) : (
+                                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-sm"
+                                            style={{ background: editForm.primary_color || '#6366f1' }}>
+                                            {(editForm.name || 'A').charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
+                                    <div className="flex-1">
+                                        <label className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors text-sm font-semibold
+                                            ${uploadingLogo ? 'border-surface-200 text-surface-300' : 'border-surface-300 text-surface-600 hover:border-indigo-400 hover:text-indigo-600'}`}>
+                                            {uploadingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Building2 className="w-4 h-4" />}
+                                            {uploadingLogo ? 'Uploading...' : editForm.logo_url ? 'Change Logo' : 'Upload Logo'}
+                                            <input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" className="hidden"
+                                                disabled={uploadingLogo} onChange={handleLogoUpload} />
+                                        </label>
+                                        <p className="text-[10px] text-surface-400 mt-1">JPEG, PNG, WebP or SVG · Max 2MB</p>
+                                    </div>
+                                    {editForm.logo_url && (
+                                        <button type="button"
+                                            onClick={() => setEditForm(f => ({ ...f, logo_url: '' }))}
+                                            className="p-1.5 rounded-lg text-surface-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                            title="Remove logo">
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                             <div>
                                 <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Academy Name</label>
                                 <input

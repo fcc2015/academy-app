@@ -4,21 +4,39 @@ Use as a dependency on any protected route.
 """
 import logging
 import httpx
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, HTTPException, status, Request
 from core.config import settings
 from core.context import academy_id_ctx, user_id_ctx, role_ctx
+from core.csrf import validate_csrf
 from services.supabase_client import supabase
 
 logger = logging.getLogger("auth")
-security = HTTPBearer()
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def verify_token(request: Request):
     """
     Verifies the JWT token by calling Supabase's /auth/v1/user endpoint.
+    Reads token from httpOnly cookie first, falls back to Authorization header.
     Resolves role from the database (public.users + admins table), NOT user_metadata.
     """
-    token = credentials.credentials
+    # 1. Try httpOnly cookie (preferred — set on login)
+    token = request.cookies.get("access_token")
+    using_cookie = token is not None
+
+    # 2. Fallback: Authorization header (Google OAuth callback, QR auth, etc.)
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+
+    # CSRF validation — only for cookie-based auth (Bearer tokens are inherently CSRF-safe)
+    if using_cookie:
+        validate_csrf(request)
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:

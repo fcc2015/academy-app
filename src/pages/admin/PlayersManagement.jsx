@@ -19,13 +19,153 @@ import {
     Clock,
     QrCode,
     Trophy,
-    MapPin
+    MapPin,
+    Eye,
+    User,
+    Heart,
+    CreditCard,
+    Activity
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import PlayerBadgeModal from '../../components/PlayerBadgeModal';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
+import AttendanceHeatmap from '../../components/AttendanceHeatmap';
+import MedicalCard from '../../components/MedicalCard';
+import PaymentTimeline from '../../components/PaymentTimeline';
+
+const PlayerProfileModal = ({ isOpen, onClose, player, isRTL, dir }) => {
+    const [activeTab, setActiveTab] = useState('profile');
+    const [attendance, setAttendance] = useState([]);
+    const [payments, setPayments] = useState([]);
+    const [loadingData, setLoadingData] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen || !player) return;
+        setActiveTab('profile');
+        setAttendance([]);
+        setPayments([]);
+        setLoadingData(true);
+        Promise.all([
+            authFetch(`${API_URL}/attendance/player/${player.user_id}`).then(r => r.ok ? r.json() : []).catch(() => []),
+            authFetch(`${API_URL}/finances/payments/player/${player.user_id}`).then(r => r.ok ? r.json() : []).catch(() => []),
+        ]).then(([att, pay]) => {
+            setAttendance(Array.isArray(att) ? att : []);
+            setPayments(Array.isArray(pay) ? pay : []);
+            setLoadingData(false);
+        });
+    }, [isOpen, player]);
+
+    if (!isOpen || !player) return null;
+
+    const tabs = [
+        { id: 'profile',    label: isRTL ? 'الملف'   : 'Profile',    icon: User },
+        { id: 'attendance', label: isRTL ? 'الحضور'  : 'Attendance', icon: Activity },
+        { id: 'medical',    label: isRTL ? 'الطبي'   : 'Medical',    icon: Heart },
+        { id: 'payments',   label: isRTL ? 'المدفوعات': 'Payments',   icon: CreditCard },
+    ];
+
+    const age = player.birth_date
+        ? Math.floor((new Date() - new Date(player.birth_date)) / (365.25 * 24 * 3600 * 1000))
+        : null;
+
+    return (
+        <div
+            className={`fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 ${isRTL ? 'text-right' : 'text-left'}`}
+            dir={dir}
+        >
+            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl flex flex-col border border-slate-200 overflow-hidden" style={{ maxHeight: '90vh' }}>
+                {/* Header */}
+                <div className={`flex justify-between items-center p-6 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-purple-50 shrink-0 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div className="h-14 w-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex flex-col items-center justify-center text-white shrink-0">
+                            <span className="text-[9px] font-black opacity-60">CAT</span>
+                            <span className="text-base font-black tracking-tighter">{player.u_category}</span>
+                        </div>
+                        <div className={isRTL ? 'text-right' : 'text-left'}>
+                            <h2 className="text-xl font-black text-slate-800 tracking-tight">{player.full_name}</h2>
+                            <p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">
+                                {player.subscription_type} · LVL {player.technical_level}
+                                {age && ` · ${age}y`}
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 hover:bg-white p-2 rounded-full transition-all border border-transparent">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {/* Tabs */}
+                <div className={`flex border-b border-slate-100 shrink-0 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    {tabs.map(tab => {
+                        const Icon = tab.icon;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${
+                                    activeTab === tab.id
+                                        ? 'border-indigo-500 text-indigo-600 bg-indigo-50/50'
+                                        : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                                }`}
+                            >
+                                <Icon size={13} />
+                                {tab.label}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-slate-50/30 space-y-4">
+                    {loadingData && activeTab !== 'profile' && (
+                        <div className="flex justify-center py-10">
+                            <Loader2 className="animate-spin text-indigo-500" size={28} />
+                        </div>
+                    )}
+
+                    {/* Profile tab */}
+                    {activeTab === 'profile' && (
+                        <div className="grid grid-cols-2 gap-3">
+                            {[
+                                { label: isRTL ? 'ولي الأمر' : 'Parent', value: player.parent_name },
+                                { label: isRTL ? 'الواتساب' : 'WhatsApp', value: player.parent_whatsapp },
+                                { label: isRTL ? 'تاريخ الميلاد' : 'Birth Date', value: player.birth_date },
+                                { label: isRTL ? 'الفئة' : 'Category', value: player.u_category },
+                                { label: isRTL ? 'المستوى' : 'Level', value: player.technical_level },
+                                { label: isRTL ? 'الاشتراك' : 'Plan', value: player.subscription_type },
+                                { label: isRTL ? 'الحالة' : 'Status', value: player.account_status },
+                                { label: isRTL ? 'منطقة النقل' : 'Transport', value: player.transport_zone || '—' },
+                                { label: isRTL ? 'العنوان' : 'Address', value: player.address || '—', full: true },
+                            ].map(({ label, value, full }) => (
+                                <div key={label} className={`bg-white rounded-2xl p-4 border border-slate-100 ${full ? 'col-span-2' : ''}`}>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">{label}</p>
+                                    <p className="text-sm font-bold text-slate-800">{value || '—'}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Attendance tab */}
+                    {activeTab === 'attendance' && !loadingData && (
+                        <AttendanceHeatmap records={attendance} isRTL={isRTL} />
+                    )}
+
+                    {/* Medical tab */}
+                    {activeTab === 'medical' && !loadingData && (
+                        <MedicalCard player={player} isRTL={isRTL} />
+                    )}
+
+                    {/* Payments tab */}
+                    {activeTab === 'payments' && !loadingData && (
+                        <PaymentTimeline payments={payments} isRTL={isRTL} currency="MAD" />
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const PlayerMatchesModal = ({ isOpen, onClose, player, isRTL, dir }) => {
     const [matches, setMatches] = useState([]);
@@ -92,6 +232,178 @@ const PlayerMatchesModal = ({ isOpen, onClose, player, isRTL, dir }) => {
     );
 };
 
+// ─── Photo Upload + Crop ─────────────────────────────────────
+const CROP_PX = 180;
+
+function PhotoUploadCrop({ value, onChange }) {
+    const [srcImg, setSrcImg]     = useState(null);
+    const [imgSize, setImgSize]   = useState({ w: 0, h: 0 });
+    const [offset, setOffset]     = useState({ x: 0, y: 0 });
+    const [dragging, setDragging] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [error, setError]       = useState('');
+    const dragRef = useRef(null);
+    const imgRef  = useRef(null);
+    const fileRef = useRef(null);
+
+    const handleFile = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { setError('Only images allowed'); return; }
+        setError('');
+        const reader = new FileReader();
+        reader.onload = (ev) => setSrcImg(ev.target.result);
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    };
+
+    const onImgLoad = (e) => {
+        const { naturalWidth: nw, naturalHeight: nh } = e.target;
+        const scale = CROP_PX / Math.min(nw, nh);
+        const w = nw * scale, h = nh * scale;
+        setImgSize({ w, h });
+        setOffset({ x: -(w - CROP_PX) / 2, y: -(h - CROP_PX) / 2 });
+    };
+
+    const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+
+    const onMouseDown = (e) => {
+        setDragging(true);
+        dragRef.current = { sx: e.clientX - offset.x, sy: e.clientY - offset.y };
+    };
+    const onMouseMove = (e) => {
+        if (!dragging || !dragRef.current) return;
+        setOffset({
+            x: clamp(e.clientX - dragRef.current.sx, CROP_PX - imgSize.w, 0),
+            y: clamp(e.clientY - dragRef.current.sy, CROP_PX - imgSize.h, 0),
+        });
+    };
+    const onMouseUp = () => setDragging(false);
+
+    // Touch support
+    const onTouchStart = (e) => {
+        const t = e.touches[0];
+        setDragging(true);
+        dragRef.current = { sx: t.clientX - offset.x, sy: t.clientY - offset.y };
+    };
+    const onTouchMove = (e) => {
+        if (!dragging || !dragRef.current) return;
+        const t = e.touches[0];
+        setOffset({
+            x: clamp(t.clientX - dragRef.current.sx, CROP_PX - imgSize.w, 0),
+            y: clamp(t.clientY - dragRef.current.sy, CROP_PX - imgSize.h, 0),
+        });
+    };
+
+    const handleConfirm = async () => {
+        if (!imgRef.current) return;
+        setUploading(true);
+        setError('');
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = CROP_PX;
+            canvas.height = CROP_PX;
+            const ctx = canvas.getContext('2d');
+            const img = imgRef.current;
+            const scaleX = img.naturalWidth / imgSize.w;
+            const scaleY = img.naturalHeight / imgSize.h;
+            ctx.drawImage(img,
+                (-offset.x) * scaleX, (-offset.y) * scaleY,
+                CROP_PX * scaleX, CROP_PX * scaleY,
+                0, 0, CROP_PX, CROP_PX
+            );
+            const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+            const fd = new FormData();
+            fd.append('file', blob, 'photo.jpg');
+            const { authFetch } = await import('../../api');
+            const { API_URL } = await import('../../config');
+            const res = await authFetch(`${API_URL}/players/upload-photo`, { method: 'POST', body: fd });
+            if (!res.ok) throw new Error((await res.json()).detail || 'Upload failed');
+            const { url } = await res.json();
+            onChange(url);
+            setSrcImg(null);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            {/* Current photo or placeholder (no crop active) */}
+            {!srcImg && (
+                <div
+                    onClick={() => fileRef.current?.click()}
+                    style={{
+                        width: CROP_PX, height: CROP_PX, borderRadius: '50%', overflow: 'hidden',
+                        background: value ? 'transparent' : 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', border: '3px dashed #c7d2fe', boxSizing: 'border-box',
+                        position: 'relative',
+                    }}
+                    title="Click to upload photo"
+                >
+                    {value
+                        ? <img src={value} alt="player" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, textAlign: 'center', padding: 12 }}>📷<br/>Upload Photo</span>
+                    }
+                    <div style={{
+                        position: 'absolute', bottom: 0, left: 0, right: 0,
+                        background: 'rgba(79,70,229,0.7)', color: '#fff',
+                        fontSize: 10, fontWeight: 900, textAlign: 'center', padding: '4px 0',
+                    }}>
+                        {value ? 'CHANGE' : 'UPLOAD'}
+                    </div>
+                </div>
+            )}
+
+            {/* Crop preview */}
+            {srcImg && (
+                <div>
+                    <div
+                        style={{
+                            width: CROP_PX, height: CROP_PX, borderRadius: '50%', overflow: 'hidden',
+                            position: 'relative', cursor: dragging ? 'grabbing' : 'grab',
+                            userSelect: 'none', boxShadow: '0 0 0 3px #4f46e5',
+                        }}
+                        onMouseDown={onMouseDown} onMouseMove={onMouseMove}
+                        onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
+                        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onMouseUp}
+                    >
+                        <img
+                            ref={imgRef} src={srcImg} alt="crop"
+                            onLoad={onImgLoad} draggable={false}
+                            style={{
+                                position: 'absolute', left: offset.x, top: offset.y,
+                                width: imgSize.w, height: imgSize.h, pointerEvents: 'none',
+                            }}
+                        />
+                    </div>
+                    <p style={{ fontSize: 11, color: '#6b7280', textAlign: 'center', margin: '6px 0 0' }}>
+                        Drag to position
+                    </p>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'center' }}>
+                        <button type="button" onClick={handleConfirm} disabled={uploading}
+                            style={{ padding: '7px 16px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 900, fontSize: 12, cursor: 'pointer' }}>
+                            {uploading ? '...' : 'Use this photo'}
+                        </button>
+                        <button type="button" onClick={() => setSrcImg(null)}
+                            style={{ padding: '7px 12px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 10, fontWeight: 900, fontSize: 12, cursor: 'pointer' }}>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+            {error && <p style={{ fontSize: 11, color: '#ef4444', fontWeight: 700 }}>{error}</p>}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────
+
 const PlayerModal = ({
     isOpen, onClose, onSubmit, title, isEdit, modalStep, setModalStep,
     formData, handleInputChange, subscriptionPlans, isSubmitting, settings, t, isRTL, dir
@@ -124,6 +436,15 @@ const PlayerModal = ({
                 {(isEdit || modalStep === 1) && (
                     <form onSubmit={isEdit ? doSubmit : goNext} className="flex-1 flex flex-col min-h-0 overflow-hidden">
                         <div className="p-6 sm:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                            {/* Photo upload — centered above the grid */}
+                            <div className="flex flex-col items-center gap-1 pb-4 border-b border-slate-100">
+                                <PhotoUploadCrop
+                                    value={formData.photo_url}
+                                    onChange={(url) => handleInputChange({ target: { name: 'photo_url', value: url } })}
+                                />
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Player Photo (optional)</p>
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.fullName')}</label>
@@ -287,6 +608,7 @@ const PlayersManagement = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isBadgeModalOpen, setIsBadgeModalOpen] = useState(false);
     const [isMatchesModalOpen, setIsMatchesModalOpen] = useState(false);
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [currentPlayer, setCurrentPlayer] = useState(null);
     const [resolvingRequestId, setResolvingRequestId] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -421,6 +743,11 @@ const PlayersManagement = () => {
     const openMatchesModal = (player) => {
         setCurrentPlayer(player);
         setIsMatchesModalOpen(true);
+    };
+
+    const openProfileModal = (player) => {
+        setCurrentPlayer(player);
+        setIsProfileModalOpen(true);
     };
 
     const handleAddSubmit = async (e) => {
@@ -702,14 +1029,20 @@ const PlayersManagement = () => {
                                     <tr key={player.user_id} className="hover:bg-slate-50/50 group">
                                         <td className={`px-8 py-6 ${isRTL ? 'text-right' : 'text-left'}`}>
                                             <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
-                                                <div className="h-14 w-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex flex-col items-center justify-center text-white shrink-0 group-hover:rotate-3 transition-transform relative">
+                                                <div className="h-14 w-14 rounded-2xl shrink-0 group-hover:rotate-3 transition-transform relative overflow-hidden">
+                                                    {player.photo_url
+                                                        ? <img src={player.photo_url} alt={player.full_name} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                                                        : null
+                                                    }
+                                                    <div className={`w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex flex-col items-center justify-center text-white ${player.photo_url ? 'hidden' : 'flex'}`}>
+                                                        <span className="text-[10px] font-black opacity-60">CAT</span>
+                                                        <span className="text-sm font-black tracking-tighter">{player.u_category}</span>
+                                                    </div>
                                                     {player.technical_level === 'A' && (
                                                         <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-yellow-400 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
                                                             <span className="w-1.5 h-1.5 bg-yellow-600 rounded-full animate-pulse"></span>
                                                         </span>
                                                     )}
-                                                    <span className="text-[10px] font-black opacity-60">CAT</span>
-                                                    <span className="text-sm font-black tracking-tighter">{player.u_category}</span>
                                                 </div>
                                                 <div className={isRTL ? 'text-right' : 'text-left'}>
                                                     <div className="flex items-center gap-2">
@@ -763,6 +1096,7 @@ const PlayersManagement = () => {
                                         </td>
                                         <td className={`px-8 py-6 ${isRTL ? 'text-left' : 'text-right'}`}>
                                             <div className={`flex flex-wrap gap-2 ${isRTL ? 'justify-start' : 'justify-end'}`}>
+                                                <button onClick={() => openProfileModal(player)} className="p-3 bg-purple-50 text-purple-600 border border-purple-100 hover:bg-purple-500 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={isRTL ? 'الملف الشخصي' : 'Profile'}><Eye size={16} /></button>
                                                 <button onClick={() => openMatchesModal(player)} className="p-3 bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-500 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={isRTL ? 'المباريات' : 'Matches'}><Trophy size={16} /></button>
                                                 <button onClick={() => { setCurrentPlayer(player); setIsBadgeModalOpen(true); }} className="p-3 bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-500 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={t('players.viewCard')}><QrCode size={16} /></button>
                                                 <button onClick={() => openEditModal(player)} className="p-3 bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-600 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={isRTL ? 'تعديل البيانات' : 'Edit'}><Edit2 size={16} /></button>
@@ -810,6 +1144,7 @@ const PlayersManagement = () => {
             )}
             <PlayerBadgeModal player={currentPlayer} isOpen={isBadgeModalOpen} onClose={() => setIsBadgeModalOpen(false)} />
             <PlayerMatchesModal player={currentPlayer} isOpen={isMatchesModalOpen} onClose={() => setIsMatchesModalOpen(false)} t={t} isRTL={isRTL} dir={dir} />
+            <PlayerProfileModal player={currentPlayer} isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} isRTL={isRTL} dir={dir} />
 
             <ConfirmDialog
                 isOpen={confirmDialog.isOpen && confirmDialog.type === 'player'}

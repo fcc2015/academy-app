@@ -23,7 +23,8 @@ import {
     Package,
     Shirt,
     Heart,
-    TrendingDown
+    TrendingDown,
+    UserCheck
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -163,9 +164,10 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
         {
             label: t('ui.admin'),
             items: [
-                { to: '/admin/chat',     icon: MessageCircle, labelKey: 'sidebar.chat' },
-                { to: '/admin/admins',   icon: Shield,  labelKey: 'sidebar.admins' },
-                { to: '/admin/settings', icon: Settings, labelKey: 'sidebar.settings' },
+                { to: '/admin/chat',            icon: MessageCircle, labelKey: 'sidebar.chat' },
+                { to: '/admin/pending-parents', icon: UserCheck,     labelKey: 'sidebar.pendingParents' },
+                { to: '/admin/admins',          icon: Shield,        labelKey: 'sidebar.admins' },
+                { to: '/admin/settings',        icon: Settings,      labelKey: 'sidebar.settings' },
             ]
         }
     ];

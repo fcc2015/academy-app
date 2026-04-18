@@ -155,10 +155,14 @@ export default function SaasAcademyDetail() {
                 </button>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
-                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg text-white shadow-lg"
-                            style={{ background: academy.primary_color || '#6366f1' }}>
-                            {(academy.name || 'A').charAt(0).toUpperCase()}
-                        </div>
+                        {academy.logo_url ? (
+                            <img src={academy.logo_url} alt={academy.name} className="w-12 h-12 rounded-2xl object-cover shadow-lg border border-surface-100" />
+                        ) : (
+                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg text-white shadow-lg"
+                                style={{ background: academy.primary_color || '#6366f1' }}>
+                                {(academy.name || 'A').charAt(0).toUpperCase()}
+                            </div>
+                        )}
                         <div>
                             <h2 className="text-xl font-black text-surface-900 leading-tight">{academy.name}</h2>
                             <div className="flex items-center gap-3 mt-1 flex-wrap">

@@ -9,9 +9,11 @@ import {
     XCircle,
     Clock,
     ShieldAlert,
-    QrCode
+    QrCode,
+    Loader2
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { scanQRFromCamera, isNativePlatform } from '../../native/nativeScanner';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useToast } from '../../components/Toast';
 import { SkeletonTable } from '../../components/Skeleton';
@@ -29,6 +31,7 @@ const CoachAttendance = () => {
 
     const [isScannerOpen, setIsScannerOpen] = useState(false);
     const [scanFeedback, setScanFeedback] = useState({ show: false, message: '', type: '' });
+    const [nativeScanning, setNativeScanning] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -156,22 +159,31 @@ const CoachAttendance = () => {
         }
     };
 
+    // ── Native one-shot scanner (Capacitor) ──────────────────────────────────
+    const handleNativeScan = async () => {
+        setNativeScanning(true);
+        try {
+            const decoded = await scanQRFromCamera();
+            if (decoded) onScanResult(decoded);
+        } finally {
+            setNativeScanning(false);
+        }
+    };
+
     const ScannerModal = () => {
+        // Web viewfinder scanner
         useEffect(() => {
+            if (isNativePlatform || !isScannerOpen) return;
             let scanner = null;
-            if (isScannerOpen) {
-                scanner = new Html5Qrcode("coach-qr-reader");
-                scanner.start(
-                    { facingMode: "environment" }, 
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
-                    onScanResult,
-                    () => {} 
-                ).catch(err => console.error("Scanner error", err));
-            }
+            scanner = new Html5Qrcode("coach-qr-reader");
+            scanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                onScanResult,
+                () => {}
+            ).catch(err => console.error("Scanner error", err));
             return () => {
-                if (scanner && isScannerOpen) {
-                    scanner.stop().then(() => scanner.clear()).catch(e => console.error(e));
-                }
+                if (scanner) scanner.stop().then(() => scanner.clear()).catch(() => {});
             };
             // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [isScannerOpen]);
@@ -188,12 +200,36 @@ const CoachAttendance = () => {
                         <QrCode size={32} />
                     </div>
                     <h3 className="font-black text-slate-800 text-lg mb-6 tracking-widest uppercase text-center">Scan Player Card</h3>
-                    
-                    <div className="w-full rounded-2xl overflow-hidden shadow-inner border-4 border-slate-100 bg-black">
-                        <div id="coach-qr-reader" className="w-full min-h-[300px]"></div>
-                    </div>
 
-                    <p className="mt-6 text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Point phone camera at player badge QR code for automatic attendance</p>
+                    {isNativePlatform ? (
+                        /* Native: tap-to-capture button */
+                        <div className="flex flex-col items-center gap-6 w-full">
+                            <div className="w-48 h-48 bg-slate-100 rounded-2xl flex items-center justify-center border-4 border-dashed border-emerald-300">
+                                {nativeScanning
+                                    ? <Loader2 size={48} className="text-emerald-500 animate-spin" />
+                                    : <QrCode size={64} className="text-slate-300" />
+                                }
+                            </div>
+                            <button
+                                onClick={handleNativeScan}
+                                disabled={nativeScanning}
+                                className="w-full py-4 bg-emerald-600 text-white font-black text-sm uppercase tracking-widest rounded-2xl hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {nativeScanning
+                                    ? <><Loader2 size={18} className="animate-spin" /> Scanning...</>
+                                    : <><QrCode size={18} /> Tap to Scan QR</>
+                                }
+                            </button>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">
+                                Point camera at player badge QR code
+                            </p>
+                        </div>
+                    ) : (
+                        /* Web: continuous viewfinder */
+                        <div className="w-full rounded-2xl overflow-hidden shadow-inner border-4 border-slate-100 bg-black">
+                            <div id="coach-qr-reader" className="w-full min-h-[300px]"></div>
+                        </div>
+                    )}
                 </div>
             </div>
         );

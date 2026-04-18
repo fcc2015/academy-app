@@ -24,6 +24,21 @@ logging.basicConfig(
 logging.getLogger().addFilter(RequestIdFilter())
 logger = logging.getLogger("academy")
 
+# ─── Sentry Error Tracking ──────────────────────────────────
+if settings.SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=0.1,          # 10% of requests traced
+        profiles_sample_rate=0.05,       # 5% profiled
+        environment="development" if settings.DEV_MODE else "production",
+        send_default_pii=False,          # Never send PII to Sentry
+    )
+    logger.info("Sentry initialized")
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -50,7 +65,7 @@ app.add_middleware(
     allow_origin_regex=r"https://(.*\.netlify\.app|.*\.vercel\.app)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "X-CSRF-Token"],
     expose_headers=["Content-Disposition"],
 )
 
@@ -107,7 +122,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         if request.method in self.AUDIT_METHODS:
             client_ip = request.client.host if request.client else "unknown"
             # Extract user info from auth header (don't decode, just log presence)
-            has_auth = "Authorization" in request.headers
+            has_auth = "Authorization" in request.headers or "access_token" in request.cookies
             logger.info(
                 f"AUDIT | {request.method} {request.url.path} | "
                 f"IP={client_ip} | Auth={'yes' if has_auth else 'no'} | "
@@ -174,37 +189,49 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RateLimitMiddleware)
 
 
-# Include Routers
-app.include_router(auth.router)
-app.include_router(players.router)
-app.include_router(finances.router)
-app.include_router(coaches.router)
-app.include_router(events.router)
-app.include_router(stats.router)
-app.include_router(settings_router.router)
-app.include_router(evaluations.router)
-app.include_router(squads.router)
-app.include_router(attendance.router)
-app.include_router(notifications.router)
+# ─── API v1 Router ────────────────────────────────────────
+# All application routes live under /api/v1.
+# public_api is also kept at root level (/public/...) for backward
+# compatibility with external websites that embed the registration form.
+from fastapi import APIRouter as _APIRouter
+v1 = _APIRouter(prefix="/api/v1")
+
+v1.include_router(auth.router)
+v1.include_router(players.router)
+v1.include_router(finances.router)
+v1.include_router(coaches.router)
+v1.include_router(events.router)
+v1.include_router(stats.router)
+v1.include_router(settings_router.router)
+v1.include_router(evaluations.router)
+v1.include_router(squads.router)
+v1.include_router(attendance.router)
+v1.include_router(notifications.router)
+v1.include_router(public_api.router)
+v1.include_router(coupons.router)
+v1.include_router(plans.router)
+v1.include_router(admins.router)
+v1.include_router(chat.router)
+v1.include_router(chat.ws_router)
+v1.include_router(inventory.router)
+v1.include_router(matches.router)
+v1.include_router(injuries.router)
+v1.include_router(training.router)
+v1.include_router(kits.router)
+v1.include_router(medical.router)
+v1.include_router(expenses.router)
+v1.include_router(storage.router)
+v1.include_router(exports.router)
+v1.include_router(saas_admin.router)
+v1.include_router(payments_gateway.router)
+v1.include_router(tournaments.router)
+v1.include_router(tryouts.router)
+v1.include_router(qr_auth.router)
+
+app.include_router(v1)
+
+# Backward-compat: keep /public/... accessible at root for external embeds
 app.include_router(public_api.router)
-app.include_router(coupons.router)
-app.include_router(plans.router)
-app.include_router(admins.router)
-app.include_router(chat.router)
-app.include_router(inventory.router)
-app.include_router(matches.router)
-app.include_router(injuries.router)
-app.include_router(training.router)
-app.include_router(kits.router)
-app.include_router(medical.router)
-app.include_router(expenses.router)
-app.include_router(storage.router)
-app.include_router(exports.router)
-app.include_router(saas_admin.router)
-app.include_router(payments_gateway.router)
-app.include_router(tournaments.router)
-app.include_router(tryouts.router)
-app.include_router(qr_auth.router)
 
 # ─── Global Exception Handler (mask internal errors) ───────
 from fastapi.responses import JSONResponse

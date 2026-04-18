@@ -2,7 +2,7 @@ import { API_URL } from './config';
 
 /**
  * Authenticated fetch wrapper with retry logic and network error handling.
- * - Attaches JWT token from localStorage
+ * - Sends httpOnly cookie automatically via credentials: 'include'
  * - Retries on 502/503/504 and network errors (up to 2 retries)
  * - Handles 401 by redirecting to login
  * - Throws user-friendly errors for timeout/network failures
@@ -11,6 +11,37 @@ import { API_URL } from './config';
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 800; // ms, doubles each retry
 const FETCH_TIMEOUT = 30000; // 30s
+
+// ─── Refresh Token Logic ──────────────────────────────────────
+// Prevents parallel refresh storms: queue concurrent 401s and resolve them
+// after a single refresh call completes.
+let _isRefreshing = false;
+let _refreshQueue = [];
+
+async function tryRefreshToken() {
+  if (_isRefreshing) {
+    return new Promise((resolve) => {
+      _refreshQueue.push(resolve);
+    });
+  }
+
+  _isRefreshing = true;
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    const ok = res.ok;
+    _refreshQueue.forEach(resolve => resolve(ok));
+    return ok;
+  } catch {
+    _refreshQueue.forEach(resolve => resolve(false));
+    return false;
+  } finally {
+    _isRefreshing = false;
+    _refreshQueue = [];
+  }
+}
 
 /**
  * Fetch with timeout support.
@@ -22,31 +53,53 @@ function fetchWithTimeout(url, options, timeout = FETCH_TIMEOUT) {
     .finally(() => clearTimeout(id));
 }
 
+/**
+ * Read the CSRF token from the readable csrf_token cookie.
+ * Returns null if not found (e.g. not logged in yet).
+ */
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export async function authFetch(url, options = {}) {
-  const token = localStorage.getItem('token');
   const headers = {
     ...(options.headers || {}),
   };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   // Auto-add Content-Type for JSON bodies if not already set
   if (options.body && typeof options.body === 'string' && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
   }
 
+  // Auto-add CSRF token for mutating requests (cookie-based auth requires this)
+  const method = (options.method || 'GET').toUpperCase();
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
+
   let lastError = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const res = await fetchWithTimeout(url, { ...options, headers });
+      const res = await fetchWithTimeout(url, {
+        ...options,
+        headers,
+        credentials: 'include', // Send httpOnly cookie automatically
+      });
 
-      // Auto-logout on 401 (expired/invalid token)
+      // On 401: try refresh first, retry once, then logout
       if (res.status === 401) {
         const currentPath = window.location.pathname;
         if (!currentPath.includes('/login') && currentPath !== '/') {
+          const refreshed = await tryRefreshToken();
+          if (refreshed) {
+            // Retry the original request with fresh cookies
+            return fetchWithTimeout(url, { ...options, headers, credentials: 'include' });
+          }
           logout();
         }
         return res;
@@ -96,30 +149,33 @@ export class NetworkError extends Error {
 
 /**
  * Check if the current session is valid.
- * Returns true if token exists and hasn't expired.
+ * Token is httpOnly — not readable from JS. Check role presence instead.
  */
 export function isAuthenticated() {
-  const token = localStorage.getItem('token');
-  const expires = parseInt(localStorage.getItem('token_expires') || '0');
-  if (!token) return false;
-  if (expires > 0 && Date.now() >= expires) {
-    // Token expired — clean up
-    logout();
-    return false;
-  }
-  return true;
+  return !!localStorage.getItem('role');
 }
 
 /**
  * Clear all auth data and redirect to login.
+ * Calls backend to clear the httpOnly cookie, then clears localStorage.
  */
 export function logout() {
   const role = localStorage.getItem('role');
-  localStorage.removeItem('token');
+
+  // Clear server-side httpOnly cookie (fire-and-forget)
+  fetch(`${API_URL}/auth/logout`, {
+    method: 'POST',
+    credentials: 'include',
+  }).catch(() => {});
+
+  // Clear client-side storage
   localStorage.removeItem('role');
   localStorage.removeItem('user_id');
+  // Legacy cleanup (token was stored here before httpOnly migration)
+  localStorage.removeItem('token');
   localStorage.removeItem('token_expires');
-  // Redirect to appropriate login based on previous role
+
+  // Redirect to appropriate login
   if (role === 'super_admin') {
     window.location.href = '/saas/login';
   } else {

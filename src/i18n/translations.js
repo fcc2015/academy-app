@@ -65,6 +65,7 @@ const translations = {
         medical: { ar: 'الملفات الطبية', en: 'Medical', fr: 'Médical' },
         expenses: { ar: 'المصاريف', en: 'Expenses', fr: 'Dépenses' },
         chat: { ar: 'التواصل والدردشة', en: 'Chat & Groups', fr: 'Chat & Groupes' },
+        pendingParents: { ar: 'حسابات معلقة', en: 'Pending Parents', fr: 'Parents en attente' },
     },
 
     // ========== NOTIFICATIONS ==========

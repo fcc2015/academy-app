@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     SMTP_PASS: Optional[str] = None
     SMTP_FROM: str = "noreply@academy.com"
 
+    # Monitoring
+    SENTRY_DSN: Optional[str] = None  # Set in production via env var
+
     # DEV_MODE=true في .env يفعّل الـ bypass للتطوير المحلي فقط
     # في الإنتاج يجب أن يكون DEV_MODE=false أو غير موجود
     DEV_MODE: bool = False

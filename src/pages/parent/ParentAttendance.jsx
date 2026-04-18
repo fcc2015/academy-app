@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { CalendarCheck, CheckCircle2, XCircle, Clock, ShieldAlert, Filter } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { SkeletonDashboard } from '../../components/Skeleton';
+import AttendanceHeatmap from '../../components/AttendanceHeatmap';
 
 const ParentAttendance = () => {
     const { t, isRTL, dir } = useLanguage();
@@ -104,6 +105,9 @@ const ParentAttendance = () => {
                     <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-400"></span> {isRTL ? 'غائب' : 'Absent'}</span>
                 </div>
             </div>
+
+            {/* Heatmap */}
+            <AttendanceHeatmap records={attendance} isRTL={isRTL} />
 
             {/* Records */}
             <div className="bg-white rounded-2xl border border-slate-200 premium-shadow overflow-hidden">

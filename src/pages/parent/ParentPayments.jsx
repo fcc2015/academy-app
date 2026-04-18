@@ -5,6 +5,7 @@ import { CreditCard, CheckCircle2, Clock, AlertTriangle, TrendingUp, Upload, X, 
 import { useToast } from '../../components/Toast';
 import { SkeletonDashboard } from '../../components/Skeleton';
 import { useLanguage } from '../../i18n/LanguageContext';
+import PaymentTimeline from '../../components/PaymentTimeline';
 
 const ParentPayments = () => {
     const toast = useToast();
@@ -167,6 +168,9 @@ const ParentPayments = () => {
                     <p className="text-sm font-bold text-slate-500 mt-1">{isRTL ? 'يُرجى التحقق منها' : 'Needs Verification'}</p>
                 </div>
             </div>
+
+            {/* Timeline */}
+            <PaymentTimeline payments={payments} isRTL={isRTL} currency="MAD" />
 
             {/* Payment Table */}
             <div className="bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden p-2">

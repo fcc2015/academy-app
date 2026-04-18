@@ -14,6 +14,7 @@ import NotFound from './pages/NotFound';
 // Lazy-loaded pages — only loaded when navigated to
 const DownloadPage = lazy(() => import('./pages/DownloadPage'));
 const QRLoginPage = lazy(() => import('./pages/QRLoginPage'));
+const ParentSignup = lazy(() => import('./pages/parent/ParentSignup'));
 
 // SaaS Root
 const SaasLogin = lazy(() => import('./pages/saas/SaasLogin'));
@@ -53,6 +54,7 @@ const KitsManagement = lazy(() => import('./pages/admin/KitsManagement'));
 const InventoryManagement = lazy(() => import('./pages/admin/InventoryManagement'));
 const ExpensesManagement = lazy(() => import('./pages/admin/ExpensesManagement'));
 const AdminTactics = lazy(() => import('./pages/admin/AdminTactics'));
+const AdminPendingParents = lazy(() => import('./pages/admin/AdminPendingParents'));
 
 // Coach
 const CoachLayout = lazy(() => import('./pages/coach/CoachLayout'));
@@ -99,6 +101,7 @@ function App() {
           <Route path="/saas/login" element={<SaasLogin />} />
           <Route path="/saas-platform" element={<SaasLanding />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/parent/signup" element={<ParentSignup />} />
 
           {/* SaaS Root */}
           <Route path="/saas" element={<SaasLayout />}>
@@ -138,6 +141,7 @@ function App() {
             <Route path="admins" element={<AdminsManagement />} />
             <Route path="chat" element={<ChatManagement />} />
             <Route path="tactics" element={<AdminTactics />} />
+            <Route path="pending-parents" element={<AdminPendingParents />} />
             <Route path="settings" element={<SettingsManagement />} />
           </Route>
 
