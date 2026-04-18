@@ -47,8 +47,11 @@ class LoginResponse(BaseModel):
     """Returned by /auth/login.
     - Normal login: user_id + role set, requires_2fa=False
     - 2FA required: requires_2fa=True + temp_token, no user_id/role yet
+    Tokens are returned in body for cross-domain setups where cookies are blocked.
     """
     user_id: Optional[str] = None
     role: Optional[str] = None
     requires_2fa: bool = False
     temp_token: Optional[str] = None
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None

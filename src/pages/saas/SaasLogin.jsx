@@ -120,9 +120,11 @@ const SaasLogin = () => {
             }
             loginAttempts.count = 0;
             loginAttempts.lockedUntil = null;
-            // Token is now in httpOnly cookie — only store non-sensitive data
+            // Store tokens + user data for cross-domain auth
             localStorage.setItem('role', data.role);
             localStorage.setItem('user_id', data.user_id);
+            if (data.access_token) localStorage.setItem('token', data.access_token);
+            if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
             if (data.role === 'super_admin') {
                 navigate('/saas/dashboard');
             } else if (data.role === 'admin') {
@@ -224,9 +226,11 @@ const SaasLogin = () => {
                 });
                 const loginData = await loginRes.json();
                 if (loginRes.ok && loginData.user_id) {
-                    // Token is in httpOnly cookie — store only non-sensitive data
+                    // Store tokens for cross-domain auth
                     localStorage.setItem('role', loginData.role);
                     localStorage.setItem('user_id', loginData.user_id);
+                    if (loginData.access_token) localStorage.setItem('token', loginData.access_token);
+                    if (loginData.refresh_token) localStorage.setItem('refresh_token', loginData.refresh_token);
                     setTimeout(() => { navigate('/admin/dashboard'); }, 1500);
                 } else {
                     setTimeout(() => {

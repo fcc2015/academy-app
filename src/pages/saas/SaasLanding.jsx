@@ -421,9 +421,9 @@ export default function SaasLanding() {
                                                 const loginData = await loginRes.json();
                                                 if (loginRes.ok && loginData.access_token) {
                                                     localStorage.setItem('token', loginData.access_token);
+                                                    if (loginData.refresh_token) localStorage.setItem('refresh_token', loginData.refresh_token);
                                                     localStorage.setItem('role', loginData.role);
                                                     localStorage.setItem('user_id', loginData.user_id);
-                                                    localStorage.setItem('token_expires', Date.now() + 24 * 60 * 60 * 1000);
                                                 }
                                             } catch {}
                                             setPostPaymentStatus('success');

@@ -112,8 +112,10 @@ const AdminLogin = () => {
                 return;
             }
 
-            // Token is now in httpOnly cookie — only store non-sensitive data
+            // Store tokens for cross-domain auth
             localStorage.setItem('user_id', data.user_id);
+            if (data.access_token) localStorage.setItem('token', data.access_token);
+            if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
 
             // Offer to save credentials for biometric login next time
             const bioAvailable = await isBiometricAvailable();
@@ -122,10 +124,13 @@ const AdminLogin = () => {
                 setBiometricReady(true);
             }
 
-            // Always verify role from DB (cookie is sent automatically)
+            // Always verify role from DB
             let role = data.role;
             try {
+                const roleHeaders = {};
+                if (data.access_token) roleHeaders['Authorization'] = `Bearer ${data.access_token}`;
                 const roleRes = await fetch(`${API_URL}/auth/role`, {
+                    headers: roleHeaders,
                     credentials: 'include',
                 });
                 if (roleRes.ok) {
@@ -165,6 +170,8 @@ const AdminLogin = () => {
 
             localStorage.setItem('user_id', data.user_id);
             localStorage.setItem('role', data.role);
+            if (data.access_token) localStorage.setItem('token', data.access_token);
+            if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
 
             if (data.role === 'super_admin') navigate('/saas/dashboard');
             else if (data.role === 'admin') navigate('/admin/dashboard');
@@ -205,6 +212,8 @@ const AdminLogin = () => {
             }
 
             localStorage.setItem('user_id', data.user_id);
+            if (data.access_token) localStorage.setItem('token', data.access_token);
+            if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
             const role = data.role;
             localStorage.setItem('role', role);
             if (role === 'super_admin') navigate('/saas/dashboard');
