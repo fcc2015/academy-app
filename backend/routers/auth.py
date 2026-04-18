@@ -3,7 +3,7 @@ import secrets
 import time
 from typing import Literal
 from pydantic import BaseModel, EmailStr
-from fastapi import APIRouter, HTTPException, status, Depends, Response
+from fastapi import APIRouter, HTTPException, status, Depends, Request, Response
 from schemas.auth import UserLogin, UserCreate, LoginResponse
 from services.supabase_client import supabase
 from services.email_service import send_otp_email
@@ -172,9 +172,15 @@ async def login(credentials: UserLogin, response: Response):
 @router.post("/logout")
 async def logout(response: Response):
     """Clear the auth, refresh, and CSRF cookies to log out the user."""
-    response.delete_cookie(key="access_token", path="/")
-    response.delete_cookie(key="refresh_token", path="/")
-    response.delete_cookie(key=CSRF_COOKIE_NAME, path="/")
+    is_dev = settings.DEV_MODE
+    delete_kwargs = dict(
+        path="/",
+        secure=not is_dev,
+        samesite="lax" if is_dev else "none",
+    )
+    response.delete_cookie(key="access_token", **delete_kwargs)
+    response.delete_cookie(key="refresh_token", **delete_kwargs)
+    response.delete_cookie(key=CSRF_COOKIE_NAME, **delete_kwargs)
     return {"message": "Logged out successfully"}
 
 @router.post("/refresh")
@@ -200,9 +206,10 @@ async def refresh_access_token(request: Request, response: Response):
             )
             if res.status_code != 200:
                 # Refresh token is invalid/expired — force re-login
-                response.delete_cookie(key="access_token", path="/")
-                response.delete_cookie(key="refresh_token", path="/")
-                response.delete_cookie(key=CSRF_COOKIE_NAME, path="/")
+                del_kw = dict(path="/", secure=not settings.DEV_MODE, samesite="lax" if settings.DEV_MODE else "none")
+                response.delete_cookie(key="access_token", **del_kw)
+                response.delete_cookie(key="refresh_token", **del_kw)
+                response.delete_cookie(key=CSRF_COOKIE_NAME, **del_kw)
                 raise HTTPException(status_code=401, detail="Session expired. Please login again.")
 
             data = res.json()
