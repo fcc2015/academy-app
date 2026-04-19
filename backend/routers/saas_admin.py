@@ -1331,69 +1331,29 @@ from core.config import settings as app_settings
 @router.post("/impersonate/{academy_id}")
 async def impersonate_academy(academy_id: str):
     """
-    Generate an impersonation session for an academy's primary admin.
-    Uses Supabase Admin API to generate a magic link or return user credentials.
+    Return metadata that lets the super admin impersonate this academy.
+    The frontend stores academy_id + name in localStorage, then sends
+    X-Impersonate-Academy header on all subsequent requests. The auth
+    middleware swaps role → "admin" and academy_id → target for super_admins
+    who present that header.
     """
-    # 1. Find the primary admin for this academy
     async with httpx.AsyncClient(timeout=30.0) as client:
+        acc_res = await client.get(
+            f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}&select=id,name,logo_url,primary_color&limit=1",
+            headers=supabase.admin_headers,
+        )
+        if acc_res.status_code != 200 or not acc_res.json():
+            raise HTTPException(status_code=404, detail="Academy not found.")
+        academy = acc_res.json()[0]
+
         admin_res = await client.get(
             f"{supabase.url}/rest/v1/admins?academy_id=eq.{academy_id}&select=user_id,email,full_name&limit=1",
-            headers=supabase.admin_headers
+            headers=supabase.admin_headers,
         )
-
-    if admin_res.status_code != 200 or not admin_res.json():
-        raise HTTPException(status_code=404, detail="No admin found for this academy.")
-
-    admin = admin_res.json()[0]
-    user_id = admin.get("user_id")
-    email = admin.get("email")
-
-    if not user_id:
-        raise HTTPException(status_code=400, detail="Admin has no linked user ID.")
-
-    # 2. Use Supabase Admin API to generate a magic link (or use generateLink)
-    service_key = app_settings.SUPABASE_SERVICE_ROLE_KEY or app_settings.SUPABASE_KEY
-
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        # Generate a magic link via Supabase Admin
-        link_res = await client.post(
-            f"{supabase.url}/auth/v1/admin/generate_link",
-            json={
-                "type": "magiclink",
-                "email": email,
-                "options": {
-                    "redirect_to": f"{app_settings.FRONTEND_URL}/admin"
-                }
-            },
-            headers={
-                "apikey": app_settings.SUPABASE_KEY,
-                "Authorization": f"Bearer {service_key}",
-                "Content-Type": "application/json",
-            }
-        )
-
-    if link_res.status_code >= 400:
-        # Fallback: just return admin info for manual login
-        return {
-            "success": True,
-            "method": "manual",
-            "admin": {
-                "email": email,
-                "full_name": admin.get("full_name", ""),
-                "user_id": user_id,
-            },
-            "message": "Magic link generation unavailable. Use the admin credentials to login manually.",
-        }
-
-    link_data = link_res.json()
+        admin = admin_res.json()[0] if admin_res.status_code == 200 and admin_res.json() else None
 
     return {
         "success": True,
-        "method": "magic_link",
-        "admin": {
-            "email": email,
-            "full_name": admin.get("full_name", ""),
-        },
-        "action_link": link_data.get("action_link", ""),
-        "redirect_url": f"{app_settings.FRONTEND_URL}/admin",
+        "academy": academy,
+        "admin": admin,
     }

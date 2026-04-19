@@ -84,6 +84,16 @@ async def verify_token(request: Request):
                     if a_res.status_code == 200 and a_res.json():
                         role = "admin"
 
+            # Impersonation — super_admin acting as an academy admin.
+            # The header is set by the frontend after the super admin clicks "Login As".
+            # Effective role becomes "admin" and academy_id is swapped to the target.
+            impersonated_academy = request.headers.get("X-Impersonate-Academy")
+            impersonating = False
+            if impersonated_academy and role == "super_admin":
+                academy_id = impersonated_academy
+                role = "admin"
+                impersonating = True
+
             # Set Global Context for downstream injection
             academy_id_ctx.set(academy_id)
             user_id_ctx.set(user_id)
@@ -93,7 +103,8 @@ async def verify_token(request: Request):
                 "user_id": user_id,
                 "email": user.get("email"),
                 "role": role,
-                "academy_id": academy_id
+                "academy_id": academy_id,
+                "impersonating": impersonating,
             }
     except HTTPException:
         raise
