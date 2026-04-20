@@ -3,6 +3,7 @@ import { LanguageProvider } from './i18n/LanguageContext';
 import { ThemeProvider } from './components/ThemeContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
+import ImpersonationBanner from './components/ImpersonationBanner';
 import React, { Suspense, lazy } from 'react';
 
 // Pages — Eagerly loaded (public/critical)
@@ -91,6 +92,7 @@ function App() {
     <LanguageProvider>
     <ToastProvider>
       <Router>
+        <ImpersonationBanner />
         <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Public */}
