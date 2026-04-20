@@ -18,11 +18,65 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // AUTO-HEAL: unregister stale SW + clear old caches once per session
+      (function () {
+        try {
+          if (sessionStorage.getItem('sw_auto_cleaned')) return;
+          sessionStorage.setItem('sw_auto_cleaned', '1');
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              var hadOld = false;
+              regs.forEach(function (r) {
+                if (r.active && /v1|v2|v3/.test(r.active.scriptURL || '')) { r.unregister(); hadOld = true; }
+              });
+              if ('caches' in window) {
+                caches.keys().then(function (names) {
+                  var stale = names.filter(function (n) { return /dbadmin-academy-v[123]$/.test(n); });
+                  Promise.all(stale.map(function (n) { return caches.delete(n); })).then(function () {
+                    if (hadOld || stale.length > 0) location.reload();
+                  });
+                });
+              }
+            }).catch(function () {});
+          }
+        } catch (e) {}
+      })();
+
+      // GLOBAL ERROR HANDLER — dumps errors visibly so we can diagnose without DevTools
+      (function () {
+        var logs = [];
+        function pushLog(kind, msg, stack) {
+          logs.push({ kind: kind, msg: String(msg || ''), stack: String(stack || '') });
+          try { window.__ERRORS__ = logs; } catch (e) {}
+          render();
+        }
+        function render() {
+          var el = document.getElementById('__err_banner__');
+          if (!el) {
+            el = document.createElement('div');
+            el.id = '__err_banner__';
+            el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:2147483647;background:#7f1d1d;color:#fff;font:12px/1.5 monospace;max-height:40vh;overflow:auto;padding:8px 12px;border-top:3px solid #fca5a5;white-space:pre-wrap;direction:ltr;text-align:left;';
+            document.body && document.body.appendChild(el);
+          }
+          el.textContent = 'ERRORS (' + logs.length + '):\n' + logs.map(function (l, i) {
+            return '[' + (i + 1) + '][' + l.kind + '] ' + l.msg + (l.stack ? '\n' + l.stack : '');
+          }).join('\n\n');
+        }
+        window.addEventListener('error', function (e) {
+          pushLog('error', e.message + ' @ ' + (e.filename || '') + ':' + (e.lineno || ''), e.error && e.error.stack);
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason || {};
+          pushLog('promise', r.message || r, r.stack);
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {});
         });
       }
     </script>
