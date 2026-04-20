@@ -94,6 +94,13 @@ export async function authFetch(url, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  // Impersonation header — lets a super admin act as an academy admin.
+  // Set by SaasAcademies "Login As" flow. Backend auth middleware honors it.
+  const impersonateId = localStorage.getItem('impersonating_academy_id');
+  if (impersonateId && !headers['X-Impersonate-Academy']) {
+    headers['X-Impersonate-Academy'] = impersonateId;
+  }
+
   let lastError = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -191,6 +198,8 @@ export function logout() {
   localStorage.removeItem('user_id');
   localStorage.removeItem('token');
   localStorage.removeItem('refresh_token');
+  localStorage.removeItem('impersonating_academy_id');
+  localStorage.removeItem('impersonating_academy_name');
   // Legacy cleanup
   localStorage.removeItem('token_expires');
 

@@ -124,15 +124,13 @@ export default function SaasAcademyDetail() {
         try {
             const res = await authFetch(`${API_URL}/saas/impersonate/${academyId}`, { method: 'POST' });
             if (res.ok) {
-                const data = await res.json();
-                if (data.method === 'magic_link' && data.action_link) {
-                    window.open(data.action_link, '_blank');
-                } else {
-                    // Fallback: show admin email for manual login
-                    alert(`Login as: ${data.admin?.email}\nUse their credentials to login manually.`);
-                }
+                const body = await res.json();
+                const acc = body.academy || {};
+                localStorage.setItem('impersonating_academy_id', acc.id || academyId);
+                localStorage.setItem('impersonating_academy_name', acc.name || '');
+                navigate('/admin/dashboard');
             } else {
-                alert('Failed to generate impersonation link.');
+                alert('Failed to start impersonation.');
             }
         } catch {
             alert('Network error.');

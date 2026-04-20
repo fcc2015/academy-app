@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import {
     Loader2, Plus, Ban, CheckCircle2, X, Pencil, Save,
     MapPin, SlidersHorizontal, Building2, ChevronRight, Users, Search,
-    Trash2, Download, Check
+    Trash2, Download, Check, LogIn
 } from 'lucide-react';
 
 // Moroccan cities for rollout pipeline
@@ -29,9 +29,29 @@ function cityOf(acc) {
 }
 
 export default function SaasAcademies() {
+    const navigate = useNavigate();
     const [academies, setAcademies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(null);
+    const [impersonatingId, setImpersonatingId] = useState(null);
+
+    const handleImpersonate = async (acc) => {
+        setImpersonatingId(acc.id);
+        try {
+            const res = await authFetch(`${API_URL}/saas/impersonate/${acc.id}`, { method: 'POST' });
+            if (res.ok) {
+                localStorage.setItem('impersonating_academy_id', acc.id);
+                localStorage.setItem('impersonating_academy_name', acc.name || '');
+                navigate('/admin/dashboard');
+                return;
+            }
+            alert('Failed to start impersonation.');
+        } catch {
+            alert('Network error.');
+        } finally {
+            setImpersonatingId(null);
+        }
+    };
 
     // Create modal
     const [showCreate, setShowCreate] = useState(false);
@@ -491,6 +511,14 @@ export default function SaasAcademies() {
                                             </td>
                                             <td className="text-right">
                                                 <div className="flex items-center gap-1.5 justify-end">
+                                                    <button
+                                                        onClick={() => handleImpersonate(acc)}
+                                                        disabled={impersonatingId === acc.id}
+                                                        className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-50"
+                                                        title="Login as this academy's admin"
+                                                    >
+                                                        {impersonatingId === acc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogIn className="w-3.5 h-3.5" />}
+                                                    </button>
                                                     <button
                                                         onClick={() => openEdit(acc)}
                                                         className="p-1.5 rounded-lg bg-surface-100 text-surface-600 hover:bg-surface-200 border border-surface-200 transition-colors"

@@ -38,7 +38,9 @@ const AdminLayout = () => {
         const role = localStorage.getItem('role');
         const expires = parseInt(localStorage.getItem('token_expires') || '0');
 
-        const valid = token && role === 'admin' && (expires === 0 || Date.now() < expires);
+        const impersonating = !!localStorage.getItem('impersonating_academy_id');
+        const roleOk = role === 'admin' || (role === 'super_admin' && impersonating);
+        const valid = token && roleOk && (expires === 0 || Date.now() < expires);
 
         if (!valid) {
             localStorage.removeItem('token');
