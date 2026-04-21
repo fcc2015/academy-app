@@ -1,6 +1,6 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Users,
     Search,
