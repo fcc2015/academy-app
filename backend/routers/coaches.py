@@ -71,7 +71,7 @@ async def create_coach(coach: CoachCreate):
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An internal error occurred. Please try again."
+            detail=f"[DEBUG] create_coach failed: {type(e).__name__}: {error_msg}"
         )
 
 @router.put("/{coach_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
