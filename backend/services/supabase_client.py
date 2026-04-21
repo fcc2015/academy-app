@@ -91,6 +91,10 @@ class SupabaseHttpClient:
             "Prefer": "return=representation",
         }
         self.client = InjectClient(httpx.AsyncClient(timeout=30.0, headers=self.headers), base_url=self.url)
+        # Startup log — confirm which key is in use
+        _key_type = "service_role" if self.service_role_key else "anon"
+        _key_preview = _effective_key[:15] + "..."
+        logger.info(f"SupabaseHttpClient initialized with {_key_type} key ({_key_preview})")
 
     async def _get(self, endpoint: str):
         """GET with automatic retry on transient failures."""
