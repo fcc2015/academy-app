@@ -30,16 +30,20 @@ async def get_all_players(user: dict = Depends(require_role("admin", "coach", "s
 @router.post("/", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
 async def create_player(player: PlayerCreate):
     try:
-        # --- Duplicate Check: Player Name (via users table which has full_name column) ---
+        # --- Duplicate Check: Player Name (via users table with admin headers to bypass RLS) ---
         try:
-            existing = await supabase._get(
-                f"/rest/v1/users?full_name=eq.{quote(player.full_name)}&role=eq.player&select=id"
-            )
-            if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"A player with this name already exists. | واحد اللاعب بهاد الاسم ديجا كاين: {player.full_name}"
+            import httpx as _httpx
+            from core.config import settings as _s
+            async with _httpx.AsyncClient(timeout=10.0) as _c:
+                _dup_res = await _c.get(
+                    f"{_s.SUPABASE_URL}/rest/v1/users?full_name=eq.{quote(player.full_name)}&role=eq.player&select=id",
+                    headers=supabase.admin_headers
                 )
+                if _dup_res.status_code == 200 and _dup_res.json():
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"A player with this name already exists. | واحد اللاعب بهاد الاسم ديجا كاين: {player.full_name}"
+                    )
         except HTTPException:
             raise
         except Exception as dup_err:
