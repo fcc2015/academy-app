@@ -199,7 +199,21 @@ class SupabaseHttpClient:
         return data[0] if data else None
 
     async def insert_user(self, user_data):
-        return await self._post("/rest/v1/users", user_data)
+        """Insert into users table using admin headers to bypass RLS."""
+        # Auto-inject academy_id from context (since we bypass InjectClient)
+        from core.context import academy_id_ctx
+        academy_id = academy_id_ctx.get(None)
+        if academy_id and "academy_id" not in user_data:
+            user_data = {**user_data, "academy_id": academy_id}
+        url = f"{self.url}/rest/v1/users"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.post(
+                url,
+                json=user_data,
+                headers={**self.admin_headers, "Prefer": "return=representation"}
+            )
+            res.raise_for_status()
+            return res.json()
 
     async def update_user(self, user_id: str, user_data: dict):
         res = await self.client.patch(f"{self.url}/rest/v1/users?id=eq.{user_id}", json=user_data)
