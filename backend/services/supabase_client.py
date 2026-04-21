@@ -74,13 +74,16 @@ class SupabaseHttpClient:
         self.url = url
         self.key = key
         self.service_role_key = service_role_key
+        # Use service_role key for all backend operations — our own auth middleware
+        # handles authorization, so RLS at the DB level is bypassed intentionally.
+        _effective_key = self.service_role_key or self.key
         self.headers = {
-            "apikey": self.key,
-            "Authorization": f"Bearer {self.key}",
+            "apikey": _effective_key,
+            "Authorization": f"Bearer {_effective_key}",
             "Content-Type": "application/json",
             "Prefer": "return=representation",
         }
-        # Admin headers use service_role key for privileged operations
+        # Admin headers (kept for backward compatibility, same as headers now)
         self.admin_headers = {
             "apikey": self.service_role_key or self.key,
             "Authorization": f"Bearer {self.service_role_key or self.key}",
