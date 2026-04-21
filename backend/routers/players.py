@@ -30,15 +30,20 @@ async def get_all_players(user: dict = Depends(require_role("admin", "coach", "s
 @router.post("/", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
 async def create_player(player: PlayerCreate):
     try:
-        # --- Duplicate Check: Player Name ---
-        existing = await supabase._get(
-            f"/rest/v1/players?full_name=eq.{quote(player.full_name)}&select=user_id"
-        )
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"A player with this name already exists. | واحد اللاعب بهاد الاسم ديجا كاين: {player.full_name}"
+        # --- Duplicate Check: Player Name (via users table which has full_name column) ---
+        try:
+            existing = await supabase._get(
+                f"/rest/v1/users?full_name=eq.{quote(player.full_name)}&role=eq.player&select=id"
             )
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"A player with this name already exists. | واحد اللاعب بهاد الاسم ديجا كاين: {player.full_name}"
+                )
+        except HTTPException:
+            raise
+        except Exception as dup_err:
+            logger.warning("Duplicate check failed (non-critical): %s", dup_err)
 
         # 1. Insert into users table first (required by FK constraint players_user_id_fkey)
         user_data = {
@@ -53,7 +58,7 @@ async def create_player(player: PlayerCreate):
             if "duplicate" not in str(user_err).lower() and "23505" not in str(user_err):
                 raise user_err
 
-        # 2. Insert player record (exclude full_name - stored in users table)
+        # 2. Insert player record
         player_dict = player.model_dump(exclude={"full_name"}, mode='json')
         response = await supabase.insert_player(player_dict)
 
