@@ -18,6 +18,11 @@ SMTP_FROM = settings.SMTP_FROM
 ACADEMY_NAME = "Football Academy SaaS"
 
 
+def _frontend_url() -> str:
+    """Resolved at call time so tests can monkeypatch settings.FRONTEND_URL."""
+    return settings.FRONTEND_URL or "https://academy-app-mu.vercel.app"
+
+
 def _send_email(to: str, subject: str, html_body: str):
     """Send an email via SMTP. Silently fails if SMTP is not configured."""
     if not SMTP_USER or not SMTP_PASS:
@@ -45,6 +50,7 @@ def _send_email(to: str, subject: str, html_body: str):
 
 def send_welcome_email(to: str, name: str):
     """Send welcome email to new user."""
+    login_url = f"{_frontend_url()}/login"
     html = f"""
     <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
         <div style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 24px;">
@@ -53,7 +59,7 @@ def send_welcome_email(to: str, name: str):
         <p style="font-size: 16px; color: #374151;">Bonjour <strong>{name}</strong>,</p>
         <p style="color: #6b7280;">Votre compte {ACADEMY_NAME} a été créé avec succès. Vous pouvez maintenant accéder à votre espace.</p>
         <div style="text-align: center; margin: 32px 0;">
-            <a href="#" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 900; font-size: 14px;">Accéder à mon espace</a>
+            <a href="{login_url}" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 900; font-size: 14px;">Accéder à mon espace</a>
         </div>
         <p style="font-size: 12px; color: #9ca3af; text-align: center;">{ACADEMY_NAME}</p>
     </div>
@@ -120,3 +126,59 @@ def send_event_notification(to: str, event_title: str, event_date: str, event_ti
     </div>
     """
     return _send_email(to, f"Événement: {event_title}", html)
+
+
+def send_payment_receipt(
+    to: str,
+    payer_name: str,
+    amount: float,
+    currency: str,
+    plan_name: str,
+    order_id: str,
+    paid_at: str,
+):
+    """Send a payment receipt after a successful PayPal capture."""
+    dashboard_url = f"{_frontend_url()}/saas/subscriptions"
+    html = f"""
+    <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+        <div style="background: linear-gradient(135deg, #059669, #10b981); border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 24px;">
+            <h1 style="color: white; font-size: 24px; margin: 0;">✅ Paiement reçu</h1>
+        </div>
+        <p style="font-size: 16px; color: #374151;">Bonjour <strong>{payer_name}</strong>,</p>
+        <p style="color: #6b7280;">Nous avons bien reçu votre paiement. Voici le récapitulatif:</p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 20px 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Plan</td><td style="padding: 8px 0; text-align: right; font-weight: 700; color: #0f172a;">{plan_name}</td></tr>
+                <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Montant</td><td style="padding: 8px 0; text-align: right; font-weight: 900; color: #059669; font-size: 20px;">{amount:.2f} {currency}</td></tr>
+                <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Référence</td><td style="padding: 8px 0; text-align: right; font-family: monospace; font-size: 12px; color: #475569;">{order_id}</td></tr>
+                <tr><td style="padding: 8px 0; color: #64748b; font-size: 14px;">Date</td><td style="padding: 8px 0; text-align: right; color: #475569; font-size: 14px;">{paid_at}</td></tr>
+            </table>
+        </div>
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="{dashboard_url}" style="background: linear-gradient(135deg, #059669, #10b981); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 900; font-size: 14px;">Voir mon abonnement</a>
+        </div>
+        <p style="font-size: 12px; color: #9ca3af; text-align: center;">{ACADEMY_NAME} — Conservez cet email comme preuve de paiement.</p>
+    </div>
+    """
+    return _send_email(to, f"Reçu de paiement — {plan_name} ({amount:.2f} {currency})", html)
+
+
+def send_overdue_notification(to: str, player_name: str, amount: float, days_overdue: int, due_date: str):
+    """Send an overdue payment notification (intended to be triggered by a scheduler)."""
+    html = f"""
+    <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+        <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 24px;">
+            <h1 style="color: white; font-size: 24px; margin: 0;">⚠️ Paiement en retard</h1>
+        </div>
+        <p style="font-size: 16px; color: #374151;">Bonjour,</p>
+        <p style="color: #6b7280;">Le paiement pour <strong>{player_name}</strong> est en retard de <strong>{days_overdue} jour(s)</strong>.</p>
+        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; margin: 20px 0;">
+            <p style="margin: 0 0 8px; font-size: 14px; color: #991b1b;">Montant dû</p>
+            <p style="margin: 0; font-size: 28px; font-weight: 900; color: #7f1d1d;">{amount:.2f} MAD</p>
+            <p style="margin: 12px 0 0; font-size: 13px; color: #b91c1c;">Échéance dépassée: {due_date}</p>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">Merci de régulariser la situation au plus vite pour éviter toute interruption de service.</p>
+        <p style="font-size: 12px; color: #9ca3af; text-align: center;">{ACADEMY_NAME}</p>
+    </div>
+    """
+    return _send_email(to, f"⚠️ Retard de paiement — {player_name}", html)

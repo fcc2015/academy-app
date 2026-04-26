@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from core.config import settings
 from services.supabase_client import supabase
+from services.email_service import send_payment_receipt
 import httpx
 import base64
 import uuid
@@ -212,7 +213,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
         except Exception as e:
             logger.warning(f"Failed to update transaction: {e}")
 
-        # If successful, update academy subscription status
+        # If successful, update academy subscription status + send receipt email
         if capture_status == "COMPLETED":
             try:
                 update_data = {
@@ -231,6 +232,42 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                     )
             except Exception as e:
                 logger.warning(f"Failed to update academy subscription: {e}")
+
+            # Receipt email — non-blocking: capture must succeed even if email fails
+            try:
+                payer_email = ""
+                payer_name = ""
+                amount_value = 0.0
+                currency = "USD"
+                try:
+                    payer = capture_data.get("payer", {})
+                    payer_email = payer.get("email_address", "") or ""
+                    payer_name_obj = payer.get("name", {}) or {}
+                    payer_name = (
+                        f"{payer_name_obj.get('given_name', '')} {payer_name_obj.get('surname', '')}"
+                    ).strip() or payer_email.split("@")[0]
+                    units = capture_data.get("purchase_units") or []
+                    if units:
+                        captures = (units[0].get("payments") or {}).get("captures") or []
+                        if captures:
+                            amt = captures[0].get("amount") or {}
+                            amount_value = float(amt.get("value") or 0)
+                            currency = amt.get("currency_code") or currency
+                except Exception as parse_err:
+                    logger.warning(f"Failed to parse capture payload for receipt: {parse_err}")
+
+                if payer_email:
+                    send_payment_receipt(
+                        to=payer_email,
+                        payer_name=payer_name or "Customer",
+                        amount=amount_value,
+                        currency=currency,
+                        plan_name=req.plan_id or "Subscription",
+                        order_id=req.order_id,
+                        paid_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+                    )
+            except Exception as mail_err:
+                logger.warning(f"Receipt email failed for order {req.order_id}: {mail_err}")
 
         return {
             "success": capture_status == "COMPLETED",
