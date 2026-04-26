@@ -7,6 +7,7 @@ from core.auth_middleware import require_role
 
 logger = logging.getLogger("saas_admin")
 from services.supabase_client import supabase
+from services.email_service import send_renewal_reminder
 from urllib.parse import quote
 
 router = APIRouter(
@@ -941,11 +942,12 @@ async def trigger_renewal_reminders(req: RenewalReminderRequest):
             })
 
     sent = []
+    emails_sent = 0
     async with httpx.AsyncClient(timeout=30.0) as client:
-        # Fetch admin user_ids in parallel
+        # Fetch admin user_id + email in parallel (email needed for the reminder)
         admin_responses = await asyncio.gather(*[
             client.get(
-                f"{supabase.url}/rest/v1/admins?academy_id=eq.{acc['id']}&select=user_id&limit=1",
+                f"{supabase.url}/rest/v1/admins?academy_id=eq.{acc['id']}&select=user_id,email&limit=1",
                 headers=supabase.admin_headers
             )
             for acc in due_soon
@@ -966,8 +968,11 @@ async def trigger_renewal_reminders(req: RenewalReminderRequest):
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
             ar = admin_responses[i]
+            admin_email = None
             if not isinstance(ar, Exception) and ar.status_code == 200 and ar.json():
-                notif_data["user_id"] = ar.json()[0]["user_id"]
+                admin_row = ar.json()[0]
+                notif_data["user_id"] = admin_row["user_id"]
+                admin_email = admin_row.get("email")
 
             try:
                 await client.post(
@@ -979,11 +984,27 @@ async def trigger_renewal_reminders(req: RenewalReminderRequest):
             except Exception as e:
                 logger.warning("Failed to send renewal reminder for %s: %s", acc["name"], e)
 
+            # Email reminder — non-blocking: in-app notification already counts as sent
+            if admin_email:
+                try:
+                    send_renewal_reminder(
+                        to=admin_email,
+                        academy_name=acc["name"],
+                        plan_name=acc["plan_id"],
+                        renewal_date=acc["renewal_date"],
+                        days_until=acc["days_until"],
+                        amount=float(price),
+                    )
+                    emails_sent += 1
+                except Exception as e:
+                    logger.warning("Renewal email failed for %s: %s", acc["name"], e)
+
     return {
         "success": True,
         "checked": len(academies),
         "due_soon": len(due_soon),
         "reminders_sent": len(sent),
+        "emails_sent": emails_sent,
         "days_ahead": req.days_ahead,
         "academies": sent,
     }

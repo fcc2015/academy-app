@@ -163,6 +163,33 @@ def send_payment_receipt(
     return _send_email(to, f"Reçu de paiement — {plan_name} ({amount:.2f} {currency})", html)
 
 
+def send_renewal_reminder(to: str, academy_name: str, plan_name: str, renewal_date: str, days_until: int, amount: float, currency: str = "MAD"):
+    """Send a renewal reminder email to an academy admin (triggered by scheduled cron)."""
+    when_text = "aujourd'hui" if days_until == 0 else f"dans {days_until} jour(s)"
+    dashboard_url = f"{_frontend_url()}/admin/subscription"
+    html = f"""
+    <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+        <div style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 24px;">
+            <h1 style="color: white; font-size: 24px; margin: 0;">⏰ Rappel de renouvellement</h1>
+        </div>
+        <p style="font-size: 16px; color: #374151;">Bonjour,</p>
+        <p style="color: #6b7280;">L'abonnement <strong>{plan_name.capitalize()}</strong> de <strong>{academy_name}</strong> sera renouvelé <strong>{when_text}</strong>.</p>
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 20px; margin: 20px 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="padding: 6px 0; color: #1e40af; font-size: 14px;">Date de renouvellement</td><td style="padding: 6px 0; text-align: right; font-weight: 700; color: #1e3a8a;">{renewal_date}</td></tr>
+                <tr><td style="padding: 6px 0; color: #1e40af; font-size: 14px;">Montant</td><td style="padding: 6px 0; text-align: right; font-weight: 900; color: #1e3a8a; font-size: 20px;">{amount:.0f} {currency}</td></tr>
+            </table>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">Assurez-vous que votre méthode de paiement est à jour pour éviter toute interruption de service.</p>
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="{dashboard_url}" style="background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 900; font-size: 14px;">Gérer mon abonnement</a>
+        </div>
+        <p style="font-size: 12px; color: #9ca3af; text-align: center;">{ACADEMY_NAME}</p>
+    </div>
+    """
+    return _send_email(to, f"Rappel: Renouvellement {plan_name.capitalize()} — {academy_name}", html)
+
+
 def send_overdue_notification(to: str, player_name: str, amount: float, days_overdue: int, due_date: str):
     """Send an overdue payment notification (intended to be triggered by a scheduler)."""
     html = f"""
