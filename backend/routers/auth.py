@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr
 from fastapi import APIRouter, HTTPException, status, Depends, Request, Response
 from schemas.auth import UserLogin, UserCreate, LoginResponse
 from services.supabase_client import supabase
-from services.email_service import send_otp_email
+from services.email_service import send_otp_email, send_welcome_email
 from services.totp_service import generate_totp_secret, get_totp_uri, verify_totp_code, generate_qr_base64
 from core.auth_middleware import verify_token
 from core.config import settings
@@ -470,6 +470,12 @@ async def register(user: UserCreate):
             user.password,
             data={"role": user.role, "full_name": user.full_name}
         )
+
+        # Welcome email — non-blocking: registration must succeed even if SMTP fails
+        try:
+            send_welcome_email(user.email, user.full_name or user.email.split("@")[0])
+        except Exception as mail_err:
+            logger.warning(f"Welcome email failed for {user.email}: {mail_err}")
 
         return {"message": "User created successfully. Please verify email.", "user_id": response["user"]["id"]}
     except Exception as e:
