@@ -32,6 +32,18 @@ backend/.env
 backend/venv/
 backend/__pycache__/
 
+# Test artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+junit.xml
+htmlcov/
+backend/.pytest_cache/
+backend/.coverage
+backend/coverage.xml
+backend/junit.xml
+backend/htmlcov/
+
 # Local Netlify folder
 .netlify
 
