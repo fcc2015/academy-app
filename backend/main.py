@@ -158,12 +158,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 del _rate_store[k]
             _last_cleanup = now
 
-        # Determine rate limit tier
-        if path.startswith("/auth/login"):
+        # Determine rate limit tier — match both root and /api/v1 prefixes
+        # so the same rule applies whether the route is mounted at /auth/* or /api/v1/auth/*.
+        def _matches(suffixes: tuple) -> bool:
+            return any(
+                path.startswith(s) or path.startswith(f"/api/v1{s}")
+                for s in suffixes
+            )
+
+        if _matches(("/auth/login",)):
             key = f"auth:{client_ip}"
             limit = _AUTH_RATE_LIMIT
             window = _AUTH_RATE_WINDOW
-        elif path.startswith(("/auth/register", "/auth/reset", "/public/register")):
+        elif _matches(("/auth/register", "/auth/reset", "/public/register")):
             key = f"sensitive:{client_ip}"
             limit = _SENSITIVE_RATE_LIMIT
             window = _SENSITIVE_RATE_WINDOW
