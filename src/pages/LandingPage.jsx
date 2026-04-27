@@ -2,8 +2,8 @@ import { API_URL } from '../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    ChevronRight, Star, Users, Phone, MapPin, Instagram,
-    X, Shield, Trophy, Target, Heart, Facebook, Mail,
+    ChevronRight, Star, Users, Phone, MapPin, Camera,
+    X, Shield, Trophy, Target, Heart, AtSign, Mail,
     Sparkles, ArrowRight, Check, Zap, Globe, Loader2
 } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -517,7 +517,7 @@ const LandingPage = () => {
                                 );
                             })}
                             <div className={`flex gap-3 pt-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                                {[Instagram, Facebook].map((Icon, i) => (
+                                {[Camera, AtSign].map((Icon, i) => (
                                     <button key={i} className="w-11 h-11 rounded-xl flex items-center justify-center text-white transition-all hover:scale-110"
                                         style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
                                         <Icon size={18} />
