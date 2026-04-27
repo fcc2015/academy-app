@@ -48,6 +48,9 @@ export default defineConfig([
       'react-hooks/purity': 'warn',
       'react-hooks/immutability': 'warn',
       'react-hooks/preserve-manual-memoization': 'warn',
+      // New rules in eslint-plugin-react-hooks v6+ — also demoted for legacy code
+      'react-hooks/static-components': 'warn',
+      'react-hooks/use-memo': 'warn',
       // Critical correctness rule — kept as 'error'.
       'react-hooks/rules-of-hooks': 'error',
     },
