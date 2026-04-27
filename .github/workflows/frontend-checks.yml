@@ -47,6 +47,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Test
+        run: npm run test:run
+
       - name: Build
         env:
           # Provide placeholder values so vite.config.js doesn't crash on missing env

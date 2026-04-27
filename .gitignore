@@ -38,6 +38,7 @@ backend/__pycache__/
 coverage.xml
 junit.xml
 htmlcov/
+coverage/
 backend/.pytest_cache/
 backend/.coverage
 backend/coverage.xml
