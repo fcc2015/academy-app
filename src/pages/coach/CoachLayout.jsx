@@ -35,6 +35,17 @@ const CoachLayout = () => {
 
     const [isValid] = useState(checkCoachAuth);
 
+    const handleLogout = useCallback(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('token_expires');
+        navigate('/login');
+    }, [navigate]);
+
+    // 🔒 Session Security — تسجيل خروج بعد 10 دقائق بدون نشاط
+    const { showWarning, remainingSeconds, extendSession } = useIdleTimer(handleLogout);
+
     if (!isValid) {
         localStorage.removeItem('token');
         localStorage.removeItem('role');
@@ -51,17 +62,6 @@ const CoachLayout = () => {
         { path: '/coach/matches', name: t('sidebar.matches') || (isRTL ? 'المباريات' : 'Matches'), icon: Trophy },
         { path: '/coach/chat', name: t('sidebar.chat') || 'Chat', icon: MessageCircle },
     ];
-
-    const handleLogout = useCallback(() => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
-        localStorage.removeItem('user_id');
-        localStorage.removeItem('token_expires');
-        navigate('/login');
-    }, [navigate]);
-
-    // 🔒 Session Security — تسجيل خروج بعد 10 دقائق بدون نشاط
-    const { showWarning, remainingSeconds, extendSession } = useIdleTimer(handleLogout);
 
     return (
         <div className="min-h-screen bg-slate-50 relative flex overflow-hidden">
