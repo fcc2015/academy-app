@@ -68,6 +68,12 @@ export default function SaasAcademies() {
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
 
+    // Plan change modal
+    const [planTarget, setPlanTarget] = useState(null);
+    const [planValue, setPlanValue] = useState('free');
+    const [planSaving, setPlanSaving] = useState(false);
+    const [planError, setPlanError] = useState('');
+
     // Filter
     const [cityFilter, setCityFilter] = useState('All');
     const [search, setSearch] = useState('');
@@ -142,6 +148,40 @@ export default function SaasAcademies() {
             setCreateError('Network error.');
         } finally {
             setCreating(false);
+        }
+    };
+
+    // ── Plan change ──
+    const openPlanChange = (acc) => {
+        setPlanTarget(acc);
+        setPlanValue(acc.plan_id || 'free');
+        setPlanError('');
+    };
+
+    const handlePlanChange = async (e) => {
+        e.preventDefault();
+        if (!planTarget) return;
+        setPlanError('');
+        setPlanSaving(true);
+        try {
+            const res = await authFetch(
+                `${API_URL}/saas/academies/${planTarget.id}/plan`,
+                {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plan_id: planValue }),
+                }
+            );
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.detail || 'Failed to change plan');
+            }
+            setPlanTarget(null);
+            fetchAcademies();
+        } catch (err) {
+            setPlanError(err.message || 'Network error.');
+        } finally {
+            setPlanSaving(false);
         }
     };
 
@@ -479,13 +519,18 @@ export default function SaasAcademies() {
                                                 )}
                                             </td>
                                             <td>
-                                                <span className={`text-xs font-bold uppercase px-2 py-1 rounded-lg ${
-                                                    acc.plan_id === 'pro' ? 'bg-blue-50 text-blue-700' :
-                                                    acc.plan_id === 'enterprise' ? 'bg-violet-50 text-violet-700' :
-                                                    'bg-surface-100 text-surface-500'
-                                                }`}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openPlanChange(acc)}
+                                                    title="Click to change plan"
+                                                    className={`text-xs font-bold uppercase px-2 py-1 rounded-lg cursor-pointer hover:ring-2 hover:ring-offset-1 transition-all ${
+                                                        acc.plan_id === 'pro' ? 'bg-blue-50 text-blue-700 hover:ring-blue-300' :
+                                                        acc.plan_id === 'enterprise' ? 'bg-violet-50 text-violet-700 hover:ring-violet-300' :
+                                                        'bg-surface-100 text-surface-500 hover:ring-surface-300'
+                                                    }`}
+                                                >
                                                     {acc.plan_id || 'free'}
-                                                </span>
+                                                </button>
                                             </td>
                                             <td>
                                                 <div className="flex items-center gap-2 text-[11px] text-surface-500 font-medium">
@@ -773,6 +818,46 @@ export default function SaasAcademies() {
                                 <button type="button" onClick={() => setShowCreate(false)} className="btn btn-secondary">Cancel</button>
                                 <button type="submit" disabled={creating} className="btn btn-brand w-[140px] justify-center">
                                     {creating ? <Loader2 size={16} className="animate-spin" /> : 'Provision'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Plan Change Modal ── */}
+            {planTarget && (
+                <div className="modal-backdrop">
+                    <div className="modal-content max-w-md">
+                        <form onSubmit={handlePlanChange} className="p-6 space-y-5">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-surface-900">Change Plan</h3>
+                                    <p className="text-xs text-surface-500 mt-1">{planTarget.name}</p>
+                                </div>
+                                <button type="button" onClick={() => setPlanTarget(null)} className="p-1.5 rounded-lg hover:bg-surface-100 text-surface-500">
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Plan</label>
+                                <select className="input" value={planValue} onChange={e => setPlanValue(e.target.value)}>
+                                    <option value="free">Free — 15 players, 1 admin, 1 coach</option>
+                                    <option value="pro">Pro — 100 players, 4 admins, 10 coaches</option>
+                                    <option value="enterprise">Enterprise — Unlimited + Branches</option>
+                                </select>
+                                <p className="text-[11px] text-surface-400 mt-2">
+                                    Current: <span className="font-bold uppercase">{planTarget.plan_id || 'free'}</span>
+                                </p>
+                            </div>
+                            {planError && (
+                                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">{planError}</div>
+                            )}
+                            <div className="flex gap-3 justify-end pt-2">
+                                <button type="button" onClick={() => setPlanTarget(null)} className="btn btn-secondary">Cancel</button>
+                                <button type="submit" disabled={planSaving || planValue === (planTarget.plan_id || 'free')}
+                                    className="btn btn-brand w-[120px] justify-center">
+                                    {planSaving ? <Loader2 size={16} className="animate-spin" /> : 'Apply'}
                                 </button>
                             </div>
                         </form>
