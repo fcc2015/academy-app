@@ -66,7 +66,7 @@ jobs:
 
       - name: Upload coverage report
         if: always() && matrix.python-version == '3.13'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: backend/coverage.xml
@@ -74,7 +74,7 @@ jobs:
 
       - name: Upload junit report
         if: always() && matrix.python-version == '3.13'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: junit-report
           path: backend/junit.xml
