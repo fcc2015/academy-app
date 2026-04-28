@@ -736,10 +736,11 @@ async def upload_chat_image(
     file_content = await file.read()
     filename = f"chat/{uuid.uuid4()}{file.filename[file.filename.rfind('.'):]}"
 
-    # Upload to Supabase Storage
+    # Upload to Supabase Storage — use service_role to bypass storage RLS
+    _storage_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
     upload_headers = {
-        "apikey": settings.SUPABASE_KEY,
-        "Authorization": f"Bearer {settings.SUPABASE_KEY}",
+        "apikey": _storage_key,
+        "Authorization": f"Bearer {_storage_key}",
         "Content-Type": file.content_type
     }
     async with httpx.AsyncClient() as client:

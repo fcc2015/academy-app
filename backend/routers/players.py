@@ -177,9 +177,10 @@ async def upload_player_photo(file: UploadFile = File(...)):
     from core.config import settings
 
     filename = f"players/{uuid.uuid4()}.jpg"
+    _storage_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
     upload_headers = {
-        "apikey": settings.SUPABASE_KEY,
-        "Authorization": f"Bearer {settings.SUPABASE_KEY}",
+        "apikey": _storage_key,
+        "Authorization": f"Bearer {_storage_key}",
         "Content-Type": "image/jpeg",
     }
     try:
