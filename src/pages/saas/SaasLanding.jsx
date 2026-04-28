@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useToast } from '../../components/Toast';
 import { API_URL } from '../../config';
 import {
-    Check, ChevronRight, Star, Users, Phone, Mail, MapPin, Instagram, Facebook,
+    Check, ChevronRight, Star, Users, Phone, Mail, MapPin, Camera, AtSign,
     Shield, Trophy, BarChart3, Zap, Globe, Crown, Clock, X, Menu,
     ArrowRight, CheckCircle2, Loader2, MessageSquare, FileText, RotateCcw,
     Lock, Headphones, TrendingUp, Layout, Database, Smartphone
@@ -989,7 +989,7 @@ export default function SaasLanding() {
                             })}
 
                             <div className="flex gap-3 pt-4">
-                                {[Instagram, Facebook].map((Icon, i) => (
+                                {[Camera, AtSign].map((Icon, i) => (
                                     <button key={i} className="w-11 h-11 rounded-xl flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95"
                                         style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
                                         <Icon size={18} />
