@@ -794,9 +794,10 @@ class SupabaseHttpClient:
     # =========================================================
     async def upload_file(self, bucket: str, path: str, content: bytes, content_type: str):
         """Upload a file to Supabase Storage and return the public URL."""
+        _key = self.service_role_key or self.key
         headers = {
-            "apikey": self.key,
-            "Authorization": f"Bearer {self.key}",
+            "apikey": _key,
+            "Authorization": f"Bearer {_key}",
             "Content-Type": content_type,
             "x-upsert": "true",
         }
@@ -815,9 +816,10 @@ class SupabaseHttpClient:
 
     async def delete_file(self, bucket: str, path: str):
         """Delete a file from Supabase Storage."""
+        _key = self.service_role_key or self.key
         headers = {
-            "apikey": self.key,
-            "Authorization": f"Bearer {self.key}",
+            "apikey": _key,
+            "Authorization": f"Bearer {_key}",
             "Content-Type": "application/json",
         }
         async with httpx.AsyncClient(timeout=30.0) as client:
