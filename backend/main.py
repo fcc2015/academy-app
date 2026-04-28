@@ -262,11 +262,16 @@ def read_root():
 async def health_check():
     """Health check with DB connectivity test."""
     import httpx
+    # Use service_role key if available (bypasses RLS), otherwise fall back to anon
+    api_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/",
-                headers={"apikey": settings.SUPABASE_KEY},
+                headers={
+                    "apikey": api_key,
+                    "Authorization": f"Bearer {api_key}",
+                },
             )
             db_ok = res.status_code == 200
     except Exception:
