@@ -1,11 +1,12 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Edit2, Trash2, Search, X, CheckCircle2, ShieldAlert, Copy, Check, UserCog, Calculator, Briefcase, ChevronDown } from 'lucide-react';
+import { Shield, Plus, Edit2, Trash2, Search, X, CheckCircle2, ShieldAlert, Copy, Check, UserCog, Calculator, Briefcase, ChevronDown, Building2 } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
 const ADMIN_TYPES = [
     { value: 'admin',      label: 'مدير كامل الصلاحيات', labelFr: 'Administrateur', icon: Shield,    color: '#6366f1', bg: '#eef2ff' },
+    { value: 'sous_admin', label: 'مسؤول مساعد (فرع)',    labelFr: 'Sous-Admin',     icon: Building2, color: '#8b5cf6', bg: '#ede9fe' },
     { value: 'employee',   label: 'موظف',                  labelFr: 'Employé',        icon: Briefcase, color: '#0ea5e9', bg: '#e0f2fe' },
     { value: 'accountant', label: 'محاسب',                 labelFr: 'Comptable',      icon: Calculator, color: '#10b981', bg: '#d1fae5' },
 ];
@@ -80,6 +81,7 @@ const AdminsManagement = () => {
     const handleAdminTypeChange = (type) => {
         const permMap = {
             admin:      { can_manage_users: true, can_manage_financials: true, can_manage_coaches: true },
+            sous_admin: { can_manage_users: true, can_manage_financials: false, can_manage_coaches: true },
             employee:   { can_manage_users: true, can_manage_financials: false, can_manage_coaches: false },
             accountant: { can_manage_users: false, can_manage_financials: true, can_manage_coaches: false },
         };

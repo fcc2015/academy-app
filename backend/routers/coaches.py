@@ -1,6 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from core.auth_middleware import verify_token, require_role
+from core.context import user_id_ctx, role_ctx
 from typing import List
 from schemas.coaches import CoachCreate, CoachResponse
 from services.supabase_client import supabase
@@ -17,6 +18,14 @@ router = APIRouter(prefix="/coaches", tags=["Coaches"], dependencies=[Depends(ve
 async def get_all_coaches():
     try:
         response = await supabase.get_coaches()
+        # sous_admin: filter to only coaches in their assigned branches
+        if role_ctx.get(None) == "sous_admin":
+            uid = user_id_ctx.get(None)
+            assigned = await supabase._get(
+                f"/rest/v1/sous_admin_branches?user_id=eq.{uid}&select=branch_id"
+            )
+            allowed_branches = {r["branch_id"] for r in (assigned or [])}
+            response = [c for c in (response or []) if c.get("branch_id") in allowed_branches]
         return response
     except Exception as e:
         logger.error("Error fetching coaches: %s", e, exc_info=True)

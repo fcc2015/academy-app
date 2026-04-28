@@ -30,6 +30,7 @@ class PlayerCreate(BaseModel):
     transport_zone: Optional[str] = Field(None, max_length=100)
     allergies: Optional[str] = Field(None, max_length=500)
     emergency_contact: Optional[str] = Field(None, max_length=200)
+    branch_id: Optional[str] = None
 
     @field_validator("full_name", "parent_name", "address", "allergies", "emergency_contact")
     @classmethod

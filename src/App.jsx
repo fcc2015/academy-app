@@ -56,6 +56,7 @@ const InventoryManagement = lazy(() => import('./pages/admin/InventoryManagement
 const ExpensesManagement = lazy(() => import('./pages/admin/ExpensesManagement'));
 const AdminTactics = lazy(() => import('./pages/admin/AdminTactics'));
 const AdminPendingParents = lazy(() => import('./pages/admin/AdminPendingParents'));
+const BranchesManagement = lazy(() => import('./pages/admin/BranchesManagement'));
 
 // Coach
 const CoachLayout = lazy(() => import('./pages/coach/CoachLayout'));
@@ -141,6 +142,7 @@ function App() {
             <Route path="inventory" element={<InventoryManagement />} />
             <Route path="expenses" element={<ExpensesManagement />} />
             <Route path="admins" element={<AdminsManagement />} />
+            <Route path="branches" element={<BranchesManagement />} />
             <Route path="chat" element={<ChatManagement />} />
             <Route path="tactics" element={<AdminTactics />} />
             <Route path="pending-parents" element={<AdminPendingParents />} />

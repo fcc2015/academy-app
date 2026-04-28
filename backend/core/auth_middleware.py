@@ -73,16 +73,17 @@ async def verify_token(request: Request):
                 academy_id = db_row.get("academy_id")
                 db_role = db_row.get("role")
 
-                if db_role in ("super_admin", "admin", "coach", "parent", "player"):
+                if db_role in ("super_admin", "admin", "coach", "parent", "player", "sous_admin"):
                     role = db_role
                 else:
-                    # Fallback: check admins table
+                    # Fallback: check admins table — sous_admin admin_type maps to sous_admin role
                     a_res = await client.get(
-                        f"{settings.SUPABASE_URL}/rest/v1/admins?user_id=eq.{user_id}&select=user_id",
+                        f"{settings.SUPABASE_URL}/rest/v1/admins?user_id=eq.{user_id}&select=user_id,admin_type",
                         headers=supabase.admin_headers
                     )
                     if a_res.status_code == 200 and a_res.json():
-                        role = "admin"
+                        admin_row = a_res.json()[0]
+                        role = "sous_admin" if admin_row.get("admin_type") == "sous_admin" else "admin"
 
             # Impersonation — super_admin acting as an academy admin.
             # The header is set by the frontend after the super admin clicks "Login As".

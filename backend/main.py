@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from core.config import settings
 from core.context import request_id_ctx
-from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin, payments_gateway, tournaments, tryouts, qr_auth
+from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin, payments_gateway, tournaments, tryouts, qr_auth, branches
 
 # ─── Structured Logging with Request ID ─────────────────────
 class RequestIdFilter(logging.Filter):
@@ -234,6 +234,7 @@ v1.include_router(payments_gateway.router)
 v1.include_router(tournaments.router)
 v1.include_router(tryouts.router)
 v1.include_router(qr_auth.router)
+v1.include_router(branches.router)
 
 app.include_router(v1)
 

@@ -12,9 +12,19 @@ from urllib.parse import quote
 router = APIRouter(prefix="/players", tags=["Players Engine"], dependencies=[Depends(verify_token)])
 
 @router.get("/", response_model=List[PlayerResponse])
-async def get_all_players(user: dict = Depends(require_role("admin", "coach", "super_admin"))):
+async def get_all_players(user: dict = Depends(require_role("admin", "coach", "super_admin", "sous_admin"))):
     try:
         raw_players = await supabase.get_players()
+
+        # sous_admin: filter to only players in their assigned branches
+        if role_ctx.get(None) == "sous_admin":
+            uid = user_id_ctx.get(None)
+            assigned = await supabase._get(
+                f"/rest/v1/sous_admin_branches?user_id=eq.{uid}&select=branch_id"
+            )
+            allowed_branches = {r["branch_id"] for r in (assigned or [])}
+            raw_players = [p for p in raw_players if p.get("branch_id") in allowed_branches]
+
         # Players table now stores full_name directly – no join needed
         for p in raw_players:
             if not p.get('full_name'):

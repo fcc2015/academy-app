@@ -46,11 +46,12 @@ async def create_admin(admin: AdminCreate):
         # 1. Generate temp password
         temp_password = generate_temp_password()
         
-        # 2. Create Auth User
+        # 2. Create Auth User — role mirrors admin_type so sous_admin metadata is consistent
+        signup_role = "sous_admin" if admin_dict.get("admin_type") == "sous_admin" else "admin"
         auth_response = await supabase.sign_up(
             email=email,
             password=temp_password,
-            data={"role": "admin", "full_name": full_name}
+            data={"role": signup_role, "full_name": full_name}
         )
         
         user_id = auth_response.get("user", {}).get("id")
