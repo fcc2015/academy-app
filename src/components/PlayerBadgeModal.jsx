@@ -4,10 +4,16 @@ import { Download, X, User } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useLanguage } from '../i18n/LanguageContext';
 
-const PlayerBadgeModal = ({ player, isOpen, onClose }) => {
+const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, branchName }) => {
     const { isRTL } = useLanguage();
 
     if (!isOpen || !player) return null;
+
+    // Resolve academy display name
+    const displayName = academyName || 'ACADEMY';
+    const displayNameUpper = displayName.toUpperCase();
+    // First letter fallback for logo
+    const logoInitial = displayName.charAt(0).toUpperCase();
 
     const qrData = JSON.stringify({
         id: player.user_id,
@@ -111,13 +117,26 @@ const PlayerBadgeModal = ({ player, isOpen, onClose }) => {
                             )}
                         </div>
 
-                        {/* Logo Area */}
-                        <div className="mb-2 mt-auto z-10 flex items-center justify-center gap-2">
-                             <div className={`w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg ${isPro ? 'ring-2 ring-yellow-400 shadow-yellow-500/50' : ''}`}>
-                                {/* Placeholder for Logo */}
-                                <span className={`font-black text-sm ${isPro ? 'text-amber-600' : 'text-indigo-600'}`}>A</span>
-                             </div>
-                             <h2 className="text-xl font-black text-white uppercase tracking-[0.2em] drop-shadow-md">ATHLETIC</h2>
+                        {/* Logo + Academy Name Area */}
+                        <div className="mb-2 mt-auto z-10 flex flex-col items-center justify-center gap-1">
+                            <div className="flex items-center justify-center gap-2">
+                                <div className={`w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-lg overflow-hidden ${isPro ? 'ring-2 ring-yellow-400 shadow-yellow-500/50' : ''}`}>
+                                    {academyLogo ? (
+                                        <img src={academyLogo} alt="logo" className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                    ) : (
+                                        <span className={`font-black text-sm ${isPro ? 'text-amber-600' : 'text-indigo-600'}`}>{logoInitial}</span>
+                                    )}
+                                </div>
+                                <h2 className="text-lg font-black text-white uppercase tracking-[0.15em] drop-shadow-md leading-tight" style={{ maxWidth: 220, textAlign: 'center' }}>
+                                    {displayNameUpper}
+                                </h2>
+                            </div>
+                            {/* Branch name if exists */}
+                            {branchName && (
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-white/70 bg-white/10 px-3 py-0.5 rounded-full border border-white/15 mt-0.5">
+                                    {branchName}
+                                </span>
+                            )}
                         </div>
                     </div>
 
@@ -216,4 +235,3 @@ const PlayerBadgeModal = ({ player, isOpen, onClose }) => {
 };
 
 export default PlayerBadgeModal;
-

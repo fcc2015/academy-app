@@ -35,6 +35,7 @@ const ParentDashboard = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSendingTest, setIsSendingTest] = useState(false);
     const [isBadgeModalOpen, setIsBadgeModalOpen] = useState(false);
+    const [academySettings, setAcademySettings] = useState(null);
     const userId = localStorage.getItem('user_id');
 
     const fetchData = async () => {
@@ -160,6 +161,12 @@ const ParentDashboard = () => {
                 sessionStorage.setItem(`parent_dash_data_${userId}`, JSON.stringify(dashData));
                 sessionStorage.setItem(`parent_dash_last_fetch_${userId}`, now.toString());
             }
+
+            // Fetch academy settings (non-critical)
+            try {
+                const settingsRes = await authFetch(`${API_URL}/settings/`);
+                if (settingsRes?.ok) setAcademySettings(await settingsRes.json());
+            } catch { /* ignore */ }
         } catch (error) {
             console.error('Performance Error:', error);
         } finally {
@@ -483,6 +490,8 @@ const ParentDashboard = () => {
                     isOpen={isBadgeModalOpen}
                     onClose={() => setIsBadgeModalOpen(false)}
                     player={childData}
+                    academyName={academySettings?.academy_name}
+                    academyLogo={academySettings?.logo_url}
                 />
             )}
         </div>
