@@ -5,7 +5,7 @@ import { authFetch } from '../../api';
 import {
     Loader2, Plus, Ban, CheckCircle2, X, Pencil, Save,
     MapPin, SlidersHorizontal, Building2, ChevronRight, Users, Search,
-    Trash2, Download, Check, LogIn
+    Trash2, Download, Check, LogIn, KeyRound
 } from 'lucide-react';
 
 // Moroccan cities for rollout pipeline
@@ -87,6 +87,13 @@ export default function SaasAcademies() {
     // Delete
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
+
+    // Reset password
+    const [resetTarget, setResetTarget] = useState(null);
+    const [newPassword, setNewPassword] = useState('');
+    const [resetting, setResetting] = useState(false);
+    const [resetError, setResetError] = useState('');
+    const [resetSuccess, setResetSuccess] = useState('');
 
     const fetchAcademies = async () => {
         try {
@@ -315,6 +322,31 @@ export default function SaasAcademies() {
         link.download = `academies_${new Date().toISOString().slice(0, 10)}.csv`;
         link.click();
         URL.revokeObjectURL(url);
+    };
+
+    // ── Reset Password ──
+    const handleResetPassword = async (e) => {
+        e.preventDefault();
+        if (!resetTarget) return;
+        setResetError(''); setResetSuccess(''); setResetting(true);
+        try {
+            const res = await authFetch(`${API_URL}/saas/academies/${resetTarget.id}/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_password: newPassword }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setResetSuccess(data.message || 'تم تحديث كلمة المرور بنجاح');
+                setNewPassword('');
+            } else {
+                setResetError(data.detail || 'فشل تحديث كلمة المرور');
+            }
+        } catch {
+            setResetError('خطأ في الاتصال بالخادم');
+        } finally {
+            setResetting(false);
+        }
     };
 
     // ── Toggle selection ──
@@ -563,6 +595,13 @@ export default function SaasAcademies() {
                                                         title="Login as this academy's admin"
                                                     >
                                                         {impersonatingId === acc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogIn className="w-3.5 h-3.5" />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setResetTarget(acc); setNewPassword(''); setResetError(''); setResetSuccess(''); }}
+                                                        className="p-1.5 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors"
+                                                        title="إعادة تعيين كلمة المرور"
+                                                    >
+                                                        <KeyRound className="w-3.5 h-3.5" />
                                                     </button>
                                                     <button
                                                         onClick={() => openEdit(acc)}
@@ -888,6 +927,53 @@ export default function SaasAcademies() {
                                 {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete Permanently'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Reset Password Modal ── */}
+            {resetTarget && (
+                <div className="modal-backdrop">
+                    <div className="modal-content max-w-md">
+                        <form onSubmit={handleResetPassword} className="p-6 space-y-5">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-surface-900">إعادة تعيين كلمة المرور</h3>
+                                    <p className="text-xs text-surface-500 mt-1">{resetTarget.name}</p>
+                                </div>
+                                <button type="button" onClick={() => setResetTarget(null)} className="p-1.5 rounded-lg hover:bg-surface-100 text-surface-500">
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            {resetError && (
+                                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">{resetError}</div>
+                            )}
+                            {resetSuccess && (
+                                <div className="text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    {resetSuccess}
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">كلمة المرور الجديدة</label>
+                                <input
+                                    required
+                                    type="password"
+                                    className="input"
+                                    minLength="6"
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    placeholder="6 أحرف على الأقل"
+                                />
+                            </div>
+                            <div className="flex gap-3 justify-end pt-2">
+                                <button type="button" onClick={() => setResetTarget(null)} className="btn btn-secondary">إلغاء</button>
+                                <button type="submit" disabled={resetting || newPassword.length < 6}
+                                    className="btn btn-brand w-[160px] justify-center">
+                                    {resetting ? <Loader2 size={16} className="animate-spin" /> : <><KeyRound className="w-4 h-4" /> تحديث كلمة المرور</>}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

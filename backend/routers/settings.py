@@ -15,9 +15,31 @@ router = APIRouter(prefix="/settings", tags=["Settings"], dependencies=[Depends(
 async def get_settings():
     try:
         response = await supabase.get_academy_settings()
-        if not response:
+        if response:
+            return response
+
+        # Auto-seed for academies provisioned before settings-row-on-create was added
+        academy_id = academy_id_ctx.get(None)
+        if not academy_id:
             raise HTTPException(status_code=404, detail="Settings not found")
-        return response
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            acc = await client.get(
+                f"{app_settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=name",
+                headers=supabase.admin_headers,
+            )
+            academy_name = (acc.json()[0].get("name") if acc.status_code == 200 and acc.json() else "Academy")
+            seed = await client.post(
+                f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings",
+                json={"academy_id": academy_id, "academy_name": academy_name},
+                headers={**supabase.admin_headers, "Prefer": "return=representation"},
+            )
+            if seed.status_code in (200, 201):
+                rows = seed.json()
+                return rows[0] if isinstance(rows, list) else rows
+        raise HTTPException(status_code=404, detail="Settings not found")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error fetching settings: %s", e, exc_info=True)
         raise HTTPException(
