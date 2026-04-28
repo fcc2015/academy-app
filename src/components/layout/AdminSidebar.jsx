@@ -28,6 +28,7 @@ import {
     Building2
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { usePlan } from '../../hooks/usePlan';
 
 const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setMobileOpen, navGroups, handleLogout, CollapseIcon }) => (
     <div className="flex flex-col h-full bg-white border-r border-surface-200 overflow-hidden" dir={dir}>
@@ -118,6 +119,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { t, isRTL, dir } = useLanguage();
+    const { hasFeature } = usePlan();
     const [mobileOpen, setMobileOpen] = useState(false);
 
     const handleLogout = () => {
@@ -168,7 +170,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
                 { to: '/admin/chat',            icon: MessageCircle, labelKey: 'sidebar.chat' },
                 { to: '/admin/pending-parents', icon: UserCheck,     labelKey: 'sidebar.pendingParents' },
                 { to: '/admin/admins',          icon: Shield,        labelKey: 'sidebar.admins' },
-                { to: '/admin/branches',        icon: Building2,     labelKey: 'sidebar.branches' },
+                ...(hasFeature('branches') ? [{ to: '/admin/branches', icon: Building2, labelKey: 'sidebar.branches' }] : []),
                 { to: '/admin/settings',        icon: Settings,      labelKey: 'sidebar.settings' },
             ]
         }

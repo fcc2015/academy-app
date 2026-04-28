@@ -1,6 +1,9 @@
 import logging
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from core.auth_middleware import verify_token
+from core.context import academy_id_ctx
+from core.config import settings as app_settings
 from schemas.settings import AcademySettingsUpdate, AcademySettingsResponse
 from services.supabase_client import supabase
 
@@ -21,6 +24,30 @@ async def get_settings():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred. Please try again."
         )
+
+@router.get("/plan")
+async def get_academy_plan():
+    """Returns the current academy's plan_id and computed feature flags."""
+    academy_id = academy_id_ctx.get(None)
+    if not academy_id:
+        return {"plan_id": "free", "features": {"branches": False}}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(
+                f"{app_settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=plan_id",
+                headers=supabase.admin_headers,
+            )
+        plan_id = "free"
+        if res.status_code == 200 and res.json():
+            plan_id = (res.json()[0].get("plan_id") or "free").lower()
+        return {
+            "plan_id": plan_id,
+            "features": {"branches": plan_id == "enterprise"},
+        }
+    except Exception as e:
+        logger.error("Error fetching plan: %s", e, exc_info=True)
+        return {"plan_id": "free", "features": {"branches": False}}
+
 
 @router.patch("/{settings_id}", response_model=AcademySettingsResponse)
 async def update_settings(settings_id: str, settings: AcademySettingsUpdate):

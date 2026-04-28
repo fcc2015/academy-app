@@ -8,12 +8,14 @@ import {
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
+import { usePlan } from '../../hooks/usePlan';
 
 const emptyForm = { name: '', city: '', address: '', phone: '', is_active: true };
 
 const BranchesManagement = () => {
     const { isRTL } = useLanguage();
     const toast = useToast();
+    const { plan, loading: planLoading, hasFeature } = usePlan();
 
     const [branches, setBranches] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -43,7 +45,12 @@ const BranchesManagement = () => {
         }
     };
 
-    useEffect(() => { loadBranches(); }, []);
+    useEffect(() => {
+        if (planLoading) return;
+        if (hasFeature('branches')) loadBranches();
+        else setLoading(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [planLoading, plan]);
 
     const openCreate = () => {
         setEditing(null);
@@ -194,6 +201,29 @@ const BranchesManagement = () => {
         b.name?.toLowerCase().includes(search.toLowerCase()) ||
         b.city?.toLowerCase().includes(search.toLowerCase())
     );
+
+    if (!planLoading && !hasFeature('branches')) {
+        return (
+            <div className="p-6 max-w-3xl mx-auto" dir={isRTL ? 'rtl' : 'ltr'}>
+                <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 border border-indigo-100 rounded-3xl p-10 text-center shadow-sm">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl mb-5 shadow-lg">
+                        <Building2 className="text-white" size={40} />
+                    </div>
+                    <h1 className="text-2xl font-black text-slate-900 mb-2">ميزة الفروع متاحة في خطة Enterprise</h1>
+                    <p className="text-slate-600 mb-6 max-w-md mx-auto">
+                        خطتك الحالية: <span className="font-bold text-indigo-700 uppercase">{plan?.plan_id || 'free'}</span>.
+                        قم بالترقية إلى <span className="font-black">Enterprise</span> لإدارة فروع متعددة وتعيين مسؤولين مساعدين لكل فرع.
+                    </p>
+                    <a
+                        href="/admin/settings"
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl font-black shadow-lg hover:-translate-y-0.5 transition-all"
+                    >
+                        ترقية الخطة
+                    </a>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 max-w-7xl mx-auto" dir={isRTL ? 'rtl' : 'ltr'}>
