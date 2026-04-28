@@ -27,6 +27,7 @@ class AcademyProvisionRequest(BaseModel):
     city: str | None = None
     notes: str | None = None
     subdomain: str | None = None
+    plan_id: str | None = None  # "free" | "pro" | "enterprise"
 
 class AcademyStatusUpdate(BaseModel):
     status: str  # "active" or "suspended"
@@ -156,6 +157,8 @@ async def create_academy(req: AcademyProvisionRequest):
             academy_data["notes"] = req.notes
         if req.subdomain:
             academy_data["subdomain"] = req.subdomain
+        if req.plan_id and req.plan_id in PLAN_LIMITS:
+            academy_data["plan_id"] = req.plan_id
 
         async def insert_academy(payload):
             return await client.post(
