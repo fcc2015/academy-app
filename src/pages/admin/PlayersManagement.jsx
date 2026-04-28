@@ -406,7 +406,7 @@ function PhotoUploadCrop({ value, onChange }) {
 
 const PlayerModal = ({
     isOpen, onClose, onSubmit, title, isEdit, modalStep, setModalStep,
-    formData, handleInputChange, subscriptionPlans, isSubmitting, settings, t, isRTL, dir
+    formData, handleInputChange, subscriptionPlans, isSubmitting, settings, t, isRTL, dir, branches = []
 }) => {
     if (!isOpen) return null;
     const selectedPlanObj = subscriptionPlans.find(p => p.name === formData.subscription_type) || null;
@@ -492,6 +492,15 @@ const PlayerModal = ({
                                                 <option value="Suspended">{t('players.suspended')}</option>
                                             </select>
                                         </div>
+                                        {branches.length > 0 && (
+                                            <div>
+                                                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{isRTL ? 'الفرع' : 'Branch'}</label>
+                                                <select name="branch_id" value={formData.branch_id || ''} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
+                                                    <option value="">{isRTL ? '— بدون فرع —' : '— No branch —'}</option>
+                                                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}{b.city ? ` (${b.city})` : ''}</option>)}
+                                                </select>
+                                            </div>
+                                        )}
                                         <div>
                                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.subscriptionType')}</label>
                                             <select name="subscription_type" value={formData.subscription_type} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
@@ -629,6 +638,7 @@ const PlayersManagement = () => {
     const [subscriptionPlans, setSubscriptionPlans] = useState([]);
     const [settings, setSettings] = useState(null);
     const [modalStep, setModalStep] = useState(1);
+    const [branches, setBranches] = useState([]);
 
     const fetchPlayers = async () => {
         setLoading(true);
@@ -663,6 +673,12 @@ const PlayersManagement = () => {
         try {
             const res = await authFetch(`${API_URL}/settings/`);
             if (res.ok) setSettings(await res.json());
+        } catch { /* ignore */ }
+
+        // Branches (non-critical)
+        try {
+            const res = await authFetch(`${API_URL}/branches/`);
+            if (res.ok) setBranches(await res.json() || []);
         } catch { /* ignore */ }
 
         setLoading(false);
@@ -717,7 +733,8 @@ const PlayersManagement = () => {
             u_category: settings?.age_categories?.[0] || 'U11', technical_level: 'B',
             subscription_type: 'Monthly', discount_type: 'none', discount_value: '',
             account_status: 'Pending', photo_url: '',
-            blood_type: '', medical_cert_valid_until: '', transport_zone: '', allergies: '', emergency_contact: ''
+            blood_type: '', medical_cert_valid_until: '', transport_zone: '', allergies: '', emergency_contact: '',
+            branch_id: ''
         });
         setResolvingRequestId(null); setModalStep(1); setIsAddModalOpen(true);
     };
@@ -729,7 +746,8 @@ const PlayersManagement = () => {
             u_category: settings?.age_categories?.[0] || 'U11', technical_level: 'B',
             subscription_type: req.plan_name || 'Monthly', discount_type: 'none', discount_value: '',
             account_status: 'Pending', photo_url: '',
-            blood_type: '', medical_cert_valid_until: '', transport_zone: '', allergies: '', emergency_contact: ''
+            blood_type: '', medical_cert_valid_until: '', transport_zone: '', allergies: '', emergency_contact: '',
+            branch_id: ''
         });
         setResolvingRequestId(req.id); setModalStep(1); setIsAddModalOpen(true);
     };
@@ -1132,6 +1150,7 @@ const PlayersManagement = () => {
                 modalStep={modalStep} setModalStep={setModalStep} formData={formData}
                 handleInputChange={handleInputChange} subscriptionPlans={subscriptionPlans}
                 isSubmitting={isSubmitting} settings={settings} t={t} isRTL={isRTL} dir={dir}
+                branches={branches}
             />
             {isEditModalOpen && (
                 <PlayerModal
@@ -1140,6 +1159,7 @@ const PlayersManagement = () => {
                     modalStep={modalStep} setModalStep={setModalStep} formData={formData}
                     handleInputChange={handleInputChange} subscriptionPlans={subscriptionPlans}
                     isSubmitting={isSubmitting} settings={settings} t={t} isRTL={isRTL} dir={dir}
+                    branches={branches}
                 />
             )}
             <PlayerBadgeModal player={currentPlayer} isOpen={isBadgeModalOpen} onClose={() => setIsBadgeModalOpen(false)} academyName={settings?.academy_name} academyLogo={settings?.logo_url} />

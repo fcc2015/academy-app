@@ -125,8 +125,9 @@ const CoachesManagement = () => {
     const [formData, setFormData] = useState({
         full_name: '', email: '', phone: '',
         specialization: 'Technical', status: 'Active',
-        photo_url: '', diploma_url: ''
+        photo_url: '', diploma_url: '', branch_id: ''
     });
+    const [branches, setBranches] = useState([]);
     const toast = useToast();
 
     const showBanner = (message, type = 'success') => {
@@ -135,7 +136,14 @@ const CoachesManagement = () => {
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => { fetchCoaches(); }, []);
+    useEffect(() => { fetchCoaches(); fetchBranches(); }, []);
+
+    const fetchBranches = async () => {
+        try {
+            const res = await authFetch(`${API_URL}/branches/`);
+            if (res.ok) setBranches(await res.json() || []);
+        } catch { /* non-blocking */ }
+    };
 
     const fetchCoaches = async () => {
         setIsLoading(true);
@@ -153,7 +161,7 @@ const CoachesManagement = () => {
     };
 
     const handleAddClick = () => {
-        setFormData({ full_name: '', email: '', phone: '', specialization: 'Technical', status: 'Active', photo_url: '', diploma_url: '' });
+        setFormData({ full_name: '', email: '', phone: '', specialization: 'Technical', status: 'Active', photo_url: '', diploma_url: '', branch_id: '' });
         setIsEditMode(false);
         setEditingId(null);
         setIsAddModalOpen(true);
@@ -167,7 +175,8 @@ const CoachesManagement = () => {
             specialization: coach.specialization,
             status: coach.status,
             photo_url: coach.photo_url || '',
-            diploma_url: coach.diploma_url || ''
+            diploma_url: coach.diploma_url || '',
+            branch_id: coach.branch_id || ''
         });
         setIsEditMode(true);
         setEditingId(coach.id);
@@ -189,7 +198,7 @@ const CoachesManagement = () => {
             if (res.ok) {
                 const savedCoach = await res.json();
                 setIsAddModalOpen(false);
-                setFormData({ full_name: '', email: '', phone: '', specialization: 'Technical', status: 'Active', photo_url: '', diploma_url: '' });
+                setFormData({ full_name: '', email: '', phone: '', specialization: 'Technical', status: 'Active', photo_url: '', diploma_url: '', branch_id: '' });
                 
                 // Miza (Synchronization) - immediately update local state
                 if (isEditMode) {
@@ -438,6 +447,20 @@ const CoachesManagement = () => {
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* Branch */}
+                                {branches.length > 0 && (
+                                    <div>
+                                        <label className={`block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 ${isRTL ? 'text-right' : ''}`}>{isRTL ? 'الفرع' : 'Branch'}</label>
+                                        <select name="branch_id" value={formData.branch_id || ''} onChange={handleInputChange}
+                                            className={`w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all ${isRTL ? 'text-right' : ''}`}>
+                                            <option value="">{isRTL ? '— بدون فرع —' : '— No branch —'}</option>
+                                            {branches.map(b => (
+                                                <option key={b.id} value={b.id}>{b.name}{b.city ? ` (${b.city})` : ''}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Modal Footer */}
