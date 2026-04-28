@@ -57,7 +57,7 @@ export default function SaasAcademies() {
     const [showCreate, setShowCreate] = useState(false);
     const [creating, setCreating] = useState(false);
     const [createForm, setCreateForm] = useState({
-        name: '', subdomain: '', city: '', notes: '',
+        name: '', subdomain: '', city: '', notes: '', plan_id: 'free',
         admin_name: '', admin_email: '', admin_password: ''
     });
     const [createError, setCreateError] = useState('');
@@ -133,7 +133,7 @@ export default function SaasAcademies() {
             const data = await res.json();
             if (res.ok) {
                 setShowCreate(false);
-                setCreateForm({ name: '', subdomain: '', city: '', notes: '', admin_name: '', admin_email: '', admin_password: '' });
+                setCreateForm({ name: '', subdomain: '', city: '', notes: '', plan_id: 'free', admin_name: '', admin_email: '', admin_password: '' });
                 fetchAcademies();
             } else {
                 setCreateError(data.detail || 'Failed to create academy.');
@@ -727,6 +727,15 @@ export default function SaasAcademies() {
                                     <input className="input" value={createForm.subdomain}
                                         onChange={e => setCreateForm(f => ({ ...f, subdomain: e.target.value }))}
                                         placeholder="elite-soccer" />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Plan *</label>
+                                    <select className="input" value={createForm.plan_id}
+                                        onChange={e => setCreateForm(f => ({ ...f, plan_id: e.target.value }))}>
+                                        <option value="free">Free — 15 players, 1 admin, 1 coach</option>
+                                        <option value="pro">Pro — 100 players, 4 admins, 10 coaches</option>
+                                        <option value="enterprise">Enterprise — Unlimited + Branches</option>
+                                    </select>
                                 </div>
                                 <div className="col-span-2">
                                     <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Notes</label>
