@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from core.auth_middleware import verify_token, require_role
 from core.context import user_id_ctx, role_ctx, academy_id_ctx
+from core.config import settings
+import httpx
 from schemas.branches import (
     BranchCreate,
     BranchUpdate,
@@ -14,11 +16,31 @@ from services.supabase_client import supabase
 
 logger = logging.getLogger("branches")
 
-router = APIRouter(
-    prefix="/branches",
-    tags=["Branches"],
-    dependencies=[Depends(verify_token)],
-)
+
+async def _require_enterprise_plan():
+    """Ensures the current academy is on the enterprise plan; raises 403 otherwise."""
+    academy_id = academy_id_ctx.get(None)
+    if not academy_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="لم يتم تحديد الأكاديمية",
+        )
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=plan_id",
+            headers=supabase.admin_headers,
+        )
+    if res.status_code != 200 or not res.json():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="تعذر التحقق من خطة الأكاديمية",
+        )
+    plan = (res.json()[0].get("plan_id") or "free").lower()
+    if plan != "enterprise":
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="ميزة الفروع متاحة فقط في خطة Enterprise. يرجى الترقية للاستفادة منها.",
+        )
 
 
 async def _get_sous_admin_branch_ids(user_id: str) -> List[str]:
@@ -27,6 +49,13 @@ async def _get_sous_admin_branch_ids(user_id: str) -> List[str]:
         f"/rest/v1/sous_admin_branches?user_id=eq.{user_id}&select=branch_id"
     )
     return [r["branch_id"] for r in (rows or [])]
+
+
+router = APIRouter(
+    prefix="/branches",
+    tags=["Branches"],
+    dependencies=[Depends(verify_token), Depends(_require_enterprise_plan)],
+)
 
 
 @router.get("/", response_model=List[BranchResponse])
