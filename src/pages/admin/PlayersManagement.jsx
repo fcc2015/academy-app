@@ -1142,7 +1142,7 @@ const PlayersManagement = () => {
                     isSubmitting={isSubmitting} settings={settings} t={t} isRTL={isRTL} dir={dir}
                 />
             )}
-            <PlayerBadgeModal player={currentPlayer} isOpen={isBadgeModalOpen} onClose={() => setIsBadgeModalOpen(false)} />
+            <PlayerBadgeModal player={currentPlayer} isOpen={isBadgeModalOpen} onClose={() => setIsBadgeModalOpen(false)} academyName={settings?.academy_name} academyLogo={settings?.logo_url} />
             <PlayerMatchesModal player={currentPlayer} isOpen={isMatchesModalOpen} onClose={() => setIsMatchesModalOpen(false)} t={t} isRTL={isRTL} dir={dir} />
             <PlayerProfileModal player={currentPlayer} isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} isRTL={isRTL} dir={dir} />
 
