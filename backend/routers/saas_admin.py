@@ -56,6 +56,9 @@ class NotificationTriggerRequest(BaseModel):
 class RenewalReminderRequest(BaseModel):
     days_ahead: int = 7  # Send reminders for academies renewing within N days
 
+class ResetPasswordRequest(BaseModel):
+    new_password: str
+
 # ── Plan limits (must match frontend PLANS) ──
 PLAN_LIMITS = {
     "free":       {"players": 15,   "admins": 1,  "coaches": 1},
@@ -222,6 +225,21 @@ async def create_academy(req: AcademyProvisionRequest):
                 logger.error("admins insert failed: %s %s", a_res.status_code, a_res.text)
                 raise HTTPException(status_code=500, detail=f"Admin record insert failed: {a_res.text[:200]}")
 
+            # Seed academy_settings row so /admin/settings doesn't crash for the new academy
+            try:
+                s_res = await client.post(
+                    f"{supabase.url}/rest/v1/academy_settings",
+                    json={
+                        "academy_id": new_academy_id,
+                        "academy_name": req.name,
+                    },
+                    headers=supabase.admin_headers,
+                )
+                if s_res.status_code >= 400:
+                    logger.warning("academy_settings seed non-critical: %s %s", s_res.status_code, s_res.text)
+            except Exception as se:
+                logger.warning("academy_settings seed failed (non-critical): %s", se)
+
             return {"success": True, "academy": academy_row, "admin_user_id": admin_user_id}
         except HTTPException:
             raise
@@ -237,6 +255,40 @@ async def create_academy(req: AcademyProvisionRequest):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Academy created, but failed to provision admin: {error_msg[:200]}",
             )
+
+
+@router.post("/academies/{academy_id}/reset-password")
+async def reset_academy_admin_password(academy_id: str, req: ResetPasswordRequest):
+    """
+    Reset the admin password for an academy.
+    Finds the admin user linked to this academy and updates their Supabase Auth password.
+    """
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="كلمة المرور يجب أن تكون 6 أحرف على الأقل")
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # 1. Find admin user(s) for this academy
+        admin_res = await client.get(
+            f"{supabase.url}/rest/v1/users?academy_id=eq.{academy_id}&role=eq.admin&select=id,full_name",
+            headers=supabase.admin_headers,
+        )
+        if admin_res.status_code >= 400 or not admin_res.json():
+            raise HTTPException(status_code=404, detail="لم يتم العثور على مسؤول لهذه الأكاديمية")
+
+        admin_user = admin_res.json()[0]
+        admin_auth_id = admin_user["id"]
+
+        # 2. Update password via Supabase Auth Admin API
+        pwd_res = await client.put(
+            f"{supabase.url}/auth/v1/admin/users/{admin_auth_id}",
+            json={"password": req.new_password},
+            headers=supabase.admin_headers,
+        )
+        if pwd_res.status_code >= 400:
+            logger.error("Password reset failed: %s %s", pwd_res.status_code, pwd_res.text)
+            raise HTTPException(status_code=500, detail="فشل تحديث كلمة المرور")
+
+        return {"success": True, "message": f"تم تحديث كلمة المرور للمسؤول {admin_user.get('full_name', '')}"}
 
 
 @router.patch("/academies/{academy_id}")

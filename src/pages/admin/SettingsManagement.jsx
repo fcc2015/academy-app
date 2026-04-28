@@ -383,6 +383,22 @@ const SettingsManagement = () => {
 
     if (isLoading) return <SkeletonDashboard />;
 
+    if (!settings) {
+        return (
+            <div className="animate-fade-in py-20 text-center" dir="rtl">
+                <AlertCircle className="mx-auto text-amber-400 mb-4" size={48} />
+                <h2 className="text-xl font-bold text-slate-800 mb-2">لم يتم العثور على إعدادات الأكاديمية</h2>
+                <p className="text-sm text-slate-500 mb-6">جاري إنشاء الإعدادات الافتراضية...</p>
+                <button
+                    onClick={() => { setIsLoading(true); fetchSettings(); }}
+                    className="px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors"
+                >
+                    إعادة المحاولة
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className="animate-fade-in pb-20 text-right" dir="rtl">
             {/* Toast handled by global provider */}
