@@ -803,8 +803,8 @@ export default function SaasAcademies() {
             {/* ── Create Modal ── */}
             {showCreate && (
                 <div className="modal-backdrop">
-                    <div className="modal-content">
-                        <div className="flex justify-between items-center p-6 border-b border-surface-200">
+                    <div className="modal-content max-w-xl flex flex-col" style={{ maxHeight: '90vh' }}>
+                        <div className="flex justify-between items-center p-6 border-b border-surface-200 shrink-0">
                             <div className="flex items-center gap-2">
                                 <Building2 className="w-5 h-5 text-surface-600" />
                                 <h3 className="text-lg font-semibold text-surface-900">Provision New Academy</h3>
@@ -813,7 +813,7 @@ export default function SaasAcademies() {
                                 <X size={22} />
                             </button>
                         </div>
-                        <form onSubmit={handleCreate} className="p-6 space-y-4">
+                        <form onSubmit={handleCreate} className="p-6 space-y-4 overflow-y-auto">
                             {createError && (
                                 <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-sm">{createError}</div>
                             )}
