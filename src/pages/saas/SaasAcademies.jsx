@@ -844,13 +844,32 @@ export default function SaasAcademies() {
                                         placeholder="elite-soccer" />
                                 </div>
                                 <div className="col-span-2">
-                                    <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Plan *</label>
-                                    <select className="input" value={createForm.plan_id}
-                                        onChange={e => setCreateForm(f => ({ ...f, plan_id: e.target.value }))}>
-                                        <option value="free">Free — 15 players, 1 admin, 1 coach</option>
-                                        <option value="pro">Pro — 100 players, 4 admins, 10 coaches</option>
-                                        <option value="enterprise">Enterprise — Unlimited + Branches</option>
-                                    </select>
+                                    <label className="block text-xs font-bold text-surface-600 mb-2 uppercase tracking-wider">Plan *</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[
+                                            { id: 'free',       name: 'Free',       desc: '15 players · 1 admin',   gradient: 'from-slate-400 to-slate-600',     icon: '🆓' },
+                                            { id: 'pro',        name: 'Pro',        desc: '100 players · 4 admins', gradient: 'from-blue-500 to-cyan-600',        icon: '⚡' },
+                                            { id: 'enterprise', name: 'Enterprise', desc: 'Unlimited + 🏢 Branches', gradient: 'from-violet-500 to-purple-600',   icon: '👑' },
+                                        ].map(p => {
+                                            const selected = createForm.plan_id === p.id;
+                                            return (
+                                                <button
+                                                    key={p.id}
+                                                    type="button"
+                                                    onClick={() => setCreateForm(f => ({ ...f, plan_id: p.id }))}
+                                                    className={`p-3 rounded-xl border-2 text-center transition-all ${
+                                                        selected
+                                                            ? `bg-gradient-to-br ${p.gradient} text-white border-transparent shadow-lg`
+                                                            : 'bg-white border-surface-200 text-surface-700 hover:border-surface-300'
+                                                    }`}
+                                                >
+                                                    <div className="text-xl mb-1">{p.icon}</div>
+                                                    <div className="text-sm font-black uppercase tracking-wider">{p.name}</div>
+                                                    <div className={`text-[10px] mt-1 ${selected ? 'text-white/90' : 'text-surface-500'}`}>{p.desc}</div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                                 <div className="col-span-2">
                                     <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Notes</label>
