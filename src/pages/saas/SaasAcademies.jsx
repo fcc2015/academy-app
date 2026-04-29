@@ -5,7 +5,7 @@ import { authFetch } from '../../api';
 import {
     Loader2, Plus, Ban, CheckCircle2, X, Pencil, Save,
     MapPin, SlidersHorizontal, Building2, ChevronRight, Users, Search,
-    Trash2, Download, Check, LogIn, KeyRound
+    Trash2, Download, Check, LogIn, KeyRound, Copy, ExternalLink, CheckCircle, Mail, Lock, Globe
 } from 'lucide-react';
 
 // Moroccan cities for rollout pipeline
@@ -67,6 +67,10 @@ export default function SaasAcademies() {
     const [editForm, setEditForm] = useState({});
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState('');
+
+    // Provisioned credentials (shown after successful create)
+    const [provisioned, setProvisioned] = useState(null); // { name, subdomain, login_url, admin_email, admin_password }
+    const [copiedField, setCopiedField] = useState('');
 
     // Plan change modal
     const [planTarget, setPlanTarget] = useState(null);
@@ -145,8 +149,20 @@ export default function SaasAcademies() {
             });
             const data = await res.json();
             if (res.ok) {
-                setShowCreate(false);
-                setCreateForm({ name: '', subdomain: '', city: '', notes: '', plan_id: 'free', admin_name: '', admin_email: '', admin_password: '' });
+                // Build login URL — if a subdomain is set, hint it via query string
+                const origin = window.location.origin;
+                const sub = createForm.subdomain || '';
+                const login_url = sub
+                    ? `${origin}/login?academy=${encodeURIComponent(sub)}`
+                    : `${origin}/login`;
+                setProvisioned({
+                    name: createForm.name,
+                    subdomain: sub,
+                    login_url,
+                    admin_email: createForm.admin_email,
+                    admin_password: createForm.admin_password,
+                    plan_id: createForm.plan_id,
+                });
                 fetchAcademies();
             } else {
                 setCreateError(data.detail || 'Failed to create academy.');
@@ -156,6 +172,21 @@ export default function SaasAcademies() {
         } finally {
             setCreating(false);
         }
+    };
+
+    // ── Copy helper for provisioned credentials ──
+    const copyToClipboard = async (text, field) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedField(field);
+            setTimeout(() => setCopiedField(''), 1500);
+        } catch { /* no-op */ }
+    };
+
+    const closeProvisioned = () => {
+        setProvisioned(null);
+        setShowCreate(false);
+        setCreateForm({ name: '', subdomain: '', city: '', notes: '', plan_id: 'free', admin_name: '', admin_email: '', admin_password: '' });
     };
 
     // ── Plan change ──
@@ -860,6 +891,110 @@ export default function SaasAcademies() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Provisioned Credentials Success Modal ── */}
+            {provisioned && (
+                <div className="modal-backdrop">
+                    <div className="modal-content max-w-lg">
+                        <div className="p-6 space-y-5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                                    <CheckCircle className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-surface-900">Academy provisioned successfully</h3>
+                                    <p className="text-xs text-surface-500 mt-0.5">{provisioned.name} — Plan: <span className="font-bold uppercase">{provisioned.plan_id}</span></p>
+                                </div>
+                            </div>
+
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                                ⚠️ Save these credentials now — the password will not be shown again.
+                            </div>
+
+                            <div className="space-y-2.5">
+                                {/* Login URL */}
+                                <div className="bg-surface-50 border border-surface-200 rounded-xl p-3">
+                                    <div className="flex items-center gap-2 text-[10px] font-bold text-surface-500 uppercase tracking-wider mb-1.5">
+                                        <Globe className="w-3 h-3" /> Login URL
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <code className="flex-1 text-xs font-mono text-surface-900 break-all">{provisioned.login_url}</code>
+                                        <button
+                                            type="button"
+                                            onClick={() => copyToClipboard(provisioned.login_url, 'url')}
+                                            className="p-1.5 rounded-lg bg-white border border-surface-200 text-surface-600 hover:bg-surface-100"
+                                            title="Copy"
+                                        >
+                                            {copiedField === 'url' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                        </button>
+                                        <a
+                                            href={provisioned.login_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="p-1.5 rounded-lg bg-white border border-surface-200 text-surface-600 hover:bg-surface-100"
+                                            title="Open"
+                                        >
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                        </a>
+                                    </div>
+                                </div>
+
+                                {/* Email */}
+                                <div className="bg-surface-50 border border-surface-200 rounded-xl p-3">
+                                    <div className="flex items-center gap-2 text-[10px] font-bold text-surface-500 uppercase tracking-wider mb-1.5">
+                                        <Mail className="w-3 h-3" /> Admin Email
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <code className="flex-1 text-xs font-mono text-surface-900 break-all">{provisioned.admin_email}</code>
+                                        <button
+                                            type="button"
+                                            onClick={() => copyToClipboard(provisioned.admin_email, 'email')}
+                                            className="p-1.5 rounded-lg bg-white border border-surface-200 text-surface-600 hover:bg-surface-100"
+                                            title="Copy"
+                                        >
+                                            {copiedField === 'email' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Password */}
+                                <div className="bg-surface-50 border border-surface-200 rounded-xl p-3">
+                                    <div className="flex items-center gap-2 text-[10px] font-bold text-surface-500 uppercase tracking-wider mb-1.5">
+                                        <Lock className="w-3 h-3" /> Admin Password
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <code className="flex-1 text-xs font-mono text-surface-900 break-all">{provisioned.admin_password}</code>
+                                        <button
+                                            type="button"
+                                            onClick={() => copyToClipboard(provisioned.admin_password, 'password')}
+                                            className="p-1.5 rounded-lg bg-white border border-surface-200 text-surface-600 hover:bg-surface-100"
+                                            title="Copy"
+                                        >
+                                            {copiedField === 'password' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 justify-end pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(
+                                        `Login URL: ${provisioned.login_url}\nEmail: ${provisioned.admin_email}\nPassword: ${provisioned.admin_password}`,
+                                        'all'
+                                    )}
+                                    className="btn btn-secondary"
+                                >
+                                    {copiedField === 'all' ? <><Check className="w-4 h-4" /> Copied</> : <><Copy className="w-4 h-4" /> Copy all</>}
+                                </button>
+                                <button type="button" onClick={closeProvisioned} className="btn btn-brand">
+                                    Done
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
