@@ -49,10 +49,10 @@ async def get_settings():
 
 @router.get("/plan")
 async def get_academy_plan():
-    """Returns the current academy's plan_id and computed feature flags."""
+    """Returns the current academy's id, plan_id and computed feature flags."""
     academy_id = academy_id_ctx.get(None)
     if not academy_id:
-        return {"plan_id": "free", "features": {"branches": False}}
+        return {"academy_id": None, "plan_id": "free", "features": {"branches": False}}
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.get(
@@ -63,12 +63,13 @@ async def get_academy_plan():
         if res.status_code == 200 and res.json():
             plan_id = (res.json()[0].get("plan_id") or "free").lower()
         return {
+            "academy_id": academy_id,
             "plan_id": plan_id,
             "features": {"branches": plan_id == "enterprise"},
         }
     except Exception as e:
         logger.error("Error fetching plan: %s", e, exc_info=True)
-        return {"plan_id": "free", "features": {"branches": False}}
+        return {"academy_id": academy_id, "plan_id": "free", "features": {"branches": False}}
 
 
 @router.patch("/{settings_id}", response_model=AcademySettingsResponse)
