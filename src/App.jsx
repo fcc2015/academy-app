@@ -57,6 +57,7 @@ const ExpensesManagement = lazy(() => import('./pages/admin/ExpensesManagement')
 const AdminTactics = lazy(() => import('./pages/admin/AdminTactics'));
 const AdminPendingParents = lazy(() => import('./pages/admin/AdminPendingParents'));
 const BranchesManagement = lazy(() => import('./pages/admin/BranchesManagement'));
+const SubscriptionPage = lazy(() => import('./pages/admin/SubscriptionPage'));
 
 // Coach
 const CoachLayout = lazy(() => import('./pages/coach/CoachLayout'));
@@ -143,6 +144,7 @@ function App() {
             <Route path="expenses" element={<ExpensesManagement />} />
             <Route path="admins" element={<AdminsManagement />} />
             <Route path="branches" element={<BranchesManagement />} />
+            <Route path="subscription" element={<SubscriptionPage />} />
             <Route path="chat" element={<ChatManagement />} />
             <Route path="tactics" element={<AdminTactics />} />
             <Route path="pending-parents" element={<AdminPendingParents />} />
