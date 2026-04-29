@@ -1,24 +1,21 @@
+"""
+الفروع — إدارة فروع الأكاديمية
+Branches CRUD router for multi-branch academy support.
+"""
 import logging
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-
-from core.auth_middleware import verify_token, require_role
-from core.context import user_id_ctx, role_ctx, academy_id_ctx
-from core.config import settings
 import httpx
-from schemas.branches import (
-    BranchCreate,
-    BranchUpdate,
-    BranchResponse,
-    SousAdminBranchAssign,
-)
+from core.auth_middleware import require_role
+from core.context import academy_id_ctx
+from core.config import settings as app_settings
 from services.supabase_client import supabase
+from schemas.branches import BranchCreate, BranchUpdate, BranchResponse, SousAdminBranchAssign
 
 logger = logging.getLogger("branches")
 
 
 async def _require_enterprise_plan():
-    """Ensures the current academy is on the enterprise plan; raises 403 otherwise."""
+    """ميزة الفروع متاحة فقط فـ Enterprise plan."""
     academy_id = academy_id_ctx.get(None)
     if not academy_id:
         raise HTTPException(
@@ -27,7 +24,7 @@ async def _require_enterprise_plan():
         )
     async with httpx.AsyncClient(timeout=10.0) as client:
         res = await client.get(
-            f"{settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=plan_id",
+            f"{app_settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=plan_id",
             headers=supabase.admin_headers,
         )
     if res.status_code != 200 or not res.json():
@@ -43,205 +40,186 @@ async def _require_enterprise_plan():
         )
 
 
-async def _get_sous_admin_branch_ids(user_id: str) -> List[str]:
-    """Return the list of branch_ids assigned to a sous_admin user."""
-    rows = await supabase._get(
-        f"/rest/v1/sous_admin_branches?user_id=eq.{user_id}&select=branch_id"
-    )
-    return [r["branch_id"] for r in (rows or [])]
-
-
 router = APIRouter(
     prefix="/branches",
     tags=["Branches"],
-    dependencies=[Depends(verify_token), Depends(_require_enterprise_plan)],
+    dependencies=[
+        Depends(require_role("admin", "sous_admin", "super_admin")),
+        Depends(_require_enterprise_plan),
+    ],
 )
 
 
-@router.get("/", response_model=List[BranchResponse])
-async def list_branches():
-    """
-    List branches scoped to the current academy.
-    - admin / super_admin: all branches in the academy
-    - sous_admin: only branches assigned to them
-    - others: forbidden
-    """
-    role = role_ctx.get(None)
-    user_id = user_id_ctx.get(None)
+@router.get("/", response_model=list[BranchResponse])
+async def list_branches(user: dict = Depends(require_role("admin", "sous_admin", "coach", "super_admin"))):
+    """قائمة الفروع — Admin يشوف كلشي، Sous-admin يشوف غير فروعه"""
+    academy_id = academy_id_ctx.get(None)
+    if not academy_id:
+        raise HTTPException(status_code=400, detail="لم يتم تحديد الأكاديمية")
 
-    if role not in ("admin", "super_admin", "sous_admin"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="ليس لديك صلاحية للوصول إلى الفروع",
-        )
-
-    try:
-        if role == "sous_admin":
-            branch_ids = await _get_sous_admin_branch_ids(user_id)
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # If sous_admin, only return their assigned branches
+        if user["role"] == "sous_admin":
+            # Get assigned branch IDs
+            sa_res = await client.get(
+                f"{supabase.url}/rest/v1/sous_admin_branches"
+                f"?user_id=eq.{user['user_id']}&academy_id=eq.{academy_id}&select=branch_id",
+                headers=supabase.admin_headers,
+            )
+            if sa_res.status_code >= 400:
+                return []
+            branch_ids = [r["branch_id"] for r in sa_res.json()]
             if not branch_ids:
                 return []
-            ids_csv = ",".join(branch_ids)
-            return await supabase._get(
-                f"/rest/v1/branches?id=in.({ids_csv})&select=*&order=created_at.desc"
+            ids_filter = ",".join(branch_ids)
+            res = await client.get(
+                f"{supabase.url}/rest/v1/branches"
+                f"?academy_id=eq.{academy_id}&id=in.({ids_filter})&order=created_at.asc",
+                headers=supabase.admin_headers,
             )
-        return await supabase._get(
-            "/rest/v1/branches?select=*&order=created_at.desc"
-        )
-    except Exception as e:
-        logger.error("Error fetching branches: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="فشل في جلب قائمة الفروع",
-        )
-
-
-@router.post(
-    "/",
-    response_model=BranchResponse,
-    dependencies=[Depends(require_role("admin", "super_admin"))],
-)
-async def create_branch(branch: BranchCreate):
-    try:
-        data = branch.model_dump()
-        response = await supabase._post("/rest/v1/branches", data)
-        if not response:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="فشل في إنشاء الفرع",
+        else:
+            res = await client.get(
+                f"{supabase.url}/rest/v1/branches"
+                f"?academy_id=eq.{academy_id}&order=created_at.asc",
+                headers=supabase.admin_headers,
             )
-        return response[0]
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error creating branch: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="فشل في إنشاء الفرع",
-        )
+
+        if res.status_code >= 400:
+            logger.error("Failed to fetch branches: %s", res.text)
+            return []
+        return res.json()
 
 
-@router.put(
-    "/{branch_id}",
-    response_model=BranchResponse,
-    dependencies=[Depends(require_role("admin", "super_admin"))],
-)
-async def update_branch(branch_id: str, branch: BranchUpdate):
-    try:
-        data = branch.model_dump(exclude_none=True)
-        if not data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="لا توجد بيانات للتحديث",
-            )
-        res = await supabase.client.patch(
-            f"/rest/v1/branches?id=eq.{branch_id}", json=data
+@router.post("/", response_model=BranchResponse, status_code=201)
+async def create_branch(
+    branch: BranchCreate,
+    user: dict = Depends(require_role("admin", "super_admin"))
+):
+    """إنشاء فرع جديد — Admin فقط"""
+    academy_id = academy_id_ctx.get(None)
+    if not academy_id:
+        raise HTTPException(status_code=400, detail="لم يتم تحديد الأكاديمية")
+
+    payload = {
+        "academy_id": academy_id,
+        **branch.model_dump(),
+    }
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(
+            f"{supabase.url}/rest/v1/branches",
+            json=payload,
+            headers={**supabase.admin_headers, "Prefer": "return=representation"},
         )
-        res.raise_for_status()
+        if res.status_code >= 400:
+            logger.error("Create branch failed: %s", res.text)
+            raise HTTPException(status_code=500, detail="فشل إنشاء الفرع")
+        rows = res.json()
+        return rows[0] if isinstance(rows, list) else rows
+
+
+@router.put("/{branch_id}", response_model=BranchResponse)
+async def update_branch(
+    branch_id: str,
+    branch: BranchUpdate,
+    user: dict = Depends(require_role("admin", "super_admin"))
+):
+    """تعديل فرع — Admin فقط"""
+    update_data = branch.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.patch(
+            f"{supabase.url}/rest/v1/branches?id=eq.{branch_id}",
+            json=update_data,
+            headers={**supabase.admin_headers, "Prefer": "return=representation"},
+        )
+        if res.status_code >= 400:
+            logger.error("Update branch failed: %s", res.text)
+            raise HTTPException(status_code=500, detail="فشل تحديث الفرع")
         rows = res.json()
         if not rows:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="الفرع غير موجود",
-            )
+            raise HTTPException(status_code=404, detail="الفرع غير موجود")
         return rows[0]
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error updating branch: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="فشل في تحديث الفرع",
+
+
+@router.delete("/{branch_id}", status_code=204)
+async def delete_branch(
+    branch_id: str,
+    user: dict = Depends(require_role("admin", "super_admin"))
+):
+    """حذف فرع — Admin فقط"""
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.delete(
+            f"{supabase.url}/rest/v1/branches?id=eq.{branch_id}",
+            headers=supabase.admin_headers,
         )
+        if res.status_code >= 400:
+            logger.error("Delete branch failed: %s", res.text)
+            raise HTTPException(status_code=500, detail="فشل حذف الفرع")
 
 
-@router.delete(
-    "/{branch_id}",
-    dependencies=[Depends(require_role("admin", "super_admin"))],
-)
-async def delete_branch(branch_id: str):
-    try:
-        res = await supabase.client.delete(
-            f"/rest/v1/branches?id=eq.{branch_id}"
+# ── Sous-Admin Assignment ──
+
+@router.post("/assign-sous-admin")
+async def assign_sous_admin_to_branch(
+    data: SousAdminBranchAssign,
+    user: dict = Depends(require_role("admin", "super_admin"))
+):
+    """تعيين Sous-Admin لفرع معين"""
+    academy_id = academy_id_ctx.get(None)
+    if not academy_id:
+        raise HTTPException(status_code=400, detail="لم يتم تحديد الأكاديمية")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(
+            f"{supabase.url}/rest/v1/sous_admin_branches",
+            json={
+                "user_id": data.user_id,
+                "branch_id": data.branch_id,
+                "academy_id": academy_id,
+            },
+            headers={**supabase.admin_headers, "Prefer": "return=representation"},
         )
-        res.raise_for_status()
-        return {"message": "تم حذف الفرع بنجاح"}
-    except Exception as e:
-        logger.error("Error deleting branch: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="فشل في حذف الفرع",
+        if res.status_code == 409 or (res.status_code >= 400 and "duplicate" in res.text.lower()):
+            raise HTTPException(status_code=409, detail="هذا المسؤول معين مسبقاً لهذا الفرع")
+        if res.status_code >= 400:
+            logger.error("Assign sous-admin failed: %s", res.text)
+            raise HTTPException(status_code=500, detail="فشل تعيين المسؤول")
+        return {"success": True, "message": "تم تعيين المسؤول بنجاح"}
+
+
+@router.delete("/unassign-sous-admin/{user_id}/{branch_id}")
+async def unassign_sous_admin(
+    user_id: str,
+    branch_id: str,
+    user: dict = Depends(require_role("admin", "super_admin"))
+):
+    """إلغاء تعيين Sous-Admin من فرع"""
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.delete(
+            f"{supabase.url}/rest/v1/sous_admin_branches"
+            f"?user_id=eq.{user_id}&branch_id=eq.{branch_id}",
+            headers=supabase.admin_headers,
         )
+        if res.status_code >= 400:
+            raise HTTPException(status_code=500, detail="فشل إلغاء التعيين")
+        return {"success": True, "message": "تم إلغاء التعيين"}
 
 
-# ---------- Sous-admin branch assignments ----------
-
-@router.get(
-    "/{branch_id}/sous-admins",
-    dependencies=[Depends(require_role("admin", "super_admin"))],
-)
-async def list_branch_sous_admins(branch_id: str):
-    try:
-        rows = await supabase._get(
-            f"/rest/v1/sous_admin_branches?branch_id=eq.{branch_id}"
-            "&select=id,user_id,branch_id,users(id,full_name,email)"
+@router.get("/sous-admins/{branch_id}")
+async def get_branch_sous_admins(
+    branch_id: str,
+    user: dict = Depends(require_role("admin", "super_admin"))
+):
+    """قائمة Sous-Admins المعينين لفرع"""
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.get(
+            f"{supabase.url}/rest/v1/sous_admin_branches"
+            f"?branch_id=eq.{branch_id}&select=user_id,users(id,full_name,email)",
+            headers=supabase.admin_headers,
         )
-        return rows or []
-    except Exception as e:
-        logger.error("Error listing sous-admins: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="فشل في جلب المسؤولين المساعدين",
-        )
-
-
-@router.post(
-    "/assign-sous-admin",
-    dependencies=[Depends(require_role("admin", "super_admin"))],
-)
-async def assign_sous_admin(payload: SousAdminBranchAssign):
-    """Assign a sous_admin user to a branch within the current academy."""
-    try:
-        existing = await supabase._get(
-            f"/rest/v1/sous_admin_branches"
-            f"?user_id=eq.{payload.user_id}"
-            f"&branch_id=eq.{payload.branch_id}&select=id"
-        )
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="هذا المستخدم معين بالفعل لهذا الفرع",
-            )
-
-        data = {
-            "user_id": payload.user_id,
-            "branch_id": payload.branch_id,
-        }
-        response = await supabase._post("/rest/v1/sous_admin_branches", data)
-        return response[0] if response else {}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error assigning sous-admin: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="فشل في تعيين المسؤول المساعد",
-        )
-
-
-@router.delete(
-    "/assign-sous-admin/{assignment_id}",
-    dependencies=[Depends(require_role("admin", "super_admin"))],
-)
-async def unassign_sous_admin(assignment_id: str):
-    try:
-        res = await supabase.client.delete(
-            f"/rest/v1/sous_admin_branches?id=eq.{assignment_id}"
-        )
-        res.raise_for_status()
-        return {"message": "تم إلغاء التعيين بنجاح"}
-    except Exception as e:
-        logger.error("Error unassigning sous-admin: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="فشل في إلغاء التعيين",
-        )
+        if res.status_code >= 400:
+            return []
+        return res.json()

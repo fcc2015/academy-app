@@ -130,7 +130,7 @@ const BranchesManagement = () => {
         setAssignLoading(true);
         try {
             const [assignedRes, adminsRes] = await Promise.all([
-                authFetch(`${API_URL}/branches/${branch.id}/sous-admins`),
+                authFetch(`${API_URL}/branches/sous-admins/${branch.id}`),
                 authFetch(`${API_URL}/admins/`),
             ]);
             const assigned = assignedRes.ok ? await assignedRes.json() : [];
@@ -169,7 +169,7 @@ const BranchesManagement = () => {
             }
             toast.success('تم التعيين بنجاح');
             setSelectedSousAdminId('');
-            const reloadRes = await authFetch(`${API_URL}/branches/${assignBranch.id}/sous-admins`);
+            const reloadRes = await authFetch(`${API_URL}/branches/sous-admins/${assignBranch.id}`);
             if (reloadRes.ok) setAssignedSousAdmins(await reloadRes.json() || []);
         } catch (err) {
             toast.error(err.message);
@@ -178,15 +178,16 @@ const BranchesManagement = () => {
         }
     };
 
-    const handleUnassign = async (assignmentId) => {
+    const handleUnassign = async (userId) => {
+        if (!assignBranch) return;
         try {
             const res = await authFetch(
-                `${API_URL}/branches/assign-sous-admin/${assignmentId}`,
+                `${API_URL}/branches/unassign-sous-admin/${userId}/${assignBranch.id}`,
                 { method: 'DELETE' }
             );
             if (!res.ok) throw new Error('فشل في إلغاء التعيين');
             toast.success('تم إلغاء التعيين');
-            setAssignedSousAdmins(prev => prev.filter(a => a.id !== assignmentId));
+            setAssignedSousAdmins(prev => prev.filter(a => a.user_id !== userId));
         } catch (err) {
             toast.error(err.message);
         }
@@ -467,7 +468,7 @@ const BranchesManagement = () => {
                                 ) : (
                                     <div className="space-y-2">
                                         {assignedSousAdmins.map(a => (
-                                            <div key={a.id} className={`flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                            <div key={a.user_id} className={`flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl ${isRTL ? 'flex-row-reverse' : ''}`}>
                                                 <div className={isRTL ? 'text-right' : 'text-left'}>
                                                     <div className="font-bold text-slate-900 text-sm">
                                                         {a.users?.full_name || '—'}
@@ -475,7 +476,7 @@ const BranchesManagement = () => {
                                                     <div className="text-xs text-slate-500">{a.users?.email || ''}</div>
                                                 </div>
                                                 <button
-                                                    onClick={() => handleUnassign(a.id)}
+                                                    onClick={() => handleUnassign(a.user_id)}
                                                     className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-all"
                                                     title="إلغاء التعيين"
                                                 >
