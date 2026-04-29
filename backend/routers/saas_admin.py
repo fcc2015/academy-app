@@ -148,6 +148,22 @@ async def create_academy(req: AcademyProvisionRequest):
                 detail=f"This email is already used by another admin. | هاد الإيميل ديجا مستعمل من طرف أدمين آخر: {req.admin_email}",
             )
 
+        # Also check Supabase Auth (catches super_admin and other auth users)
+        auth_check = await client.get(
+            f"{supabase.url}/auth/v1/admin/users?email={quote(str(req.admin_email))}",
+            headers=supabase.admin_headers,
+        )
+        if auth_check.status_code == 200:
+            try:
+                users_list = auth_check.json().get("users", [])
+                if any(u.get("email", "").lower() == str(req.admin_email).lower() for u in users_list):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"This email is already registered. Use a different email. | هاد الإيميل ديجا مسجل: {req.admin_email}",
+                    )
+            except (ValueError, AttributeError):
+                pass  # If parsing fails, fall through to provisioning attempt
+
         academy_data = {
             "name": req.name,
             "custom_domain": req.custom_domain,
@@ -242,18 +258,35 @@ async def create_academy(req: AcademyProvisionRequest):
 
             return {"success": True, "academy": academy_row, "admin_user_id": admin_user_id}
         except HTTPException:
+            # Rollback: delete the orphan academy so retrying with a different email works
+            try:
+                await client.delete(
+                    f"{supabase.url}/rest/v1/academies?id=eq.{new_academy_id}",
+                    headers=supabase.admin_headers,
+                )
+            except Exception as rollback_err:
+                logger.warning("Rollback delete failed: %s", rollback_err)
             raise
         except Exception as e:
             error_msg = str(e)
             logger.error("Failed to provision academy admin: %s", e, exc_info=True)
-            if "duplicate" in error_msg.lower() or "23505" in error_msg:
+            # Rollback orphan academy
+            try:
+                await client.delete(
+                    f"{supabase.url}/rest/v1/academies?id=eq.{new_academy_id}",
+                    headers=supabase.admin_headers,
+                )
+            except Exception as rollback_err:
+                logger.warning("Rollback delete failed: %s", rollback_err)
+
+            if "duplicate" in error_msg.lower() or "23505" in error_msg or "already been registered" in error_msg.lower():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"This email already exists: {req.admin_email}",
+                    detail=f"This email is already registered. Use a different email. | هاد الإيميل ديجا مسجل: {req.admin_email}",
                 )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Academy created, but failed to provision admin: {error_msg[:200]}",
+                detail=f"Failed to provision admin (academy was rolled back): {error_msg[:200]}",
             )
 
 
