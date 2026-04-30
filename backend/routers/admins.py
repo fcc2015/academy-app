@@ -65,16 +65,19 @@ async def create_admin(admin: AdminCreate):
         # 1. Generate temp password
         temp_password = generate_temp_password()
         
-        # 2. Create Auth User — role mirrors admin_type so sous_admin metadata is consistent
+        # 2. Create Auth User via the admin endpoint — bypasses public-signup rate limits
         signup_role = "sous_admin" if admin_dict.get("admin_type") == "sous_admin" else "admin"
-        auth_response = await supabase.sign_up(
+        from core.context import academy_id_ctx as _aid_ctx
+        auth_response = await supabase.admin_create_user(
             email=email,
             password=temp_password,
-            data={"role": signup_role, "full_name": full_name}
+            role=signup_role,
+            full_name=full_name,
+            academy_id=_aid_ctx.get(None),
         )
-        
-        user_id = auth_response.get("user", {}).get("id")
-        
+
+        user_id = auth_response.get("id")
+
         if not user_id:
             raise Exception("Failed to create auth user")
             
@@ -101,7 +104,7 @@ async def create_admin(admin: AdminCreate):
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"[debug] {type(e).__name__}: {error_msg[:400]}"
+            detail="حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى."
         )
 
 @router.put("/{admin_id}")
