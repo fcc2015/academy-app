@@ -35,13 +35,32 @@ async def create_admin(admin: AdminCreate):
         email = admin_dict.get("email")
         full_name = admin_dict.get("full_name")
 
-        # --- Duplicate Check: Email ---
+        # --- Duplicate Check: admins table ---
         existing = await supabase._get(f"/rest/v1/admins?email=eq.{quote(email)}&select=id")
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"This email is already used by another admin. | هاد الإيميل ديجا مستعمل من طرف أدمين آخر: {email}"
+                detail=f"هاد الإيميل ديجا مستعمل من طرف أدمين آخر: {email}"
             )
+
+        # --- Duplicate Check: Supabase Auth (catches deleted-but-not-purged auth users) ---
+        import httpx as _httpx
+        from core.config import settings as _settings
+        async with _httpx.AsyncClient(timeout=10.0) as _c:
+            _auth_check = await _c.get(
+                f"{_settings.SUPABASE_URL}/auth/v1/admin/users?email={quote(email)}",
+                headers=supabase.admin_headers,
+            )
+        if _auth_check.status_code == 200:
+            try:
+                _users = _auth_check.json().get("users", [])
+                if any(u.get("email", "").lower() == email.lower() for u in _users):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"هاد الإيميل ديجا مسجل (في Auth). استعمل إيميل مختلف: {email}",
+                    )
+            except (ValueError, AttributeError):
+                pass
         
         # 1. Generate temp password
         temp_password = generate_temp_password()
@@ -75,14 +94,14 @@ async def create_admin(admin: AdminCreate):
     except Exception as e:
         error_msg = str(e)
         logger.error("Error creating admin: %s", e, exc_info=True)
-        if "duplicate" in error_msg.lower() or "23505" in error_msg:
+        if "duplicate" in error_msg.lower() or "23505" in error_msg or "already been registered" in error_msg.lower() or "422" in error_msg:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"This email already exists. | هاد الإيميل ديجا كاين: {email}"
+                detail=f"هاد الإيميل ديجا مسجل. استعمل إيميل مختلف: {email}"
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"[debug] {type(e).__name__}: {error_msg[:300]}"
+            detail="حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى."
         )
 
 @router.put("/{admin_id}")
