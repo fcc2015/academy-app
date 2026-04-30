@@ -82,7 +82,7 @@ async def create_admin(admin: AdminCreate):
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An internal error occurred. Please try again."
+            detail=f"[debug] {type(e).__name__}: {error_msg[:300]}"
         )
 
 @router.put("/{admin_id}")
