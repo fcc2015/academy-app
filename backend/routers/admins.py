@@ -104,7 +104,7 @@ async def create_admin(admin: AdminCreate):
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى."
+            detail=f"[debug2] {type(e).__name__}: {error_msg[:400]}"
         )
 
 @router.put("/{admin_id}")
