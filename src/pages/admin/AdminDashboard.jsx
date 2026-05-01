@@ -30,10 +30,13 @@ import {
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useToast } from '../../components/Toast';
+import { usePlan } from '../../hooks/usePlan';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const { t, isRTL, dir, language } = useLanguage();
+    const { academyName, branchesAssigned } = usePlan();
+    const role = typeof window !== 'undefined' ? localStorage.getItem('role') : null;
     const toast = useToast();
     const [allPayments, setAllPayments] = useState([]);
     const [stats, setStats] = useState({
@@ -187,10 +190,26 @@ const AdminDashboard = () => {
             {/* Top Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                        {t('common.dashboard')} <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">{t('common.appName')}</span>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3 flex-wrap">
+                        {t('common.dashboard')}
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">
+                            {academyName || t('common.appName')}
+                        </span>
                     </h1>
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-2">{t('dashboard.subtitle')}</p>
+                    {role === 'sous_admin' && branchesAssigned.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                {isRTL ? 'مسؤول الفروع:' : 'Branches:'}
+                            </span>
+                            {branchesAssigned.map(b => (
+                                <span key={b.id} className="px-2.5 py-0.5 rounded-lg text-[11px] font-black uppercase bg-violet-50 text-violet-700 border border-violet-200">
+                                    {b.name}{b.city ? ` · ${b.city}` : ''}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-2">{t('dashboard.subtitle')}</p>
+                    )}
                 </div>
                 <div className="flex items-center gap-4">
                     <button onClick={fetchDashboardData} className="p-3.5 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all shadow-sm active:rotate-180 duration-500 flex items-center justify-center">

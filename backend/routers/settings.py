@@ -2,7 +2,7 @@ import logging
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from core.auth_middleware import verify_token
-from core.context import academy_id_ctx
+from core.context import academy_id_ctx, user_id_ctx, role_ctx
 from core.config import settings as app_settings
 from schemas.settings import AcademySettingsUpdate, AcademySettingsResponse
 from services.supabase_client import supabase
@@ -49,27 +49,55 @@ async def get_settings():
 
 @router.get("/plan")
 async def get_academy_plan():
-    """Returns the current academy's id, plan_id and computed feature flags."""
+    """Returns plan + feature flags + academy name + (for sous_admin) assigned branches."""
     academy_id = academy_id_ctx.get(None)
+    role = role_ctx.get(None)
+    user_id = user_id_ctx.get(None)
+    base = {"academy_id": academy_id, "plan_id": "free", "academy_name": None,
+            "branches_assigned": [], "features": {"branches": False}}
     if not academy_id:
-        return {"academy_id": None, "plan_id": "free", "features": {"branches": False}}
+        return base
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.get(
-                f"{app_settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=plan_id",
+            ac_res = await client.get(
+                f"{app_settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=plan_id,name",
                 headers=supabase.admin_headers,
             )
-        plan_id = "free"
-        if res.status_code == 200 and res.json():
-            plan_id = (res.json()[0].get("plan_id") or "free").lower()
+            plan_id = "free"
+            academy_name = None
+            if ac_res.status_code == 200 and ac_res.json():
+                row = ac_res.json()[0]
+                plan_id = (row.get("plan_id") or "free").lower()
+                academy_name = row.get("name")
+
+            branches_assigned = []
+            if role == "sous_admin" and user_id:
+                sa_res = await client.get(
+                    f"{app_settings.SUPABASE_URL}/rest/v1/sous_admin_branches"
+                    f"?user_id=eq.{user_id}&academy_id=eq.{academy_id}"
+                    "&select=branch_id,branches(id,name,city)",
+                    headers=supabase.admin_headers,
+                )
+                if sa_res.status_code == 200:
+                    for r in sa_res.json():
+                        b = r.get("branches")
+                        if b:
+                            branches_assigned.append({
+                                "id": b.get("id"),
+                                "name": b.get("name"),
+                                "city": b.get("city"),
+                            })
+
         return {
             "academy_id": academy_id,
             "plan_id": plan_id,
+            "academy_name": academy_name,
+            "branches_assigned": branches_assigned,
             "features": {"branches": plan_id == "enterprise"},
         }
     except Exception as e:
         logger.error("Error fetching plan: %s", e, exc_info=True)
-        return {"academy_id": academy_id, "plan_id": "free", "features": {"branches": False}}
+        return base
 
 
 @router.patch("/{settings_id}", response_model=AcademySettingsResponse)

@@ -20,5 +20,11 @@ export function usePlan() {
         inflight.then(data => { setPlan(data); setLoading(false); });
     }, []);
 
-    return { plan, loading, hasFeature: (name) => !!plan?.features?.[name] };
+    return {
+        plan,
+        loading,
+        hasFeature: (name) => !!plan?.features?.[name],
+        academyName: plan?.academy_name || null,
+        branchesAssigned: plan?.branches_assigned || [],
+    };
 }

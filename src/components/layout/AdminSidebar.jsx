@@ -40,10 +40,18 @@ const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setM
                     <div className="w-8 h-8 rounded shrink-0 bg-surface-900 flex items-center justify-center text-white">
                         <Trophy size={16} />
                     </div>
-                    <div className={isRTL ? 'text-right' : 'text-left'}>
-                        <h2 className="text-sm font-semibold text-surface-900 leading-none">{t('common.appName')}</h2>
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-surface-500 mt-1">
-                            {t('ui.adminPanel')}
+                    <div className={`min-w-0 ${isRTL ? 'text-right' : 'text-left'}`}>
+                        <h2 className="text-sm font-semibold text-surface-900 leading-none truncate">
+                            {academyName || t('common.appName')}
+                        </h2>
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-surface-500 mt-1 truncate">
+                            {role === 'sous_admin'
+                                ? (branchesAssigned.length === 1
+                                    ? `${isRTL ? 'فرع: ' : 'Branch: '}${branchesAssigned[0].name}`
+                                    : (branchesAssigned.length > 1
+                                        ? (isRTL ? `${branchesAssigned.length} فروع` : `${branchesAssigned.length} branches`)
+                                        : (isRTL ? 'مسؤول فرع' : 'Branch admin')))
+                                : t('ui.adminPanel')}
                         </p>
                     </div>
                 </div>
@@ -120,7 +128,8 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { t, isRTL, dir } = useLanguage();
-    const { hasFeature } = usePlan();
+    const { hasFeature, academyName, branchesAssigned } = usePlan();
+    const role = typeof window !== 'undefined' ? localStorage.getItem('role') : null;
     const [mobileOpen, setMobileOpen] = useState(false);
 
     const handleLogout = () => {
