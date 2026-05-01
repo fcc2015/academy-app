@@ -31,7 +31,7 @@ import {
 import { useLanguage } from '../../i18n/LanguageContext';
 import { usePlan } from '../../hooks/usePlan';
 
-const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setMobileOpen, navGroups, handleLogout, CollapseIcon }) => (
+const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setMobileOpen, navGroups, handleLogout, CollapseIcon, academyName, role, branchesAssigned }) => (
     <div className="flex flex-col h-full bg-white border-r border-surface-200 overflow-hidden" dir={dir}>
         {/* Brand Header */}
         <div className={`flex items-center px-5 py-5 border-b border-surface-200 ${collapsed ? 'justify-center' : 'justify-between'}`}>
@@ -231,6 +231,9 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
                             navGroups={navGroups}
                             handleLogout={handleLogout}
                             CollapseIcon={CollapseIcon}
+                            academyName={academyName}
+                            role={role}
+                            branchesAssigned={branchesAssigned}
                         />
                     </div>
                 </div>
@@ -251,6 +254,9 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
                     navGroups={navGroups}
                     handleLogout={handleLogout}
                     CollapseIcon={CollapseIcon}
+                    academyName={academyName}
+                    role={role}
+                    branchesAssigned={branchesAssigned}
                 />
             </aside>
         </>
