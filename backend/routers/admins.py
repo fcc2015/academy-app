@@ -50,21 +50,44 @@ async def create_admin(admin: AdminCreate):
         # 1. Generate temp password
         temp_password = generate_temp_password()
         
-        # 2. Create Auth User via the admin endpoint — bypasses public-signup rate limits
+        # 2. Create or reuse Auth User. If a previous attempt left an orphan
+        #    auth user with this email, look it up and reuse its id instead of
+        #    failing — keeps the flow idempotent for the operator.
         signup_role = "sous_admin" if admin_dict.get("admin_type") == "sous_admin" else "admin"
         from core.context import academy_id_ctx as _aid_ctx
-        auth_response = await supabase.admin_create_user(
-            email=email,
-            password=temp_password,
-            role=signup_role,
-            full_name=full_name,
-            academy_id=_aid_ctx.get(None),
-        )
-
-        user_id = auth_response.get("id")
+        user_id = None
+        try:
+            auth_response = await supabase.admin_create_user(
+                email=email,
+                password=temp_password,
+                role=signup_role,
+                full_name=full_name,
+                academy_id=_aid_ctx.get(None),
+            )
+            user_id = auth_response.get("id")
+        except Exception as ce:
+            ce_msg = str(ce).lower()
+            if any(s in ce_msg for s in ("already", "duplicate", "registered", "exists", "422")):
+                # Email exists in auth — find the user_id and reuse
+                import httpx as _httpx
+                from core.config import settings as _settings
+                async with _httpx.AsyncClient(timeout=10.0) as _c:
+                    _r = await _c.get(
+                        f"{_settings.SUPABASE_URL}/auth/v1/admin/users?per_page=200",
+                        headers=supabase.admin_headers,
+                    )
+                if _r.status_code == 200:
+                    for u in _r.json().get("users", []):
+                        if (u.get("email") or "").lower() == email.lower():
+                            user_id = u.get("id")
+                            break
+                if not user_id:
+                    raise
+            else:
+                raise
 
         if not user_id:
-            raise Exception("Failed to create auth user")
+            raise Exception("Failed to create or locate auth user")
             
         # 3. Add user_id to admin table payload
         admin_dict["user_id"] = user_id
