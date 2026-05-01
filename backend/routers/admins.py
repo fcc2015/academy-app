@@ -92,8 +92,28 @@ async def create_admin(admin: AdminCreate):
         # 3. Add user_id to admin table payload
         admin_dict["user_id"] = user_id
         
-        # 4. Insert into admins table
-        response = await supabase.insert_admin(admin_dict)
+        # 4. Insert into admins table — handle 400 (duplicate user_id, etc.) explicitly
+        try:
+            response = await supabase.insert_admin(admin_dict)
+        except Exception as ie:
+            ie_msg = str(ie)
+            # Try to read PostgREST error body for clearer message
+            import httpx as _httpx2
+            from core.config import settings as _settings2
+            async with _httpx2.AsyncClient(timeout=10.0) as _c2:
+                _existing = await _c2.get(
+                    f"{_settings2.SUPABASE_URL}/rest/v1/admins?user_id=eq.{user_id}&select=id,full_name",
+                    headers=supabase.admin_headers,
+                )
+            if _existing.status_code == 200 and _existing.json():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"كاين أدمين ديجا مرتبط بهاد الإيميل. احذفو من /admin/admins ثم رجع حاول.",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"[insert_admin] {type(ie).__name__}: {ie_msg[:300]}",
+            )
         
         created_admin = response[0]
         # Attach the temp password so the frontend can display it to the owner ONCE
