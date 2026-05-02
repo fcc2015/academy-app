@@ -70,6 +70,7 @@ export default function SaasSettings() {
     const saveLanding = async () => {
         setLandingSaving(true);
         setLandingSaved(false);
+        setError('');
         try {
             const res = await authFetch(`${API_URL}/saas/landing-settings`, {
                 method: 'PUT',
@@ -79,8 +80,13 @@ export default function SaasSettings() {
             if (res.ok) {
                 setLandingSaved(true);
                 setTimeout(() => setLandingSaved(false), 2500);
+            } else {
+                const data = await res.json().catch(() => ({}));
+                setError(data.detail || 'Failed to save landing settings.');
             }
-        } catch { /* ignore */ } finally {
+        } catch (e) {
+            setError('Network error: ' + (e.message || 'unknown'));
+        } finally {
             setLandingSaving(false);
         }
     };
@@ -244,14 +250,20 @@ export default function SaasSettings() {
                     <p className="page-subtitle">Configure global SaaS platform settings.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {saved && (
+                    {(saved || landingSaved) && (
                         <span className="flex items-center gap-1.5 text-emerald-600 text-sm font-medium animate-fade-in">
                             <CheckCircle2 className="w-4 h-4" /> Saved!
                         </span>
                     )}
-                    <button onClick={handleSave} disabled={saving} className="btn btn-brand">
-                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        {saving ? 'Saving...' : 'Save Changes'}
+                    <button
+                        onClick={activeTab === 'landing' ? saveLanding : handleSave}
+                        disabled={activeTab === 'landing' ? landingSaving : saving}
+                        className="btn btn-brand"
+                    >
+                        {(activeTab === 'landing' ? landingSaving : saving)
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : <Save className="w-4 h-4" />}
+                        {(activeTab === 'landing' ? landingSaving : saving) ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
             </div>
