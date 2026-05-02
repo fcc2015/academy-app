@@ -315,7 +315,7 @@ async def register_academy(req: RegisterAcademyRequest):
     }
 
 class PublicRequest(BaseModel):
-    type: str = Field(..., pattern=r"^(contact|registration)$")
+    type: str = Field(..., pattern=r"^(contact|registration|saas_inquiry|payment_method)$")
     name: str = Field(..., min_length=2, max_length=100)
     email: Optional[EmailStr] = None
     player_name: Optional[str] = Field(None, max_length=100)
