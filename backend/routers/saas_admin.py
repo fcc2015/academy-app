@@ -59,12 +59,66 @@ class RenewalReminderRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     new_password: str
 
+
+class SaasLandingSettings(BaseModel):
+    hero_title: str | None = None
+    hero_subtitle: str | None = None
+    hero_cta_text: str | None = None
+    features_title: str | None = None
+    features_subtitle: str | None = None
+    pricing_title: str | None = None
+    about_title: str | None = None
+    about_text: str | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
+    contact_address: str | None = None
+    facebook_url: str | None = None
+    instagram_url: str | None = None
+    youtube_url: str | None = None
+    twitter_url: str | None = None
+    linkedin_url: str | None = None
+    footer_text: str | None = None
+
 # ── Plan limits (must match frontend PLANS) ──
 PLAN_LIMITS = {
     "free":       {"players": 15,   "admins": 1,  "coaches": 1},
     "pro":        {"players": 100,  "admins": 4,  "coaches": 10},
     "enterprise": {"players": -1,   "admins": -1, "coaches": -1},
 }
+
+# ── SaaS Landing Settings (super_admin only) ──
+
+@router.get("/landing-settings")
+async def get_saas_landing_settings():
+    """Read the single saas_landing_settings row."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.get(
+            f"{supabase.url}/rest/v1/saas_landing_settings?id=eq.1",
+            headers=supabase.admin_headers,
+        )
+        if res.status_code != 200 or not res.json():
+            return {}
+        return res.json()[0]
+
+
+@router.put("/landing-settings")
+async def update_saas_landing_settings(data: SaasLandingSettings):
+    """Update the single saas_landing_settings row (id=1)."""
+    payload = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not payload:
+        raise HTTPException(status_code=400, detail="No fields to update.")
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.patch(
+            f"{supabase.url}/rest/v1/saas_landing_settings?id=eq.1",
+            json=payload,
+            headers={**supabase.admin_headers, "Prefer": "return=representation"},
+        )
+        if res.status_code >= 400:
+            logger.error("Saas landing update failed: %s %s", res.status_code, res.text)
+            raise HTTPException(status_code=500, detail="Failed to save landing settings.")
+        rows = res.json()
+        return rows[0] if isinstance(rows, list) and rows else {}
+
 
 # ── Academy CRUD ──
 

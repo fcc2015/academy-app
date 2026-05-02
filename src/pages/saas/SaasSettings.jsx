@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Loader2, CheckCircle2, Shield, Database, Globe, Key, RefreshCw, AlertCircle, CreditCard, Zap, Star, Crown, Users, UserCog, Dumbbell } from 'lucide-react';
+import { Save, Loader2, CheckCircle2, Shield, Database, Globe, Key, RefreshCw, AlertCircle, CreditCard, Zap, Star, Crown, Users, UserCog, Dumbbell, Layout } from 'lucide-react';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import { SkeletonDashboard } from '../../components/Skeleton';
@@ -38,10 +38,52 @@ export default function SaasSettings() {
         plan_enterprise_max_coaches: -1,
     });
 
+    // Landing page settings
+    const [landing, setLanding] = useState({
+        hero_title: '', hero_subtitle: '', hero_cta_text: '',
+        features_title: '', features_subtitle: '',
+        pricing_title: '',
+        about_title: '', about_text: '',
+        contact_email: '', contact_phone: '', contact_address: '',
+        facebook_url: '', instagram_url: '', youtube_url: '', twitter_url: '', linkedin_url: '',
+        footer_text: '',
+    });
+    const [landingSaving, setLandingSaving] = useState(false);
+    const [landingSaved, setLandingSaved] = useState(false);
+
     useEffect(() => {
         fetchSettings();
         fetchPaypalStatus();
+        fetchLanding();
     }, []);
+
+    const fetchLanding = async () => {
+        try {
+            const res = await authFetch(`${API_URL}/saas/landing-settings`);
+            if (res.ok) {
+                const data = await res.json();
+                setLanding(prev => ({ ...prev, ...Object.fromEntries(Object.entries(data).filter(([k]) => k in prev)) }));
+            }
+        } catch { /* ignore */ }
+    };
+
+    const saveLanding = async () => {
+        setLandingSaving(true);
+        setLandingSaved(false);
+        try {
+            const res = await authFetch(`${API_URL}/saas/landing-settings`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(landing),
+            });
+            if (res.ok) {
+                setLandingSaved(true);
+                setTimeout(() => setLandingSaved(false), 2500);
+            }
+        } catch { /* ignore */ } finally {
+            setLandingSaving(false);
+        }
+    };
 
     const fetchSettings = async () => {
         try {
@@ -116,6 +158,7 @@ export default function SaasSettings() {
 
     const tabs = [
         { id: 'general', label: 'General', icon: Globe },
+        { id: 'landing', label: 'Landing Page', icon: Layout },
         { id: 'plans', label: 'Plans & Limits', icon: Crown },
         { id: 'paypal', label: 'PayPal', icon: CreditCard },
         { id: 'automations', label: 'Automations', icon: RefreshCw },
@@ -296,6 +339,93 @@ export default function SaasSettings() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── TAB: Landing Page ── */}
+            {activeTab === 'landing' && (
+                <div>
+                    <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+                        <Layout className="w-5 h-5 text-violet-600 mt-0.5 shrink-0" />
+                        <div>
+                            <p className="text-sm font-semibold text-violet-800">Public marketing site (`/saas-platform`)</p>
+                            <p className="text-xs text-violet-600 mt-1">
+                                Edit hero copy, section titles, contact info and social links. Changes go live immediately.
+                            </p>
+                        </div>
+                    </div>
+
+                    {[
+                        { title: 'Hero', fields: [
+                            { k: 'hero_title', label: 'Hero Title', placeholder: 'Build a thriving sports academy.' },
+                            { k: 'hero_subtitle', label: 'Hero Subtitle', placeholder: 'Multi-tenant SaaS for football academies — players, finances, branches.' },
+                            { k: 'hero_cta_text', label: 'CTA Button Text', placeholder: 'Start free trial' },
+                        ]},
+                        { title: 'Sections', fields: [
+                            { k: 'features_title', label: 'Features Section Title', placeholder: 'Everything you need to run a modern academy' },
+                            { k: 'features_subtitle', label: 'Features Subtitle', placeholder: '15+ tools, one platform' },
+                            { k: 'pricing_title', label: 'Pricing Section Title', placeholder: 'Simple pricing' },
+                            { k: 'about_title', label: 'About Section Title', placeholder: 'About us' },
+                        ]},
+                        { title: 'About Text', fields: [
+                            { k: 'about_text', label: 'About Body Text', placeholder: 'We help academy owners grow…', textarea: true },
+                        ]},
+                        { title: 'Contact', fields: [
+                            { k: 'contact_email', label: 'Contact Email', placeholder: 'support@example.com' },
+                            { k: 'contact_phone', label: 'Contact Phone', placeholder: '+212 600 000 000' },
+                            { k: 'contact_address', label: 'Contact Address', placeholder: 'Casablanca, Morocco' },
+                        ]},
+                        { title: 'Social Links', fields: [
+                            { k: 'facebook_url', label: 'Facebook URL', placeholder: 'https://facebook.com/...' },
+                            { k: 'instagram_url', label: 'Instagram URL', placeholder: 'https://instagram.com/...' },
+                            { k: 'youtube_url', label: 'YouTube URL', placeholder: 'https://youtube.com/@...' },
+                            { k: 'twitter_url', label: 'Twitter/X URL', placeholder: 'https://x.com/...' },
+                            { k: 'linkedin_url', label: 'LinkedIn URL', placeholder: 'https://linkedin.com/...' },
+                        ]},
+                        { title: 'Footer', fields: [
+                            { k: 'footer_text', label: 'Footer Text', placeholder: '© 2026 Academy SaaS. All rights reserved.' },
+                        ]},
+                    ].map(group => (
+                        <div key={group.title} className="bg-white rounded-2xl border border-slate-200 mb-5 overflow-hidden">
+                            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
+                                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">{group.title}</h4>
+                            </div>
+                            <div className="p-5 space-y-3">
+                                {group.fields.map(f => (
+                                    <div key={f.k}>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1.5">{f.label}</label>
+                                        {f.textarea ? (
+                                            <textarea
+                                                rows={5}
+                                                value={landing[f.k] || ''}
+                                                onChange={e => setLanding(prev => ({ ...prev, [f.k]: e.target.value }))}
+                                                placeholder={f.placeholder}
+                                                className="input resize-none"
+                                            />
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={landing[f.k] || ''}
+                                                onChange={e => setLanding(prev => ({ ...prev, [f.k]: e.target.value }))}
+                                                placeholder={f.placeholder}
+                                                className="input"
+                                                dir={f.k.includes('url') ? 'ltr' : undefined}
+                                            />
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+
+                    <div className="flex justify-end gap-3">
+                        <a href="/saas-platform" target="_blank" rel="noreferrer" className="btn btn-secondary">
+                            <Globe size={16} /> Preview
+                        </a>
+                        <button onClick={saveLanding} disabled={landingSaving} className="btn btn-brand min-w-[140px] justify-center">
+                            {landingSaving ? <Loader2 size={16} className="animate-spin" /> : landingSaved ? <><CheckCircle2 size={16} /> Saved</> : <><Save size={16} /> Save Landing</>}
+                        </button>
                     </div>
                 </div>
             )}
