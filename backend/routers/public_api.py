@@ -13,6 +13,20 @@ import httpx
 router = APIRouter(prefix="/public", tags=["Public"])
 
 
+@router.get("/saas-landing")
+async def get_public_saas_landing():
+    """Public read of the single saas_landing_settings row — used by /saas-platform."""
+    from core.config import settings as _s
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        res = await client.get(
+            f"{_s.SUPABASE_URL}/rest/v1/saas_landing_settings?id=eq.1",
+            headers=supabase.admin_headers,
+        )
+        if res.status_code != 200 or not res.json():
+            return {}
+        return res.json()[0]
+
+
 @router.get("/academy/{subdomain}")
 async def get_public_academy(subdomain: str):
     """

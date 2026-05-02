@@ -87,6 +87,15 @@ export default function SaasLanding() {
         fetch(`${api}/health`).catch(() => {});
     }, []);
 
+    // Editable landing copy (filled from /public/saas-landing — falls back to hardcoded defaults)
+    const [cms, setCms] = useState({});
+    useEffect(() => {
+        fetch(`${API_URL}/public/saas-landing`)
+            .then(r => r.ok ? r.json() : {})
+            .then(data => setCms(data || {}))
+            .catch(() => {});
+    }, []);
+
     // Auto-open registration form if coming back from Google OAuth after payment
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -677,25 +686,31 @@ export default function SaasLanding() {
 
                     <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] mb-6"
                         style={{ letterSpacing: '-0.03em' }}>
-                        Gérez votre académie<br />
-                        <span style={{
-                            background: 'linear-gradient(135deg, #818cf8, #c084fc, #f59e0b)',
-                            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'
-                        }}>
-                            avec excellence
-                        </span>
+                        {cms.hero_title ? (
+                            <span style={{
+                                background: 'linear-gradient(135deg, #818cf8, #c084fc, #f59e0b)',
+                                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'
+                            }}>{cms.hero_title}</span>
+                        ) : (
+                            <>
+                                Gérez votre académie<br />
+                                <span style={{
+                                    background: 'linear-gradient(135deg, #818cf8, #c084fc, #f59e0b)',
+                                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text'
+                                }}>avec excellence</span>
+                            </>
+                        )}
                     </h1>
 
                     <p className="text-base sm:text-lg max-w-2xl mx-auto leading-relaxed mb-10 font-medium" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                        La solution complète pour gérer joueurs, entraîneurs, finances, tournois et bien plus —
-                        tout dans une plateforme sécurisée et intuitive.
+                        {cms.hero_subtitle || 'La solution complète pour gérer joueurs, entraîneurs, finances, tournois et bien plus — tout dans une plateforme sécurisée et intuitive.'}
                     </p>
 
                     <div className="flex flex-wrap justify-center gap-4">
                         <button onClick={() => scrollTo('pricing')}
                             className="flex items-center gap-2.5 px-7 py-4 rounded-2xl font-black text-sm uppercase tracking-widest text-white transition-all hover:scale-105 active:scale-95"
                             style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 32px rgba(99,102,241,0.4)' }}>
-                            Voir les tarifs <ChevronRight size={18} />
+                            {cms.hero_cta_text || 'Voir les tarifs'} <ChevronRight size={18} />
                         </button>
                         <button onClick={() => scrollTo('features')}
                             className="flex items-center gap-2.5 px-7 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all hover:bg-white/10"
@@ -733,10 +748,10 @@ export default function SaasLanding() {
                             Fonctionnalités
                         </span>
                         <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-4" style={{ letterSpacing: '-0.025em' }}>
-                            Tout ce dont votre académie<br />a besoin
+                            {cms.features_title || (<>Tout ce dont votre académie<br />a besoin</>)}
                         </h2>
                         <p className="text-slate-500 max-w-xl mx-auto font-medium leading-relaxed">
-                            Une plateforme complète construite spécifiquement pour les académies de football professionnelles.
+                            {cms.features_subtitle || 'Une plateforme complète construite spécifiquement pour les académies de football professionnelles.'}
                         </p>
                     </div>
 
@@ -767,7 +782,7 @@ export default function SaasLanding() {
                             Tarifs
                         </span>
                         <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-4" style={{ letterSpacing: '-0.025em' }}>
-                            Choisissez votre plan
+                            {cms.pricing_title || 'Choisissez votre plan'}
                         </h2>
                         <p className="text-slate-500 max-w-xl mx-auto font-medium mb-8">
                             Plans transparents, sans frais cachés. Commencez gratuitement.
@@ -898,14 +913,20 @@ export default function SaasLanding() {
                                 À propos
                             </span>
                             <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-5" style={{ letterSpacing: '-0.025em' }}>
-                                Qui sommes-nous ?
+                                {cms.about_title || 'Qui sommes-nous ?'}
                             </h2>
-                            <p className="text-slate-600 leading-relaxed font-medium mb-4">
-                                AcademySaaS est une plateforme de gestion dédiée aux académies de football. Nous avons développé cette solution après avoir constaté le manque d'outils adaptés aux besoins spécifiques des clubs et académies sportives.
-                            </p>
-                            <p className="text-slate-600 leading-relaxed font-medium mb-6">
-                                Notre équipe est composée de développeurs passionnés de football qui comprennent les défis quotidiens des gestionnaires d'académies : suivi des joueurs, gestion financière, communication avec les parents, organisation des tournois.
-                            </p>
+                            {cms.about_text ? (
+                                <p className="text-slate-600 leading-relaxed font-medium mb-6 whitespace-pre-line">{cms.about_text}</p>
+                            ) : (
+                                <>
+                                    <p className="text-slate-600 leading-relaxed font-medium mb-4">
+                                        AcademySaaS est une plateforme de gestion dédiée aux académies de football. Nous avons développé cette solution après avoir constaté le manque d'outils adaptés aux besoins spécifiques des clubs et académies sportives.
+                                    </p>
+                                    <p className="text-slate-600 leading-relaxed font-medium mb-6">
+                                        Notre équipe est composée de développeurs passionnés de football qui comprennent les défis quotidiens des gestionnaires d'académies : suivi des joueurs, gestion financière, communication avec les parents, organisation des tournois.
+                                    </p>
+                                </>
+                            )}
                             <div className="grid grid-cols-2 gap-4">
                                 {[
                                     { icon: Shield, label: 'Sécurisé & Fiable', color: '#10b981' },
