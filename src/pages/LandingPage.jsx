@@ -20,6 +20,25 @@ const LandingPage = () => {
     const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
     const [contactStatus, setContactStatus] = useState(null);
 
+    // Per-academy public context (read via ?a=<subdomain> or hostname subdomain)
+    const [academyCtx, setAcademyCtx] = useState(null); // { id, name, plan_id, branches, has_branches_feature }
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        let sub = params.get('a') || params.get('academy') || '';
+        if (!sub) {
+            const host = window.location.hostname;
+            const parts = host.split('.');
+            if (parts.length >= 3 && !['www', 'app', 'academy-app-mu'].includes(parts[0])) {
+                sub = parts[0];
+            }
+        }
+        if (!sub) return;
+        fetch(`${API_URL}/public/academy/${encodeURIComponent(sub)}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setAcademyCtx(data); })
+            .catch(() => {});
+    }, []);
+
     // Registration Form State
     const [regForm, setRegForm] = useState({ name: '', email: '', player_name: '', phone: '', birth_date: '', address: '', plan_name: '' });
     const [regStatus, setRegStatus] = useState(null);
@@ -176,8 +195,13 @@ const LandingPage = () => {
                     <div className={`hidden md:flex items-center gap-7 ${isRTL ? 'flex-row-reverse' : ''}`}>
                         {[
                             { href: '#features', label: t('landing.services') },
+                            ...(academyCtx?.has_branches_feature && academyCtx.branches?.length > 0
+                                ? [{ href: '#branches', label: isRTL ? 'الفروع' : 'Branches' }]
+                                : []),
                             { href: '#pricing',  label: t('landing.pricing')  },
+                            { href: '#about',    label: isRTL ? 'من نحن' : 'About' },
                             { href: '#contact',  label: t('landing.contact')  },
+                            { href: '#privacy',  label: isRTL ? 'الخصوصية' : 'Privacy' },
                         ].map(link => (
                             <a key={link.href} href={link.href}
                                 className={`text-sm font-700 transition-colors ${isScrolled ? 'text-slate-500 hover:text-indigo-600' : 'text-white/70 hover:text-white'}`}
@@ -483,6 +507,82 @@ const LandingPage = () => {
                 </div>
             </section>
 
+            {/* ─── BRANCHES SECTION (Enterprise academy only) ─── */}
+            {academyCtx?.has_branches_feature && academyCtx.branches?.length > 0 && (
+                <section id="branches" className="py-24 px-4" style={{ background: 'linear-gradient(180deg, #f0f4ff 0%, white 100%)' }}>
+                    <div className="max-w-6xl mx-auto">
+                        <div className="text-center mb-14">
+                            <p className="text-xs font-black tracking-[0.3em] uppercase mb-3" style={{ color: '#7c3aed' }}>
+                                {isRTL ? 'فروعنا' : 'Our Branches'}
+                            </p>
+                            <h2 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight">
+                                {isRTL ? `فروع ${academyCtx.name || ''}` : `${academyCtx.name || 'Academy'} Branches`}
+                            </h2>
+                            <p className="text-slate-500 mt-4 max-w-2xl mx-auto">
+                                {isRTL ? 'اختر الفرع الأقرب إليك واكتشف برامج التدريب المتاحة.' : 'Pick the closest branch and explore the training programs available.'}
+                            </p>
+                        </div>
+                        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                            {academyCtx.branches.map((b) => (
+                                <div key={b.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all overflow-hidden">
+                                    <div className="h-2 bg-gradient-to-r from-indigo-500 to-purple-600" />
+                                    <div className="p-6">
+                                        <h3 className="font-black text-slate-900 text-xl mb-2">{b.name}</h3>
+                                        {b.city && (
+                                            <div className={`flex items-center gap-1.5 text-sm text-slate-500 mb-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                <MapPin size={14} className="text-indigo-500" />
+                                                <span>{b.city}</span>
+                                            </div>
+                                        )}
+                                        {b.address && (
+                                            <p className={`text-xs text-slate-400 mb-2 ${isRTL ? 'text-right' : ''}`}>{b.address}</p>
+                                        )}
+                                        {b.phone && (
+                                            <div className={`flex items-center gap-1.5 text-xs text-slate-500 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                <Phone size={12} className="text-indigo-500" />
+                                                <span dir="ltr">{b.phone}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            )}
+
+            {/* ─── ABOUT US ─── */}
+            <section id="about" className="py-24 px-4 bg-white">
+                <div className="max-w-4xl mx-auto text-center">
+                    <p className="text-xs font-black tracking-[0.3em] uppercase mb-3" style={{ color: '#4f46e5' }}>
+                        {isRTL ? 'من نحن' : 'About Us'}
+                    </p>
+                    <h2 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight mb-6">
+                        {isRTL
+                            ? (academyCtx?.name ? `${academyCtx.name} — قصتنا` : 'قصتنا')
+                            : (academyCtx?.name ? `${academyCtx.name} — Our Story` : 'Our Story')}
+                    </h2>
+                    <p className="text-lg text-slate-600 leading-relaxed">
+                        {isRTL
+                            ? 'نحن أكاديمية رياضية شغوفة بصناعة الأبطال — من المهارات التقنية إلى القيم الأخلاقية. مدربون معتمدون، منشآت حديثة، ومنهج تدريبي مدروس لكل فئة عمرية.'
+                            : 'We are a sports academy passionate about shaping champions — from technical skills to moral values. Certified coaches, modern facilities, and structured training programs for every age group.'}
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12">
+                        {[
+                            { value: '500+', label: isRTL ? 'لاعب نشط' : 'Active Players' },
+                            { value: '20+',  label: isRTL ? 'مدرب معتمد' : 'Certified Coaches' },
+                            { value: '15',   label: isRTL ? 'سنة خبرة' : 'Years Experience' },
+                            { value: '50+',  label: isRTL ? 'بطولة' : 'Tournaments' },
+                        ].map((s, i) => (
+                            <div key={i} className="text-center">
+                                <div className="text-3xl md:text-4xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">{s.value}</div>
+                                <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mt-1">{s.label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
             {/* ─── CONTACT ─── */}
             <section id="contact" className="py-24 px-4" style={{ background: '#f8fafc' }}>
                 <div className="max-w-5xl mx-auto">
@@ -589,6 +689,55 @@ const LandingPage = () => {
                                 </button>
                             </form>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* ─── PRIVACY POLICY ─── */}
+            <section id="privacy" className="py-20 px-4 bg-slate-50">
+                <div className="max-w-3xl mx-auto">
+                    <p className="text-xs font-black tracking-[0.3em] uppercase mb-3 text-center" style={{ color: '#4f46e5' }}>
+                        {isRTL ? 'سياسة الخصوصية' : 'Privacy Policy'}
+                    </p>
+                    <h2 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight text-center mb-10">
+                        {isRTL ? 'بياناتك في أمان' : 'Your data is safe'}
+                    </h2>
+                    <div className={`space-y-5 text-slate-600 leading-relaxed ${isRTL ? 'text-right' : 'text-left'}`}>
+                        <div>
+                            <h3 className="font-black text-slate-900 mb-1">{isRTL ? 'البيانات اللي كنجمعو' : 'Data we collect'}</h3>
+                            <p className="text-sm">
+                                {isRTL
+                                    ? 'الاسم، البريد الإلكتروني، رقم الهاتف، تاريخ الميلاد ديال اللاعب — لازمين فقط لإدارة الاشتراك وتنظيم التداريب.'
+                                    : 'Name, email, phone number, player\'s date of birth — only what\'s needed to manage subscriptions and organize training sessions.'}
+                            </p>
+                        </div>
+                        <div>
+                            <h3 className="font-black text-slate-900 mb-1">{isRTL ? 'كيفاش كنحميوها' : 'How we protect it'}</h3>
+                            <p className="text-sm">
+                                {isRTL
+                                    ? 'كل البيانات مخزنة فـ قواعد بيانات مشفرة، الـ passwords كتـ hashed، والوصول محدود فقط للأدمين المعنيين بالأكاديمية ديالك.'
+                                    : 'All data is stored in encrypted databases, passwords are hashed, and access is limited only to authorized admins of your academy.'}
+                            </p>
+                        </div>
+                        <div>
+                            <h3 className="font-black text-slate-900 mb-1">{isRTL ? 'حقوقك' : 'Your rights'}</h3>
+                            <p className="text-sm">
+                                {isRTL
+                                    ? 'تقدر تـ requestي حذف الحساب ديالك فأي وقت بمراسلة الدعم. كذلك تقدر تطلب نسخة كاملة ديال البيانات ديالك.'
+                                    : 'You can request account deletion anytime by contacting support. You can also request a full export of your data.'}
+                            </p>
+                        </div>
+                        <div>
+                            <h3 className="font-black text-slate-900 mb-1">{isRTL ? 'الكوكيز' : 'Cookies'}</h3>
+                            <p className="text-sm">
+                                {isRTL
+                                    ? 'كنستعملو cookies تقنية ضرورية فقط للـ login و الـ session. ما كنستعملوش tracking cookies ديال الإعلانات.'
+                                    : 'We use only essential technical cookies for login and sessions. We do not use ad-tracking cookies.'}
+                            </p>
+                        </div>
+                        <p className="text-xs text-slate-400 italic mt-8 text-center">
+                            {isRTL ? 'آخر تحديث: 2026-05' : 'Last updated: 2026-05'}
+                        </p>
                     </div>
                 </div>
             </section>
