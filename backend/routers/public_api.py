@@ -13,6 +13,51 @@ import httpx
 router = APIRouter(prefix="/public", tags=["Public"])
 
 
+@router.get("/academy/{subdomain}")
+async def get_public_academy(subdomain: str):
+    """
+    Public read of an academy by subdomain — used by the per-academy
+    landing page. Returns minimal info + branches (only if the academy
+    is on the enterprise plan).
+    """
+    from core.config import settings as _s
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        ac = await client.get(
+            f"{_s.SUPABASE_URL}/rest/v1/academies"
+            f"?subdomain=eq.{quote(subdomain)}"
+            "&select=id,name,city,plan_id,custom_domain,logo_url,primary_color,status",
+            headers=supabase.admin_headers,
+        )
+        if ac.status_code != 200 or not ac.json():
+            raise HTTPException(status_code=404, detail="Academy not found")
+        row = ac.json()[0]
+        if (row.get("status") or "active") == "suspended":
+            raise HTTPException(status_code=403, detail="Academy is suspended")
+
+        plan_id = (row.get("plan_id") or "free").lower()
+        branches = []
+        if plan_id == "enterprise":
+            br = await client.get(
+                f"{_s.SUPABASE_URL}/rest/v1/branches"
+                f"?academy_id=eq.{row['id']}&is_active=eq.true"
+                "&select=id,name,city,address,phone&order=created_at.asc",
+                headers=supabase.admin_headers,
+            )
+            if br.status_code == 200:
+                branches = br.json()
+
+        return {
+            "id": row["id"],
+            "name": row.get("name"),
+            "city": row.get("city"),
+            "plan_id": plan_id,
+            "logo_url": row.get("logo_url"),
+            "primary_color": row.get("primary_color"),
+            "has_branches_feature": plan_id == "enterprise",
+            "branches": branches,
+        }
+
+
 class SetupAcademyRequest(BaseModel):
     academy_name: str = Field(..., min_length=2, max_length=100)
     country: Optional[str] = Field(None, max_length=100)
