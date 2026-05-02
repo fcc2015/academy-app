@@ -273,19 +273,32 @@ const LandingPage = () => {
                     {/* Hero Title */}
                     <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.1] mb-6 animate-fade-in delay-100"
                         style={{ letterSpacing: '-0.03em' }}>
-                        {t('landing.heroTitle')}<br />
-                        <span style={{
-                            background: 'linear-gradient(135deg, #818cf8, #c084fc, #f59e0b)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                        }}>
-                            {t('landing.heroHighlight')}
-                        </span>
+                        {academyCtx?.hero_title ? (
+                            <span style={{
+                                background: 'linear-gradient(135deg, #818cf8, #c084fc, #f59e0b)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                            }}>
+                                {academyCtx.hero_title}
+                            </span>
+                        ) : (
+                            <>
+                                {t('landing.heroTitle')}<br />
+                                <span style={{
+                                    background: 'linear-gradient(135deg, #818cf8, #c084fc, #f59e0b)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text',
+                                }}>
+                                    {t('landing.heroHighlight')}
+                                </span>
+                            </>
+                        )}
                     </h1>
 
                     <p className="text-base sm:text-lg text-white/55 max-w-2xl mx-auto leading-relaxed mb-10 animate-fade-in delay-200">
-                        {t('landing.heroSubtitle')}
+                        {academyCtx?.hero_subtitle || t('landing.heroSubtitle')}
                     </p>
 
                     {/* CTA Buttons */}
@@ -562,11 +575,28 @@ const LandingPage = () => {
                             ? (academyCtx?.name ? `${academyCtx.name} — قصتنا` : 'قصتنا')
                             : (academyCtx?.name ? `${academyCtx.name} — Our Story` : 'Our Story')}
                     </h2>
-                    <p className="text-lg text-slate-600 leading-relaxed">
-                        {isRTL
-                            ? 'نحن أكاديمية رياضية شغوفة بصناعة الأبطال — من المهارات التقنية إلى القيم الأخلاقية. مدربون معتمدون، منشآت حديثة، ومنهج تدريبي مدروس لكل فئة عمرية.'
-                            : 'We are a sports academy passionate about shaping champions — from technical skills to moral values. Certified coaches, modern facilities, and structured training programs for every age group.'}
+                    <p className="text-lg text-slate-600 leading-relaxed whitespace-pre-line">
+                        {academyCtx?.about_text
+                            || (isRTL
+                                ? 'نحن أكاديمية رياضية شغوفة بصناعة الأبطال — من المهارات التقنية إلى القيم الأخلاقية. مدربون معتمدون، منشآت حديثة، ومنهج تدريبي مدروس لكل فئة عمرية.'
+                                : 'We are a sports academy passionate about shaping champions — from technical skills to moral values. Certified coaches, modern facilities, and structured training programs for every age group.')}
                     </p>
+                    {(academyCtx?.facebook_url || academyCtx?.instagram_url || academyCtx?.youtube_url || academyCtx?.whatsapp_number) && (
+                        <div className="flex items-center justify-center gap-3 mt-8">
+                            {academyCtx.facebook_url && (
+                                <a href={academyCtx.facebook_url} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center font-black text-sm">f</a>
+                            )}
+                            {academyCtx.instagram_url && (
+                                <a href={academyCtx.instagram_url} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-orange-400 hover:opacity-90 text-white flex items-center justify-center font-black text-sm">IG</a>
+                            )}
+                            {academyCtx.youtube_url && (
+                                <a href={academyCtx.youtube_url} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center font-black text-sm">YT</a>
+                            )}
+                            {academyCtx.whatsapp_number && (
+                                <a href={`https://wa.me/${academyCtx.whatsapp_number.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center font-black text-sm">WA</a>
+                            )}
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12">
                         {[
                             { value: '500+', label: isRTL ? 'لاعب نشط' : 'Active Players' },
