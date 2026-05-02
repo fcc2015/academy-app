@@ -3,7 +3,7 @@ import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import {
     Building2, Plus, Edit2, Trash2, X, Loader2, MapPin, Phone,
-    Search, Users, UserPlus, UserMinus
+    Search, Users, UserPlus, UserMinus, Copy, Check, CheckCircle2, KeyRound
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -30,6 +30,11 @@ const BranchesManagement = () => {
     const [allSousAdmins, setAllSousAdmins] = useState([]);
     const [selectedSousAdminId, setSelectedSousAdminId] = useState('');
     const [assignLoading, setAssignLoading] = useState(false);
+    const [showCreateSousAdmin, setShowCreateSousAdmin] = useState(false);
+    const [createForm, setCreateForm] = useState({ full_name: '', email: '' });
+    const [creating, setCreating] = useState(false);
+    const [createdCredentials, setCreatedCredentials] = useState(null); // { email, password, name }
+    const [copiedPw, setCopiedPw] = useState(false);
 
     const loadBranches = async () => {
         setLoading(true);
@@ -149,6 +154,79 @@ const BranchesManagement = () => {
         setAssignedSousAdmins([]);
         setAllSousAdmins([]);
         setSelectedSousAdminId('');
+        setShowCreateSousAdmin(false);
+        setCreateForm({ full_name: '', email: '' });
+        setCreatedCredentials(null);
+        setCopiedPw(false);
+    };
+
+    const handleCreateSousAdmin = async (e) => {
+        e.preventDefault();
+        if (!createForm.full_name || !createForm.email) return;
+        setCreating(true);
+        try {
+            // 1. Create the sous_admin via /admins/
+            const res = await authFetch(`${API_URL}/admins/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    full_name: createForm.full_name,
+                    email: createForm.email,
+                    admin_type: 'sous_admin',
+                    status: 'Active',
+                    permissions: { can_manage_users: true, can_manage_financials: false, can_manage_coaches: true }
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || 'فشل في إنشاء المسؤول');
+            }
+            const data = await res.json();
+            
+            // Show credentials
+            setCreatedCredentials({
+                email: createForm.email,
+                password: data.temp_password,
+                name: createForm.full_name,
+            });
+
+            // 2. Auto-assign to this branch
+            if (data.user_id && assignBranch) {
+                await authFetch(`${API_URL}/branches/assign-sous-admin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: data.user_id,
+                        branch_id: assignBranch.id,
+                    }),
+                });
+                // Reload assigned list
+                const reloadRes = await authFetch(`${API_URL}/branches/sous-admins/${assignBranch.id}`);
+                if (reloadRes.ok) setAssignedSousAdmins(await reloadRes.json() || []);
+            }
+
+            // Reload sous admins dropdown
+            const adminsRes = await authFetch(`${API_URL}/admins/`);
+            if (adminsRes.ok) {
+                const allAdmins = await adminsRes.json();
+                setAllSousAdmins((allAdmins || []).filter(a => a.admin_type === 'sous_admin'));
+            }
+
+            setCreateForm({ full_name: '', email: '' });
+            toast.success('تم إنشاء المسؤول وتعيينه بنجاح');
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const handleCopyPw = () => {
+        if (createdCredentials?.password) {
+            navigator.clipboard.writeText(createdCredentials.password);
+            setCopiedPw(true);
+            setTimeout(() => setCopiedPw(false), 2000);
+        }
     };
 
     const handleAssign = async () => {
@@ -491,18 +569,14 @@ const BranchesManagement = () => {
                             {/* Add new */}
                             <div className="pt-4 border-t border-slate-100">
                                 <label className="block text-xs font-black text-slate-700 mb-2 uppercase">تعيين مسؤول جديد</label>
-                                {availableSousAdmins.length === 0 ? (
-                                    <div className="text-sm text-slate-500 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                                        لا يوجد مسؤولون مساعدون متاحون. أنشئهم أولاً من صفحة <a href="/admin/admins" className="text-indigo-600 font-bold underline">الإداريون</a> بنوع "sous_admin".
-                                    </div>
-                                ) : (
-                                    <div className="flex gap-2">
+                                {availableSousAdmins.length > 0 && (
+                                    <div className="flex gap-2 mb-3">
                                         <select
                                             value={selectedSousAdminId}
                                             onChange={(e) => setSelectedSousAdminId(e.target.value)}
                                             className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
                                         >
-                                            <option value="">— اختر مسؤول —</option>
+                                            <option value="">— اختر مسؤول موجود —</option>
                                             {availableSousAdmins.map(a => (
                                                 <option key={a.id} value={a.user_id}>
                                                     {a.full_name} ({a.email})
@@ -518,6 +592,94 @@ const BranchesManagement = () => {
                                             تعيين
                                         </button>
                                     </div>
+                                )}
+
+                                {/* Divider */}
+                                <div className="flex items-center gap-3 my-3">
+                                    <div className="flex-1 h-px bg-slate-200" />
+                                    <span className="text-[10px] font-black text-slate-400 uppercase">أو أنشئ مسؤول جديد</span>
+                                    <div className="flex-1 h-px bg-slate-200" />
+                                </div>
+
+                                {/* Created credentials display */}
+                                {createdCredentials && (
+                                    <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl overflow-hidden animate-fade-in">
+                                        <div className="p-4 border-b border-emerald-100 flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center">
+                                                <CheckCircle2 size={22} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-black text-emerald-800 text-sm">تم إنشاء وتعيين المسؤول بنجاح! 🎉</h4>
+                                                <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                                                    انسخ بيانات الدخول وأرسلها لـ {createdCredentials.name}. لن تظهر مرة أخرى.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="p-4 space-y-3">
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase text-emerald-600/60 mb-0.5">البريد الإلكتروني</p>
+                                                <p className="text-sm font-black text-emerald-900" dir="ltr">{createdCredentials.email}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase text-emerald-600/60 mb-1">كلمة المرور المؤقتة</p>
+                                                <div className="flex items-center justify-between gap-2 bg-white rounded-xl p-3 border border-emerald-200">
+                                                    <code className="text-lg font-black text-indigo-600 tracking-[0.15em] select-all" dir="ltr">
+                                                        {createdCredentials.password}
+                                                    </code>
+                                                    <button
+                                                        onClick={handleCopyPw}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all shrink-0"
+                                                        style={{
+                                                            background: copiedPw ? '#10b981' : '#eef2ff',
+                                                            color: copiedPw ? 'white' : '#6366f1'
+                                                        }}
+                                                    >
+                                                        {copiedPw ? <><Check size={13} /> تم النسخ</> : <><Copy size={13} /> نسخ</>}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-2">
+                                                <p className="text-amber-700 text-[10px] font-bold">⚠️ أرسل هذه المعلومات عبر قناة آمنة. سيُطلب تغيير كلمة المرور عند أول دخول.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Inline create form */}
+                                {!createdCredentials && (
+                                    <form onSubmit={handleCreateSousAdmin} className="bg-violet-50 border border-violet-200 rounded-2xl p-4 space-y-3">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <KeyRound size={16} className="text-violet-600" />
+                                            <span className="text-xs font-black text-violet-700">إنشاء مسؤول فرع جديد + تعيينه تلقائياً</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input
+                                                type="text"
+                                                placeholder="الاسم الكامل"
+                                                value={createForm.full_name}
+                                                onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
+                                                required
+                                                className="px-3 py-2.5 bg-white border border-violet-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                                            />
+                                            <input
+                                                type="email"
+                                                placeholder="البريد الإلكتروني"
+                                                value={createForm.email}
+                                                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                                                required
+                                                dir="ltr"
+                                                className="px-3 py-2.5 bg-white border border-violet-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                                            />
+                                        </div>
+                                        <button
+                                            type="submit"
+                                            disabled={creating || !createForm.full_name || !createForm.email}
+                                            className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm disabled:opacity-60 flex items-center justify-center gap-2 transition-all"
+                                        >
+                                            {creating ? <Loader2 className="animate-spin" size={16} /> : <UserPlus size={16} />}
+                                            {creating ? 'جاري الإنشاء...' : 'إنشاء وتعيين + عرض كلمة المرور'}
+                                        </button>
+                                    </form>
                                 )}
                             </div>
                         </div>
