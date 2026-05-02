@@ -46,6 +46,15 @@ async def get_public_academy(subdomain: str):
             if br.status_code == 200:
                 branches = br.json()
 
+        # Public landing content from academy_settings
+        st = await client.get(
+            f"{_s.SUPABASE_URL}/rest/v1/academy_settings"
+            f"?academy_id=eq.{row['id']}"
+            "&select=hero_title,hero_subtitle,about_text,facebook_url,instagram_url,youtube_url,whatsapp_number,contact_email,contact_phone,address",
+            headers=supabase.admin_headers,
+        )
+        landing = (st.json()[0] if st.status_code == 200 and st.json() else {})
+
         return {
             "id": row["id"],
             "name": row.get("name"),
@@ -55,6 +64,16 @@ async def get_public_academy(subdomain: str):
             "primary_color": row.get("primary_color"),
             "has_branches_feature": plan_id == "enterprise",
             "branches": branches,
+            "hero_title": landing.get("hero_title"),
+            "hero_subtitle": landing.get("hero_subtitle"),
+            "about_text": landing.get("about_text"),
+            "facebook_url": landing.get("facebook_url"),
+            "instagram_url": landing.get("instagram_url"),
+            "youtube_url": landing.get("youtube_url"),
+            "whatsapp_number": landing.get("whatsapp_number"),
+            "contact_email": landing.get("contact_email"),
+            "contact_phone": landing.get("contact_phone"),
+            "address": landing.get("address"),
         }
 
 

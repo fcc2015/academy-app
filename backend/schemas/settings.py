@@ -17,6 +17,14 @@ class AcademySettingsBase(BaseModel):
     age_categories: list[str] = ["U5", "U7", "U9", "U11", "U13", "U15", "U17", "U19", "Senior"]
     season_start: Optional[str] = None
     season_end: Optional[str] = None
+    # Public landing page content
+    hero_title: Optional[str] = None
+    hero_subtitle: Optional[str] = None
+    about_text: Optional[str] = None
+    facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    youtube_url: Optional[str] = None
+    whatsapp_number: Optional[str] = None
 
 class AcademySettingsUpdate(BaseModel):
     academy_name: Optional[str] = None
@@ -33,6 +41,13 @@ class AcademySettingsUpdate(BaseModel):
     age_categories: Optional[list[str]] = None
     season_start: Optional[str] = None
     season_end: Optional[str] = None
+    hero_title: Optional[str] = None
+    hero_subtitle: Optional[str] = None
+    about_text: Optional[str] = None
+    facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    youtube_url: Optional[str] = None
+    whatsapp_number: Optional[str] = None
 
 class AcademySettingsResponse(AcademySettingsBase):
     id: str
