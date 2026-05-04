@@ -310,7 +310,7 @@ export default function SaasLanding() {
             {/* ─── TOP ANNOUNCEMENT BAR ─── */}
             {cms.top_bar_enabled && cms.top_bar_text && !topBarDismissed && (
                 <div
-                    className="w-full text-white text-xs sm:text-sm font-semibold relative z-[60]"
+                    className="fixed top-0 left-0 right-0 w-full text-white text-xs sm:text-sm font-semibold z-[60]"
                     style={{ background: cms.top_bar_bg_color || '#6366f1' }}
                 >
                     <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-center gap-3 flex-wrap">
@@ -649,8 +649,9 @@ export default function SaasLanding() {
             )}
 
             {/* ─── NAVBAR ─── */}
-            <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+            <nav className="fixed left-0 right-0 z-50 transition-all duration-300"
                 style={{
+                    top: (cms.top_bar_enabled && cms.top_bar_text && !topBarDismissed) ? '40px' : '0',
                     background: isScrolled ? 'rgba(255,255,255,0.94)' : 'transparent',
                     backdropFilter: isScrolled ? 'blur(20px)' : 'none',
                     borderBottom: isScrolled ? '1px solid rgba(148,163,184,0.12)' : 'none',
