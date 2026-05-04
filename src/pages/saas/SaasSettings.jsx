@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Loader2, CheckCircle2, Shield, Database, Globe, Key, RefreshCw, AlertCircle, CreditCard, Zap, Star, Crown, Users, UserCog, Dumbbell, Layout } from 'lucide-react';
+import { Save, Loader2, CheckCircle2, Shield, Database, Globe, Key, RefreshCw, AlertCircle, CreditCard, Zap, Star, Crown, Users, UserCog, Dumbbell, Layout, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import { SkeletonDashboard } from '../../components/Skeleton';
@@ -48,6 +48,20 @@ export default function SaasSettings() {
         facebook_url: '', instagram_url: '', youtube_url: '', twitter_url: '', linkedin_url: '',
         footer_text: '',
     });
+
+    // Feature cards (stored as JSON in features_subtitle)
+    const DEFAULT_FEATURES = [
+        { title: 'Gestion des Joueurs', desc: "Profils complets, suivi médical, catégories d'âge et historique de performance." },
+        { title: 'Finances & Paiements', desc: 'Suivi des cotisations, gestion des dépenses, rapports financiers et PayPal intégré.' },
+        { title: 'Tournois & Matchs', desc: 'Planification des matchs, gestion des tournois, résultats et classements en temps réel.' },
+        { title: 'Sécurité Multi-Tenant', desc: 'Isolation totale des données entre académies. Chaque académie a son espace sécurisé.' },
+        { title: 'Interface Mobile', desc: "Application responsive accessible depuis n'importe quel appareil." },
+        { title: 'Évaluations & Stats', desc: 'Évaluez vos joueurs, suivez leur progression et générez des rapports.' },
+        { title: 'Chat Intégré', desc: 'Communication directe entre coaches, admins et parents dans un espace sécurisé.' },
+        { title: 'Données Centralisées', desc: 'Toutes vos données en un seul endroit : présences, kits, inventaire, blessures.' },
+    ];
+    const [featuresCards, setFeaturesCards] = useState(DEFAULT_FEATURES);
+    const [featuresSubtitleText, setFeaturesSubtitleText] = useState('');
     const [landingSaving, setLandingSaving] = useState(false);
     const [landingSaved, setLandingSaved] = useState(false);
 
@@ -63,6 +77,19 @@ export default function SaasSettings() {
             if (res.ok) {
                 const data = await res.json();
                 setLanding(prev => ({ ...prev, ...Object.fromEntries(Object.entries(data).filter(([k]) => k in prev)) }));
+                // Parse features_subtitle as JSON if possible
+                const fs = data.features_subtitle || '';
+                try {
+                    const parsed = JSON.parse(fs);
+                    if (parsed && parsed.cards) {
+                        setFeaturesCards(parsed.cards);
+                        setFeaturesSubtitleText(parsed.subtitle || '');
+                    } else {
+                        setFeaturesSubtitleText(fs);
+                    }
+                } catch {
+                    setFeaturesSubtitleText(fs);
+                }
             }
         } catch { /* ignore */ }
     };
@@ -72,10 +99,15 @@ export default function SaasSettings() {
         setLandingSaved(false);
         setError('');
         try {
+            // Encode features cards + subtitle into features_subtitle as JSON
+            const payload = {
+                ...landing,
+                features_subtitle: JSON.stringify({ subtitle: featuresSubtitleText, cards: featuresCards }),
+            };
             const res = await authFetch(`${API_URL}/saas/landing-settings`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(landing),
+                body: JSON.stringify(payload),
             });
             if (res.ok) {
                 setLandingSaved(true);
@@ -376,7 +408,6 @@ export default function SaasSettings() {
                         ]},
                         { title: 'Sections', fields: [
                             { k: 'features_title', label: 'Features Section Title', placeholder: 'Everything you need to run a modern academy' },
-                            { k: 'features_subtitle', label: 'Features Subtitle', placeholder: '15+ tools, one platform' },
                             { k: 'pricing_title', label: 'Pricing Section Title', placeholder: 'Simple pricing' },
                             { k: 'about_title', label: 'About Section Title', placeholder: 'About us' },
                         ]},
@@ -430,6 +461,66 @@ export default function SaasSettings() {
                             </div>
                         </div>
                     ))}
+
+                    {/* Features Subtitle */}
+                    <div className="bg-white rounded-2xl border border-slate-200 mb-5 overflow-hidden">
+                        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
+                            <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Features Subtitle</h4>
+                        </div>
+                        <div className="p-5">
+                            <label className="block text-xs font-bold text-slate-600 mb-1.5">Subtitle Text</label>
+                            <input
+                                type="text"
+                                value={featuresSubtitleText}
+                                onChange={e => setFeaturesSubtitleText(e.target.value)}
+                                placeholder="15+ tools, one platform"
+                                className="input"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Feature Cards Editor */}
+                    <div className="bg-white rounded-2xl border border-slate-200 mb-5 overflow-hidden">
+                        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                            <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Feature Cards (8)</h4>
+                            <button
+                                type="button"
+                                onClick={() => setFeaturesCards(DEFAULT_FEATURES)}
+                                className="text-[10px] font-bold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-lg hover:bg-violet-100 transition-colors"
+                            >Reset to Defaults</button>
+                        </div>
+                        <div className="p-5 space-y-3">
+                            {featuresCards.map((card, i) => (
+                                <div key={i} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 hover:bg-white transition-colors">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-bold shrink-0">{i + 1}</span>
+                                        <input
+                                            type="text"
+                                            value={card.title}
+                                            onChange={e => {
+                                                const next = [...featuresCards];
+                                                next[i] = { ...next[i], title: e.target.value };
+                                                setFeaturesCards(next);
+                                            }}
+                                            placeholder="Feature title"
+                                            className="input flex-1 !py-1.5 text-sm font-semibold"
+                                        />
+                                    </div>
+                                    <textarea
+                                        rows={2}
+                                        value={card.desc}
+                                        onChange={e => {
+                                            const next = [...featuresCards];
+                                            next[i] = { ...next[i], desc: e.target.value };
+                                            setFeaturesCards(next);
+                                        }}
+                                        placeholder="Feature description"
+                                        className="input resize-none text-xs"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
 
                     <div className="flex justify-end gap-3">
                         <a href="/saas-platform" target="_blank" rel="noreferrer" className="btn btn-secondary">
