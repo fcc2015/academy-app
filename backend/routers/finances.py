@@ -14,6 +14,7 @@ from services.billing_engine import (
     get_alert_notification,
     generate_invoice_number
 )
+from services.email_service import send_payment_reminder
 from core.auth_middleware import verify_token, require_role
 from core.context import user_id_ctx, role_ctx
 
@@ -362,11 +363,13 @@ async def run_alert_check():
             if alert == prev_alert or alert == "none":
                 continue
 
-            # Get player name
+            # Get player name + billing context
             player_info = sub.get("players") or {}
             player_name = player_info.get("full_name", "Un joueur")
+            billing_type = sub.get("billing_type") or sub.get("subscription_type") or "monthly"
+            amount = sub.get("amount") or sub.get("monthly_amount")
 
-            notif = get_alert_notification(alert, player_name)
+            notif = get_alert_notification(alert, player_name, billing_type=billing_type, amount=amount)
             if notif:
                 try:
                     await supabase.insert_notification({
@@ -381,6 +384,22 @@ async def run_alert_check():
                         })
                 except Exception as e:
                     logger.warning(f"Notification error for sub {sub_id}: {e}")
+
+                # Email reminder for "approaching" + "late" only — others are admin-only
+                if alert in ("approaching", "late"):
+                    parent_email = (player_info.get("parent_email")
+                                    or sub.get("parent_email")
+                                    or sub.get("contact_email"))
+                    if parent_email and amount:
+                        try:
+                            send_payment_reminder(
+                                to=parent_email,
+                                player_name=player_name,
+                                amount=float(amount),
+                                due_date=str(next_due),
+                            )
+                        except Exception as e:
+                            logger.warning(f"Email reminder failed for {parent_email}: {e}")
 
             # Auto-update player status if suspended/terminated
             if alert == "terminated":
