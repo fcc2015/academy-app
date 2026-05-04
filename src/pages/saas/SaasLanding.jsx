@@ -89,10 +89,29 @@ export default function SaasLanding() {
 
     // Editable landing copy (filled from /public/saas-landing — falls back to hardcoded defaults)
     const [cms, setCms] = useState({});
+    const [cmsFeatures, setCmsFeatures] = useState(null); // [{title, desc}, ...] or null
+    const [cmsFeaturesSubtitle, setCmsFeaturesSubtitle] = useState('');
     useEffect(() => {
         fetch(`${API_URL}/public/saas-landing`)
             .then(r => r.ok ? r.json() : {})
-            .then(data => setCms(data || {}))
+            .then(data => {
+                setCms(data || {});
+                // features_subtitle may be a JSON envelope: { subtitle, cards }
+                const fs = data?.features_subtitle || '';
+                try {
+                    const parsed = JSON.parse(fs);
+                    if (parsed && Array.isArray(parsed.cards) && parsed.cards.length > 0) {
+                        setCmsFeatures(parsed.cards);
+                    }
+                    if (parsed && typeof parsed.subtitle === 'string') {
+                        setCmsFeaturesSubtitle(parsed.subtitle);
+                    } else {
+                        setCmsFeaturesSubtitle('');
+                    }
+                } catch {
+                    setCmsFeaturesSubtitle(fs);
+                }
+            })
             .catch(() => {});
     }, []);
 
@@ -751,19 +770,20 @@ export default function SaasLanding() {
                             {cms.features_title || (<>Tout ce dont votre académie<br />a besoin</>)}
                         </h2>
                         <p className="text-slate-500 max-w-xl mx-auto font-medium leading-relaxed">
-                            {cms.features_subtitle || 'Une plateforme complète construite spécifiquement pour les académies de football professionnelles.'}
+                            {cmsFeaturesSubtitle || 'Une plateforme complète construite spécifiquement pour les académies de football professionnelles.'}
                         </p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {FEATURES.map((f, i) => {
-                            const Icon = f.icon;
+                        {(cmsFeatures || FEATURES).map((f, i) => {
+                            const Icon = f.icon || FEATURES[i % FEATURES.length].icon;
+                            const color = f.color || FEATURES[i % FEATURES.length].color;
                             return (
                                 <div key={i} className="group p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-2 hover:shadow-xl cursor-default"
                                     style={{ background: 'white', border: '1px solid rgba(148,163,184,0.12)' }}>
                                     <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
-                                        style={{ background: `${f.color}12` }}>
-                                        <Icon size={22} style={{ color: f.color }} />
+                                        style={{ background: `${color}12` }}>
+                                        <Icon size={22} style={{ color }} />
                                     </div>
                                     <h3 className="font-black text-slate-900 mb-2 text-[15px]">{f.title}</h3>
                                     <p className="text-sm text-slate-500 leading-relaxed font-medium">{f.desc}</p>

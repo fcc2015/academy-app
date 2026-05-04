@@ -78,6 +78,7 @@ class SaasLandingSettings(BaseModel):
     twitter_url: str | None = None
     linkedin_url: str | None = None
     footer_text: str | None = None
+    features_json: list | None = None  # [{title, desc, icon_key}, ...]
 
 # ── Plan limits (must match frontend PLANS) ──
 PLAN_LIMITS = {
