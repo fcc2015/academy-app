@@ -79,6 +79,13 @@ class SaasLandingSettings(BaseModel):
     linkedin_url: str | None = None
     footer_text: str | None = None
     features_json: list | None = None  # [{title, desc, icon_key}, ...]
+    # Top announcement bar
+    top_bar_enabled: bool | None = None
+    top_bar_text: str | None = None
+    top_bar_cta_text: str | None = None
+    top_bar_cta_url: str | None = None
+    top_bar_bg_color: str | None = None
+    top_bar_dismissible: bool | None = None
 
 # ── Plan limits (must match frontend PLANS) ──
 PLAN_LIMITS = {
