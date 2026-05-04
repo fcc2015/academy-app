@@ -1,9 +1,46 @@
 import { API_URL } from '../config';
 import { authFetch } from '../api';
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, CheckCircle, Info, AlertCircle, Trash2, BellRing, CheckCheck, Sparkles } from 'lucide-react';
+import { Bell, CheckCircle, Info, AlertCircle, Trash2, BellRing, CheckCheck, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
+
+// Play a short two-tone "PIP" beep using the Web Audio API (no asset needed).
+// Returns silently if AudioContext is unavailable or blocked.
+const playBeep = () => {
+    try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const now = ctx.currentTime;
+
+        const tone = (freq, start, dur) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + start);
+            gain.gain.setValueAtTime(0.0001, now + start);
+            gain.gain.exponentialRampToValueAtTime(0.25, now + start + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(now + start);
+            osc.stop(now + start + dur + 0.05);
+        };
+
+        tone(880, 0, 0.12);     // first PIP
+        tone(1175, 0.16, 0.14); // second PIP (higher)
+
+        setTimeout(() => { try { ctx.close(); } catch { /* noop */ } }, 600);
+    } catch { /* ignore */ }
+};
+
+const vibrate = () => {
+    try {
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            navigator.vibrate([120, 60, 120]);
+        }
+    } catch { /* ignore */ }
+};
 
 const NotificationsDropdown = () => {
     const navigate = useNavigate();
@@ -11,7 +48,13 @@ const NotificationsDropdown = () => {
     const [notifications, setNotifications] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [soundOn, setSoundOn] = useState(() => {
+        const v = localStorage.getItem('notif_sound');
+        return v === null ? true : v === '1';
+    });
     const dropdownRef = useRef(null);
+    const prevUnreadRef = useRef(0);
+    const initializedRef = useRef(false);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -30,11 +73,23 @@ const NotificationsDropdown = () => {
             const res = await authFetch(`${API_URL}/notifications/?role=${role}&user_id=${userId}`);
             if (res.ok) {
                 const data = await res.json();
-                setNotifications(data || []);
-                setUnreadCount((data || []).filter(n => !n.is_read).length);
+                const list = data || [];
+                const newUnread = list.filter(n => !n.is_read).length;
+
+                // Trigger PIP + vibration when unread count increases — but skip
+                // the very first load so we don't beep on every page open.
+                if (initializedRef.current && newUnread > prevUnreadRef.current) {
+                    if (soundOn) playBeep();
+                    vibrate();
+                }
+                prevUnreadRef.current = newUnread;
+                initializedRef.current = true;
+
+                setNotifications(list);
+                setUnreadCount(newUnread);
             }
         } catch { /* ignore */ }
-    }, []);
+    }, [soundOn]);
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -174,6 +229,20 @@ const NotificationsDropdown = () => {
                             )}
                         </div>
                         <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const next = !soundOn;
+                                    setSoundOn(next);
+                                    localStorage.setItem('notif_sound', next ? '1' : '0');
+                                    if (next) playBeep(); // preview when enabling (also unlocks audio on user gesture)
+                                }}
+                                className="text-[10px] font-black uppercase tracking-wider transition-colors"
+                                style={{ color: soundOn ? '#6366f1' : '#cbd5e1' }}
+                                title={soundOn ? 'Mute sound' : 'Enable sound'}
+                            >
+                                {soundOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                            </button>
                             {unreadCount > 0 && (
                                 <button onClick={markAllAsRead}
                                     className="text-[10px] font-black uppercase tracking-wider transition-colors hover:text-indigo-600"
