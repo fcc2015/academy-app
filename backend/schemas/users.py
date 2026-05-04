@@ -15,7 +15,7 @@ class PlayerCreate(BaseModel):
     full_name: Optional[str] = Field(None, max_length=100)
     birth_date: date
     technical_level: Optional[Literal['A', 'B']] = "B"
-    subscription_type: Literal['Golden', 'Silver', 'Copper', 'Free', 'Monthly', 'Annual']
+    subscription_type: str = Field(..., min_length=1, max_length=50)
     discount_type: Optional[Literal['percentage', 'fixed']] = None
     discount_value: Optional[float] = Field(None, ge=0)
     u_category: str = Field(..., min_length=1, max_length=20)
@@ -37,6 +37,13 @@ class PlayerCreate(BaseModel):
     def strip_html(cls, v: Optional[str]) -> Optional[str]:
         if v:
             return re.sub(r"<[^>]+>", "", v).strip()
+        return v
+
+    @field_validator("branch_id", "parent_id", "photo_url", "blood_type", "transport_zone", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "":
+            return None
         return v
 
 class PlayerResponse(PlayerCreate):
