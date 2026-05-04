@@ -89,6 +89,9 @@ export default function SaasLanding() {
 
     // Editable landing copy (filled from /public/saas-landing — falls back to hardcoded defaults)
     const [cms, setCms] = useState({});
+    const [topBarDismissed, setTopBarDismissed] = useState(() => {
+        try { return sessionStorage.getItem('saas_top_bar_dismissed') === '1'; } catch { return false; }
+    });
     const [cmsFeatures, setCmsFeatures] = useState(null); // [{title, desc}, ...] or null
     const [cmsFeaturesSubtitle, setCmsFeaturesSubtitle] = useState('');
     useEffect(() => {
@@ -303,6 +306,41 @@ export default function SaasLanding() {
 
     return (
         <div className="min-h-screen overflow-x-hidden" style={{ fontFamily: "'Inter', 'Plus Jakarta Sans', sans-serif", background: '#f8fafc' }}>
+
+            {/* ─── TOP ANNOUNCEMENT BAR ─── */}
+            {cms.top_bar_enabled && cms.top_bar_text && !topBarDismissed && (
+                <div
+                    className="w-full text-white text-xs sm:text-sm font-semibold relative z-[60]"
+                    style={{ background: cms.top_bar_bg_color || '#6366f1' }}
+                >
+                    <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-center gap-3 flex-wrap">
+                        <span className="text-center">{cms.top_bar_text}</span>
+                        {cms.top_bar_cta_text && cms.top_bar_cta_url && (
+                            <a
+                                href={cms.top_bar_cta_url}
+                                target={cms.top_bar_cta_url.startsWith('http') ? '_blank' : undefined}
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-white/20 hover:bg-white/30 backdrop-blur-sm transition-colors font-bold"
+                            >
+                                {cms.top_bar_cta_text} <ChevronRight size={14} />
+                            </a>
+                        )}
+                        {cms.top_bar_dismissible !== false && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setTopBarDismissed(true);
+                                    try { sessionStorage.setItem('saas_top_bar_dismissed', '1'); } catch { /* ignore */ }
+                                }}
+                                aria-label="Dismiss"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* ─── PAYMENT RESULT OVERLAY ─── */}
             {paymentResult && (

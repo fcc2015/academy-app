@@ -47,6 +47,8 @@ export default function SaasSettings() {
         contact_email: '', contact_phone: '', contact_address: '',
         facebook_url: '', instagram_url: '', youtube_url: '', twitter_url: '', linkedin_url: '',
         footer_text: '',
+        top_bar_enabled: false, top_bar_text: '', top_bar_cta_text: '', top_bar_cta_url: '',
+        top_bar_bg_color: '#6366f1', top_bar_dismissible: true,
     });
 
     // Feature cards (stored as JSON in features_subtitle)
@@ -397,6 +399,81 @@ export default function SaasSettings() {
                             <p className="text-xs text-violet-600 mt-1">
                                 Edit hero copy, section titles, contact info and social links. Changes go live immediately.
                             </p>
+                        </div>
+                    </div>
+
+                    {/* ─── Top Bar Manager ─── */}
+                    <div className="bg-white rounded-2xl border border-slate-200 mb-5 overflow-hidden">
+                        <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-orange-50 flex items-center justify-between">
+                            <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                📢 Top Announcement Bar
+                            </h4>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={!!landing.top_bar_enabled}
+                                    onChange={e => setLanding(prev => ({ ...prev, top_bar_enabled: e.target.checked }))}
+                                    className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                                />
+                                <span className="text-xs font-bold text-slate-600">{landing.top_bar_enabled ? 'Enabled' : 'Disabled'}</span>
+                            </label>
+                        </div>
+                        <div className={`p-5 space-y-3 ${!landing.top_bar_enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                            {/* Live preview */}
+                            <div className="rounded-lg overflow-hidden border border-slate-200">
+                                <div className="text-white text-xs font-bold px-4 py-2 flex items-center justify-center gap-3" style={{ background: landing.top_bar_bg_color || '#6366f1' }}>
+                                    <span>{landing.top_bar_text || 'Your announcement here'}</span>
+                                    {landing.top_bar_cta_text && (
+                                        <span className="px-2 py-0.5 rounded bg-white/20 backdrop-blur-sm">{landing.top_bar_cta_text} →</span>
+                                    )}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-1.5">Bar Text</label>
+                                <input type="text" value={landing.top_bar_text || ''}
+                                    onChange={e => setLanding(prev => ({ ...prev, top_bar_text: e.target.value }))}
+                                    placeholder="🎉 Limited offer: 30% off all plans!"
+                                    className="input" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1.5">CTA Text</label>
+                                    <input type="text" value={landing.top_bar_cta_text || ''}
+                                        onChange={e => setLanding(prev => ({ ...prev, top_bar_cta_text: e.target.value }))}
+                                        placeholder="Claim now"
+                                        className="input" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1.5">CTA URL</label>
+                                    <input type="text" value={landing.top_bar_cta_url || ''}
+                                        onChange={e => setLanding(prev => ({ ...prev, top_bar_cta_url: e.target.value }))}
+                                        placeholder="https://... or #pricing"
+                                        dir="ltr"
+                                        className="input" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 items-end">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1.5">Background Color</label>
+                                    <div className="flex gap-2 items-center">
+                                        <input type="color" value={landing.top_bar_bg_color || '#6366f1'}
+                                            onChange={e => setLanding(prev => ({ ...prev, top_bar_bg_color: e.target.value }))}
+                                            className="h-10 w-16 border border-slate-200 rounded cursor-pointer" />
+                                        <input type="text" value={landing.top_bar_bg_color || ''}
+                                            onChange={e => setLanding(prev => ({ ...prev, top_bar_bg_color: e.target.value }))}
+                                            placeholder="#6366f1"
+                                            dir="ltr"
+                                            className="input flex-1 font-mono text-sm" />
+                                    </div>
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer pb-2.5">
+                                    <input type="checkbox"
+                                        checked={!!landing.top_bar_dismissible}
+                                        onChange={e => setLanding(prev => ({ ...prev, top_bar_dismissible: e.target.checked }))}
+                                        className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                                    <span className="text-xs font-bold text-slate-600">Allow visitors to dismiss</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
