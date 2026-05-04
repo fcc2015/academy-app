@@ -91,20 +91,40 @@ def get_alert_status(next_due_date: date, season_end: date | None = None) -> str
         return "terminated"
 
 
-def get_alert_notification(alert_status: str, player_name: str) -> dict | None:
+def get_alert_notification(alert_status: str, player_name: str, billing_type: str = "monthly", amount: float | None = None) -> dict | None:
     """
     Build a notification dict for a given alert status.
+    Distinguishes monthly vs annual / hybrid billing in the message.
     Returns None if no notification is needed.
     """
+    # Localised billing-type label for the message
+    bt = (billing_type or "monthly").lower()
+    if bt == "annual":
+        cycle_word = "السنوي"
+    elif bt == "semi_annual":
+        cycle_word = "النصف سنوي"
+    elif bt in ("hybrid", "achtor"):
+        cycle_word = "الفصلي"
+    else:
+        cycle_word = "الشهري"
+
+    amount_text = f" ({amount:.2f} درهم)" if amount else ""
+
     messages = {
         "approaching": {
             "title": "📅 قرب موعد الأداء",
-            "message": f"نود تذكيركم بأن موعد أداء اشتراك {player_name} سيكون خلال 3 أيام. يرجى التسوية لتفادي أي انقطاع.",
+            "message": (
+                f"نذكركم بأن موعد أداء الاشتراك {cycle_word} للاعب {player_name}{amount_text} "
+                "سيحل خلال 3 أيام. يرجى التسوية لتفادي أي انقطاع."
+            ),
             "type": "alert"
         },
         "late": {
             "title": "⚠️ تأخير في الأداء / تذكير",
-            "message": f"هناك تأخير في أداء واجب اشتراك {player_name}. يرجى تسوية الوضعية في أقرب وقت ممكن.",
+            "message": (
+                f"هناك تأخير في أداء الاشتراك {cycle_word} للاعب {player_name}{amount_text}. "
+                "يرجى تسوية الوضعية في أقرب وقت ممكن."
+            ),
             "type": "alert"
         },
         "suspended": {
