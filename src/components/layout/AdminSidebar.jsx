@@ -55,7 +55,7 @@ const mapNotifToRoute = (notif) => {
     return '/admin/dashboard';
 };
 
-const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setMobileOpen, navGroups, handleLogout, CollapseIcon, academyName, role, branchesAssigned, routeBadges }) => (
+const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setMobileOpen, navGroups, handleLogout, CollapseIcon, academyName, role, branchesAssigned, routeBadges = {} }) => (
     <div className="flex flex-col h-full bg-white border-r border-surface-200 overflow-hidden" dir={dir}>
         {/* Brand Header */}
         <div className={`flex items-center px-5 py-5 border-b border-surface-200 ${collapsed ? 'justify-center' : 'justify-between'}`}>
@@ -315,6 +315,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
                     academyName={academyName}
                     role={role}
                     branchesAssigned={branchesAssigned}
+                    routeBadges={routeBadges}
                 />
             </aside>
         </>

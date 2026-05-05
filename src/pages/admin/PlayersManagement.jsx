@@ -892,11 +892,15 @@ const PlayersManagement = () => {
     };
 
     const [page, setPage] = useState(1);
+    const [proOnly, setProOnly] = useState(false);
     const PAGE_SIZE = 20;
-    const filteredPlayers = players.filter(p =>
-        p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.parent_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const proCount = players.filter(p => p.technical_level === 'A').length;
+    const filteredPlayers = players.filter(p => {
+        const matchesSearch = p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.parent_name?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesPro = !proOnly || p.technical_level === 'A';
+        return matchesSearch && matchesPro;
+    });
     const totalPages = Math.ceil(filteredPlayers.length / PAGE_SIZE);
     const pagedPlayers = filteredPlayers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -908,6 +912,12 @@ const PlayersManagement = () => {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
                         {t('players.title').split(' ')[0]} <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">{t('players.title').split(' ').slice(1).join(' ')}</span>
                         <span className="bg-indigo-600 text-white text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-widest">{players.length} {t('common.total')}</span>
+                        {proCount > 0 && (
+                            <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-yellow-400 to-amber-500 text-yellow-900 text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-widest shadow-lg shadow-amber-500/30 border border-amber-300">
+                                <Trophy size={11} fill="currentColor" />
+                                {proCount} PRO
+                            </span>
+                        )}
                     </h1>
                 </div>
                 <div className={`flex items-center gap-3 w-full md:w-auto ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -1005,6 +1015,17 @@ const PlayersManagement = () => {
                             className={`block w-full ${isRTL ? 'pr-14 pl-6 text-right' : 'pl-14 pr-6 text-left'} py-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none shadow-sm`}
                             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
+                    <button
+                        onClick={() => { setProOnly(!proOnly); setPage(1); }}
+                        className={`flex items-center justify-center gap-2 px-5 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all border ${proOnly ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-yellow-900 border-amber-300 shadow-lg shadow-amber-500/30' : 'bg-white text-slate-400 border-slate-200 hover:text-amber-600 hover:border-amber-200'}`}
+                        title={isRTL ? 'لاعبو النخبة فقط' : 'PRO players only'}
+                    >
+                        <Trophy size={16} fill={proOnly ? 'currentColor' : 'none'} />
+                        <span>PRO</span>
+                        {proCount > 0 && (
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${proOnly ? 'bg-yellow-900 text-yellow-100' : 'bg-amber-100 text-amber-700'}`}>{proCount}</span>
+                        )}
+                    </button>
                     <button className={`flex items-center justify-center gap-3 bg-white border border-slate-200 text-slate-400 px-6 py-4 rounded-2xl font-black text-xs uppercase transition-all ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <Filter size={18} />
                         <span>{t('common.filter')}</span>
@@ -1162,7 +1183,7 @@ const PlayersManagement = () => {
                     branches={branches}
                 />
             )}
-            <PlayerBadgeModal player={currentPlayer} isOpen={isBadgeModalOpen} onClose={() => setIsBadgeModalOpen(false)} academyName={settings?.academy_name} academyLogo={settings?.logo_url} />
+            <PlayerBadgeModal player={currentPlayer} isOpen={isBadgeModalOpen} onClose={() => setIsBadgeModalOpen(false)} academyName={settings?.academy_name} academyLogo={settings?.logo_url} branchName={currentPlayer?.branch_id ? branches.find(b => b.id === currentPlayer.branch_id)?.name : null} />
             <PlayerMatchesModal player={currentPlayer} isOpen={isMatchesModalOpen} onClose={() => setIsMatchesModalOpen(false)} t={t} isRTL={isRTL} dir={dir} />
             <PlayerProfileModal player={currentPlayer} isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} isRTL={isRTL} dir={dir} />
 
