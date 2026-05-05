@@ -29,6 +29,7 @@ import {
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
+import InvoiceModal from '../../components/InvoiceModal';
 
 
 const FinancesManagement = () => {
@@ -54,6 +55,7 @@ const FinancesManagement = () => {
     const [alertHistory, setAlertHistory] = useState([]);
     const [isCheckingAlerts, setIsCheckingAlerts] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null, type: '' });
+    const [invoicePayment, setInvoicePayment] = useState(null);
 
     const showBanner = (message, type = 'success') => {
         if (type === 'error') toast.error(message);
@@ -570,6 +572,7 @@ const FinancesManagement = () => {
                                         </td>
                                         <td className="px-8 py-6 text-left">
                                             <div className="flex justify-start gap-1">
+                                                <button onClick={() => setInvoicePayment(payment)} className="p-3 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="وصل / Facture"><Receipt size={18} /></button>
                                                 <button onClick={() => handleEditClick(payment)} className="p-3 text-slate-300 hover:text-indigo-600 hover:bg-slate-100/50 rounded-xl transition-all"><Edit2 size={18} /></button>
                                                 <button onClick={() => handleDeletePayment(payment.id)} className="p-3 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>
                                             </div>
@@ -956,6 +959,14 @@ const FinancesManagement = () => {
                 title="تأكيد استلام المبلغ"
                 message="هل تأكدت من استلام المبلغ وتسجيله كمؤدى؟"
                 confirmText="نعم، وصلنا؜"
+            />
+            <InvoiceModal
+                isOpen={!!invoicePayment}
+                onClose={() => setInvoicePayment(null)}
+                payment={invoicePayment}
+                academyName={academySettings?.academy_name}
+                academyLogo={academySettings?.logo_url}
+                isRTL={isRTL}
             />
         </div>
     );

@@ -1,7 +1,7 @@
 import { API_URL } from '../config';
 import { authFetch } from '../api';
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, CheckCircle, Info, AlertCircle, Trash2, BellRing, CheckCheck, Sparkles, Volume2, VolumeX } from 'lucide-react';
+import { Bell, CheckCircle, Info, AlertCircle, Trash2, BellRing, CheckCheck, Sparkles, Volume2, VolumeX, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 
@@ -229,6 +229,18 @@ const NotificationsDropdown = () => {
                             )}
                         </div>
                         <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (soundOn) playBeep();
+                                    vibrate();
+                                }}
+                                className="text-[10px] font-black uppercase tracking-wider transition-colors hover:text-amber-500"
+                                style={{ color: '#94a3b8' }}
+                                title="Test notification (PIP + vibration)"
+                            >
+                                <Zap size={14} />
+                            </button>
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();

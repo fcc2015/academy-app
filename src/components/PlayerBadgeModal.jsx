@@ -1,11 +1,64 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import QRCode from 'react-qr-code';
 import { Download, X, User } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import { useLanguage } from '../i18n/LanguageContext';
+
+// Fetch a remote image and return a base64 data URL.
+// Bypasses CORS issues with html2canvas by inlining the image.
+const toDataUrl = async (url) => {
+    if (!url) return null;
+    // Method 1: Direct fetch with CORS
+    try {
+        const res = await fetch(url, { mode: 'cors' });
+        if (res.ok) {
+            const blob = await res.blob();
+            return await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+    } catch { /* CORS blocked, try method 2 */ }
+    // Method 2: Load via Image element + Canvas
+    try {
+        return await new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const c = document.createElement('canvas');
+                c.width = img.naturalWidth;
+                c.height = img.naturalHeight;
+                c.getContext('2d').drawImage(img, 0, 0);
+                try { resolve(c.toDataURL('image/png')); }
+                catch { resolve(url); } // tainted canvas, just use URL
+            };
+            img.onerror = () => resolve(url); // fallback to original URL
+            img.src = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+        });
+    } catch {
+        return url; // last resort: use URL directly (shows on screen, may not export)
+    }
+};
 
 const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, branchName }) => {
-    const { isRTL } = useLanguage();
+    const [photoDataUrl, setPhotoDataUrl] = useState(null);
+    const [logoDataUrl, setLogoDataUrl] = useState(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let active = true;
+        (async () => {
+            const [photo, logo] = await Promise.all([
+                toDataUrl(player?.photo_url),
+                toDataUrl(academyLogo),
+            ]);
+            if (!active) return;
+            setPhotoDataUrl(photo);
+            setLogoDataUrl(logo);
+        })();
+        return () => { active = false; };
+    }, [isOpen, player?.photo_url, academyLogo]);
 
     if (!isOpen || !player) return null;
 
@@ -74,7 +127,7 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
                     <div className="absolute top-10 left-0 right-0 px-6 flex justify-between items-center z-20">
                         <div className="flex flex-col">
                             <span className="text-[10px] font-black uppercase tracking-widest text-white/80">
-                                {isRTL ? 'الموسم الرياضي' : 'Season'}
+                                Season
                             </span>
                             <span className="text-xs font-black tracking-widest text-white drop-shadow-md">
                                 {currentSeason}
@@ -121,8 +174,8 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
                         <div className="mb-2 mt-auto z-10 flex flex-col items-center justify-center gap-1">
                             <div className="flex items-center justify-center gap-2">
                                 <div className={`w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-lg overflow-hidden ${isPro ? 'ring-2 ring-yellow-400 shadow-yellow-500/50' : ''}`}>
-                                    {academyLogo ? (
-                                        <img src={academyLogo} alt="logo" className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                    {logoDataUrl ? (
+                                        <img src={logoDataUrl} alt="logo" className="w-full h-full object-cover" />
                                     ) : (
                                         <span className={`font-black text-sm ${isPro ? 'text-amber-600' : 'text-indigo-600'}`}>{logoInitial}</span>
                                     )}
@@ -144,8 +197,8 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
                     <div className="absolute top-[130px] left-1/2 -translate-x-1/2 z-20">
                         <div className={`w-[110px] h-[110px] rounded-full p-1.5 bg-white shadow-xl ${isPro ? 'ring-4 ring-yellow-400 shadow-yellow-500/30' : ''}`}>
                             <div className={`w-full h-full rounded-full bg-slate-100 overflow-hidden flex items-center justify-center border ${isPro ? 'border-yellow-200' : 'border-slate-200'} relative`}>
-                                {player.photo_url ? (
-                                    <img src={player.photo_url} alt={player.full_name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                {photoDataUrl ? (
+                                    <img src={photoDataUrl} alt={player.full_name} className="w-full h-full object-cover" />
                                 ) : (
                                     <div className="w-full h-full bg-gradient-to-tr from-slate-200 to-slate-100 flex flex-col items-center justify-center text-slate-400">
                                         <User size={40} className="mb-1 opacity-50" />
@@ -166,7 +219,7 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
                             {player.full_name}
                         </h3>
                         <p className={`text-[10px] font-bold uppercase tracking-widest ${isPro ? 'text-amber-600' : 'text-slate-400'}`}>
-                            {isPro ? (isRTL ? 'لاعب محترف' : 'Pro Athlete') : (isRTL ? 'اللاعب' : 'Athlete')}
+                            {isPro ? 'Pro Athlete' : 'Athlete'}
                         </p>
                     </div>
 
@@ -177,13 +230,13 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
                     <div className="grid grid-cols-2 gap-2 px-8 mb-4">
                         <div className={`p-3 rounded-xl border text-center ${isPro ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
                             <p className={`text-[9px] font-black tracking-widest uppercase mb-0.5 ${isPro ? 'text-amber-600/70' : 'text-slate-400'}`}>
-                                {isRTL ? 'تاريخ الازدياد' : 'Date of Birth'}
+                                Date of Birth
                             </p>
                             <p className={`text-sm font-black ${isPro ? 'text-amber-900' : 'text-slate-800'}`}>{formattedDate}</p>
                         </div>
                         <div className={`p-3 rounded-xl border text-center ${isPro ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
                             <p className={`text-[9px] font-black tracking-widest uppercase mb-0.5 ${isPro ? 'text-amber-600/70' : 'text-slate-400'}`}>
-                                {isRTL ? 'الفئة' : 'Category'}
+                                Category
                             </p>
                             <p className={`text-sm font-black ${isPro ? 'text-amber-900' : 'text-slate-800'}`}>{player.u_category || 'N/A'}</p>
                         </div>
@@ -192,15 +245,36 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
                     <div className="flex-1"></div>
 
                     {/* QR Code Container */}
-                    <div className={`px-8 pb-6 flex items-center gap-6 ${isPro ? 'bg-gradient-to-t from-amber-50 to-transparent pt-4 -mb-4' : ''}`}>
-                        <div className={`p-2 bg-white border rounded-xl shadow-sm shrink-0 ${isPro ? 'border-amber-200 shadow-amber-500/20' : 'border-slate-200'}`}>
-                            <QRCode 
-                                value={qrData} 
-                                size={70}
-                                level="M"
-                                bgColor="#ffffff"
-                                fgColor={isPro ? "#78350f" : "#0f172a"}
-                            />
+                    <div className={`px-8 pb-6 flex items-center gap-5 ${isPro ? 'bg-gradient-to-t from-amber-50 to-transparent pt-4 -mb-4' : ''}`}>
+                        {/* QR with Logo Overlay */}
+                        <div className="relative shrink-0">
+                            <div className={`p-2.5 bg-white border rounded-xl shadow-sm ${isPro ? 'border-amber-200 shadow-amber-500/20' : 'border-slate-200'}`}>
+                                <QRCode 
+                                    value={qrData} 
+                                    size={80}
+                                    level="H"
+                                    bgColor="#ffffff"
+                                    fgColor={isPro ? "#78350f" : "#0f172a"}
+                                />
+                                {/* Logo overlay centered on QR */}
+                                <div className="absolute inset-0 flex items-center justify-center" style={{ pointerEvents: 'none' }}>
+                                    <div className={`w-[26px] h-[26px] rounded-md bg-white flex items-center justify-center shadow-sm border ${isPro ? 'border-amber-200' : 'border-slate-200'}`}>
+                                        {logoDataUrl ? (
+                                            <img src={logoDataUrl} alt="logo" className="w-[20px] h-[20px] object-contain" style={{ filter: 'grayscale(100%) contrast(1.2)' }} />
+                                        ) : (
+                                            <span className="font-black text-[11px] text-slate-800">{logoInitial}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            {/* Branch name below QR */}
+                            {branchName && (
+                                <div className="text-center mt-1.5">
+                                    <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${isPro ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                        {branchName}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                         <div className="flex-1 text-left flex flex-col justify-center relative z-10">
                             <div className="flex items-center gap-1.5 mb-1.5">
@@ -226,8 +300,8 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
                     onClick={handleDownload}
                     className="mt-8 flex items-center gap-3 bg-white/10 hover:bg-white border border-white/20 hover:border-white text-white hover:text-indigo-900 px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] transition-all duration-300 backdrop-blur-sm shadow-xl"
                 >
-                    <Download size={20} /> 
-                    {isRTL ? 'تحميل البطاقة' : 'Print Badge'}
+                    <Download size={20} />
+                    Print Badge
                 </button>
             </div>
         </div>
