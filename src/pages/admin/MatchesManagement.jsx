@@ -261,8 +261,8 @@ const MatchesManagement = () => {
     const handleAddRow = async () => {
         try {
             const sat = nextSaturday();
+            const realSquad = squads.find(s => s.id !== 'default');
             const newRow = {
-                squad_id: squads[0]?.id || 'default',
                 opponent_name: 'New Opponent',
                 match_date: sat.toISOString(),
                 location: defaultLocation(),
@@ -273,15 +273,20 @@ const MatchesManagement = () => {
                 notes: buildNotes('2x30', ''),
                 category: ageCategories[0] || null,
             };
+            if (realSquad) newRow.squad_id = realSquad.id;
             const res = await authFetch(`${API_URL}/matches/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newRow),
             });
-            if (!res.ok) throw new Error('Create failed');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || `HTTP ${res.status}`);
+            }
             await fetchData();
         } catch (e) {
-            toast.error('Failed to add row');
+            console.error('Add row error:', e);
+            toast.error(`Failed to add row: ${e.message}`);
         }
     };
 
