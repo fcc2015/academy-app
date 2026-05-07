@@ -81,10 +81,12 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
         if (!element) return;
         
         try {
-            const canvas = await html2canvas(element, { 
-                backgroundColor: null, 
-                scale: 3, // Higher scale for print quality
-                useCORS: true 
+            const canvas = await html2canvas(element, {
+                backgroundColor: null,
+                scale: 3,
+                useCORS: true,
+                allowTaint: true,
+                imageTimeout: 15000,
             });
             const dataUrl = canvas.toDataURL('image/png');
             const link = document.createElement('a');
@@ -175,7 +177,9 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
                             <div className="flex items-center justify-center gap-2">
                                 <div className={`w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-lg overflow-hidden ${isPro ? 'ring-2 ring-yellow-400 shadow-yellow-500/50' : ''}`}>
                                     {logoDataUrl ? (
-                                        <img src={logoDataUrl} alt="logo" className="w-full h-full object-cover" />
+                                        <img src={logoDataUrl} alt="logo" className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                    ) : academyLogo ? (
+                                        <img src={academyLogo} alt="logo" className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                                     ) : (
                                         <span className={`font-black text-sm ${isPro ? 'text-amber-600' : 'text-indigo-600'}`}>{logoInitial}</span>
                                     )}
@@ -198,7 +202,9 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
                         <div className={`w-[110px] h-[110px] rounded-full p-1.5 bg-white shadow-xl ${isPro ? 'ring-4 ring-yellow-400 shadow-yellow-500/30' : ''}`}>
                             <div className={`w-full h-full rounded-full bg-slate-100 overflow-hidden flex items-center justify-center border ${isPro ? 'border-yellow-200' : 'border-slate-200'} relative`}>
                                 {photoDataUrl ? (
-                                    <img src={photoDataUrl} alt={player.full_name} className="w-full h-full object-cover" />
+                                    <img src={photoDataUrl} alt={player.full_name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                ) : player?.photo_url ? (
+                                    <img src={player.photo_url} alt={player.full_name} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                                 ) : (
                                     <div className="w-full h-full bg-gradient-to-tr from-slate-200 to-slate-100 flex flex-col items-center justify-center text-slate-400">
                                         <User size={40} className="mb-1 opacity-50" />
@@ -260,7 +266,9 @@ const PlayerBadgeModal = ({ player, isOpen, onClose, academyName, academyLogo, b
                                 <div className="absolute inset-0 flex items-center justify-center" style={{ pointerEvents: 'none' }}>
                                     <div className={`w-[26px] h-[26px] rounded-md bg-white flex items-center justify-center shadow-sm border ${isPro ? 'border-amber-200' : 'border-slate-200'}`}>
                                         {logoDataUrl ? (
-                                            <img src={logoDataUrl} alt="logo" className="w-[20px] h-[20px] object-contain" style={{ filter: 'grayscale(100%) contrast(1.2)' }} />
+                                            <img src={logoDataUrl} alt="logo" className="w-[20px] h-[20px] object-contain" style={{ filter: 'grayscale(100%) contrast(1.2)' }} crossOrigin="anonymous" />
+                                        ) : academyLogo ? (
+                                            <img src={academyLogo} alt="logo" className="w-[20px] h-[20px] object-contain" style={{ filter: 'grayscale(100%) contrast(1.2)' }} crossOrigin="anonymous" referrerPolicy="no-referrer" />
                                         ) : (
                                             <span className="font-black text-[11px] text-slate-800">{logoInitial}</span>
                                         )}

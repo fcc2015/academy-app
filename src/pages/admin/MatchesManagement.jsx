@@ -12,7 +12,9 @@ import {
     Trash2,
     X,
     XCircle,
-    Activity
+    Activity,
+    LandPlot,
+    CalendarDays
 } from 'lucide-react';
 
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -26,12 +28,14 @@ const MatchesManagement = () => {
     
     const [matches, setMatches] = useState([]);
     const [squads, setSquads] = useState([]);
+    const [academySettings, setAcademySettings] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
-    
+    const [weekendOnly, setWeekendOnly] = useState(false);
+
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null });
     const toast = useToast();
 
@@ -44,8 +48,13 @@ const MatchesManagement = () => {
         their_score: 0,
         match_type: 'Friendly',
         status: 'Scheduled',
-        notes: ''
+        notes: '',
+        category: '',
     });
+
+    const terrains = academySettings?.terrains || [];
+    const tournamentsList = academySettings?.tournaments_list || [];
+    const ageCategories = academySettings?.age_categories || [];
 
     useEffect(() => {
         fetchData();
@@ -55,11 +64,12 @@ const MatchesManagement = () => {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [matchesRes, squadsRes] = await Promise.all([
+            const [matchesRes, squadsRes, settingsRes] = await Promise.all([
                 authFetch(`${API_URL}/matches/`),
-                authFetch(`${API_URL}/squads/`).catch(() => ({ ok: false })) // Silent catch if squads route not present
+                authFetch(`${API_URL}/squads/`).catch(() => ({ ok: false })),
+                authFetch(`${API_URL}/settings/`).catch(() => ({ ok: false })),
             ]);
-            
+
             if (matchesRes.ok) {
                 const data = await matchesRes.json();
                 setMatches(data || []);
@@ -71,9 +81,11 @@ const MatchesManagement = () => {
                     setFormData(prev => ({ ...prev, squad_id: sqData[0].id }));
                 }
             } else {
-                // Mock squad if none exists
                 setSquads([{ id: 'default', name: t('matches.ourTeam') }]);
                 setFormData(prev => ({ ...prev, squad_id: 'default' }));
+            }
+            if (settingsRes && settingsRes.ok) {
+                setAcademySettings(await settingsRes.json());
             }
         } catch (error) {
             console.error('Error fetching matches:', error);
@@ -93,17 +105,21 @@ const MatchesManagement = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const defaultMatchType = () => (tournamentsList[0] || 'Friendly');
+    const defaultLocation = () => (terrains[0] ? `${terrains[0].name} (${terrains[0].size})` : 'Home');
+
     const handleAddClick = () => {
         setFormData({
             squad_id: squads.length > 0 ? squads[0].id : '',
             opponent_name: '',
             match_date: new Date().toISOString().slice(0, 16),
-            location: 'Home',
+            location: defaultLocation(),
             our_score: 0,
             their_score: 0,
-            match_type: 'Friendly',
+            match_type: defaultMatchType(),
             status: 'Scheduled',
-            notes: ''
+            notes: '',
+            category: ageCategories[0] || '',
         });
         setIsEditMode(false);
         setEditingId(null);
@@ -115,12 +131,13 @@ const MatchesManagement = () => {
             squad_id: match.squad_id,
             opponent_name: match.opponent_name,
             match_date: new Date(match.match_date).toISOString().slice(0, 16),
-            location: match.location || 'Home',
+            location: match.location || defaultLocation(),
             our_score: match.our_score || 0,
             their_score: match.their_score || 0,
-            match_type: match.match_type || 'Friendly',
+            match_type: match.match_type || defaultMatchType(),
             status: match.status || 'Scheduled',
-            notes: match.notes || ''
+            notes: match.notes || '',
+            category: match.category || (ageCategories[0] || ''),
         });
         setIsEditMode(true);
         setEditingId(match.id);
@@ -137,7 +154,8 @@ const MatchesManagement = () => {
                 ...formData,
                 our_score: parseInt(formData.our_score),
                 their_score: parseInt(formData.their_score),
-                match_date: new Date(formData.match_date).toISOString()
+                match_date: new Date(formData.match_date).toISOString(),
+                category: formData.category || null,
             };
 
             const res = await authFetch(url, {
@@ -173,10 +191,20 @@ const MatchesManagement = () => {
         } catch { showBanner(t('ui.deleteError'), 'error'); }
     };
 
-    const filteredMatches = matches.filter(m => 
-        m.opponent_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.notes?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const isWeekend = (iso) => {
+        if (!iso) return false;
+        const d = new Date(iso).getDay();
+        return d === 0 || d === 6 || d === 5; // Fri/Sat/Sun
+    };
+
+    const filteredMatches = matches.filter(m => {
+        const matchesSearch = m.opponent_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            m.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            m.match_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            m.category?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesWeekend = !weekendOnly || isWeekend(m.match_date);
+        return matchesSearch && matchesWeekend;
+    });
 
     const totalMatches = matches.length;
     const completedMatches = matches.filter(m => m.status === 'Completed');
@@ -194,6 +222,7 @@ const MatchesManagement = () => {
     };
     
     const getTypeBadge = (type) => {
+        if (!type) return '';
         switch (type) {
             case 'Friendly': return t('matches.friendly');
             case 'League': return t('matches.league');
@@ -297,15 +326,28 @@ const MatchesManagement = () => {
                         <Trophy size={20} className="text-fuchsia-500" /> {t('matches.archiveSchedule')}
                     </h3>
 
-                    <div className={`relative w-full sm:w-80`}>
-                        <Search className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-300`} size={18} />
-                        <input
-                            type="text"
-                            placeholder={t('matches.searchOpponent')}
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className={`w-full ${isRTL ? 'pr-12 pl-4 text-right' : 'pl-12 pr-4 text-left'} py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-fuchsia-500/10 outline-none transition-all shadow-sm`}
-                        />
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <button
+                            type="button"
+                            onClick={() => setWeekendOnly(v => !v)}
+                            className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border ${weekendOnly
+                                ? 'bg-fuchsia-600 text-white border-fuchsia-600 shadow-fuchsia-600/20'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-fuchsia-300'
+                                }`}
+                            title="Show only Friday/Saturday/Sunday matches"
+                        >
+                            <CalendarDays size={14} /> Weekend
+                        </button>
+                        <div className="relative flex-1 sm:w-80">
+                            <Search className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-300`} size={18} />
+                            <input
+                                type="text"
+                                placeholder={t('matches.searchOpponent')}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className={`w-full ${isRTL ? 'pr-12 pl-4 text-right' : 'pl-12 pr-4 text-left'} py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-fuchsia-500/10 outline-none transition-all shadow-sm`}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -369,7 +411,14 @@ const MatchesManagement = () => {
                                         </td>
                                         <td className="px-8 py-6">
                                             <div className="flex flex-col gap-2">
-                                                <span className="text-[10px] font-black text-slate-500">{getTypeBadge(match.match_type)}</span>
+                                                <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-1 rounded-full border border-amber-100 uppercase tracking-wider truncate max-w-[180px]">
+                                                    {getTypeBadge(match.match_type)}
+                                                </span>
+                                                {match.category && (
+                                                    <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100 uppercase tracking-wider">
+                                                        {match.category}
+                                                    </span>
+                                                )}
                                                 {getStatusBadge(match.status)}
                                             </div>
                                         </td>
@@ -466,7 +515,7 @@ const MatchesManagement = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('matches.status')}</label>
                                     <select
@@ -481,29 +530,83 @@ const MatchesManagement = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('matches.competition')}</label>
-                                    <select
-                                        name="match_type"
-                                        value={formData.match_type}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none shadow-sm cursor-pointer appearance-none text-right"
-                                    >
-                                        <option value="Friendly">{t('matches.friendly')}</option>
-                                        <option value="League">{t('matches.league')}</option>
-                                        <option value="Cup">{t('matches.cup')}</option>
-                                        <option value="Tournament">{t('matches.tournament')}</option>
-                                    </select>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
+                                        <Trophy size={11} /> Competition / Tournament
+                                    </label>
+                                    {tournamentsList.length > 0 ? (
+                                        <select
+                                            name="match_type"
+                                            value={formData.match_type}
+                                            onChange={handleInputChange}
+                                            className="w-full px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-black uppercase outline-none shadow-sm cursor-pointer appearance-none text-right tracking-wider"
+                                        >
+                                            <option value="Friendly">FRIENDLY / AMICAL</option>
+                                            {tournamentsList.map(tn => (
+                                                <option key={tn} value={tn}>{tn}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <div className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-3 text-center">
+                                            ⚠️ No tournaments defined. Add them in Settings first.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
+                                        <LandPlot size={11} /> Terrain / Pitch
+                                    </label>
+                                    {terrains.length > 0 ? (
+                                        <select
+                                            name="location"
+                                            value={formData.location}
+                                            onChange={handleInputChange}
+                                            className="w-full px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-black outline-none shadow-sm cursor-pointer appearance-none text-right"
+                                        >
+                                            <option value="Home">🏠 Home</option>
+                                            <option value="Away">✈️ Away</option>
+                                            {terrains.map((tr, i) => (
+                                                <option key={i} value={`${tr.name} (${tr.size})`}>
+                                                    {tr.name} — {tr.size}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            name="location"
+                                            value={formData.location}
+                                            onChange={handleInputChange}
+                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none shadow-sm text-right"
+                                            placeholder={t('matches.venuePlaceholder')}
+                                        />
+                                    )}
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('matches.venue')}</label>
-                                    <input
-                                        type="text"
-                                        name="location"
-                                        value={formData.location}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none shadow-sm text-right"
-                                        placeholder={t('matches.venuePlaceholder')}
-                                    />
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Category (U)</label>
+                                    {ageCategories.length > 0 ? (
+                                        <select
+                                            name="category"
+                                            value={formData.category}
+                                            onChange={handleInputChange}
+                                            className="w-full px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs font-black outline-none shadow-sm cursor-pointer appearance-none text-right"
+                                        >
+                                            {ageCategories.map(cat => (
+                                                <option key={cat} value={cat}>{cat}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            name="category"
+                                            value={formData.category}
+                                            onChange={handleInputChange}
+                                            placeholder="U13, U15..."
+                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none shadow-sm text-right"
+                                        />
+                                    )}
                                 </div>
                             </div>
 

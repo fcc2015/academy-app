@@ -3,7 +3,7 @@ from typing import Optional, Literal
 from datetime import datetime
 import re
 
-MatchType = Literal['Friendly', 'League', 'Cup', 'Tournament']
+# Free-form so academies can use their own tournament names (CHALLENGER, GOLDEN, etc.)
 MatchStatus = Literal['Scheduled', 'Completed', 'Cancelled', 'Postponed']
 
 class MatchBase(BaseModel):
@@ -15,7 +15,7 @@ class MatchBase(BaseModel):
     location: Optional[str] = Field(None, max_length=200)
     our_score: Optional[int] = Field(0, ge=0)
     their_score: Optional[int] = Field(0, ge=0)
-    match_type: MatchType
+    match_type: str = Field('Friendly', max_length=80)
     status: MatchStatus = 'Scheduled'
     notes: Optional[str] = Field(None, max_length=2000)
     convoked_players: list[str] = []
@@ -39,7 +39,7 @@ class MatchUpdate(BaseModel):
     location: Optional[str] = Field(None, max_length=200)
     our_score: Optional[int] = Field(None, ge=0)
     their_score: Optional[int] = Field(None, ge=0)
-    match_type: Optional[MatchType] = None
+    match_type: Optional[str] = Field(None, max_length=80)
     status: Optional[MatchStatus] = None
     notes: Optional[str] = Field(None, max_length=2000)
     convoked_players: Optional[list[str]] = None
