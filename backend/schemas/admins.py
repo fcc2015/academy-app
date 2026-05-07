@@ -11,7 +11,7 @@ class AdminCreate(BaseModel):
     email: EmailStr
     permissions: Dict[str, bool]
     status: Optional[Literal['Active', 'Inactive', 'Suspended']] = "Active"
-    admin_type: Optional[Literal['admin', 'employee', 'accountant', 'sous_admin']] = "admin"
+    admin_type: Optional[Literal['admin', 'employee', 'accountant', 'sous_admin', 'match_manager']] = "admin"
 
     @field_validator("full_name")
     @classmethod
