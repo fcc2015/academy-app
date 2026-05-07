@@ -331,11 +331,74 @@ export default function ChatManagement() {
         finally { setSyncing(false); }
     };
 
+    const syncCategoryGroups = async () => {
+        setSyncing(true);
+        try {
+            const res = await authFetch(`${API_URL}/chat/sync-category-groups`, { method: 'POST' });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success === false) {
+                    setError(`⚠️ ${data.error || 'Aucune catégorie configurée'}`);
+                } else {
+                    setError(`✅ ${data.groups_created} catégories créées, ${data.groups_updated} mises à jour`);
+                }
+                setTimeout(() => setError(''), 5000);
+                fetchGroups();
+            }
+        } catch { setError('Erreur sync catégories'); setTimeout(() => setError(''), 4000); }
+        finally { setSyncing(false); }
+    };
+
     // ── Delete message
     const deleteMsg = async (id) => {
         if (!canMod) return;
         await authFetch(`${API_URL}/chat/messages/${id}`, { method: 'DELETE' });
         fetchMessages(true);
+    };
+
+    // ── Lock / unlock active group
+    const toggleGroupLock = async () => {
+        if (!isAdmin || !activeGroup) return;
+        const newLocked = !activeGroup.is_locked;
+        try {
+            const res = await authFetch(`${API_URL}/chat/moderation/lock-group`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ group_id: activeGroup.id, is_locked: newLocked }),
+            });
+            if (!res.ok) throw new Error('Lock failed');
+            setActiveGroup(g => ({ ...g, is_locked: newLocked }));
+            fetchGroups();
+        } catch {
+            setError('Erreur verrouillage'); setTimeout(() => setError(''), 4000);
+        }
+    };
+
+    // ── Mute member
+    const [muteTarget, setMuteTarget] = useState(null);
+    const muteMember = async (mute_type, mute_minutes = null) => {
+        if (!canMod || !muteTarget || !activeGroup) return;
+        try {
+            const res = await authFetch(`${API_URL}/chat/moderation/mute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    group_id: activeGroup.id,
+                    target_user_id: muteTarget.user_id,
+                    mute_type,
+                    mute_minutes,
+                }),
+            });
+            if (!res.ok) throw new Error('Mute failed');
+            setError(`✅ ${mute_type === 'none' ? 'Démuté' : 'Muté'} : ${muteTarget.user_name}`);
+            setTimeout(() => setError(''), 3000);
+            setMuteTarget(null);
+            // Refresh members list
+            const m = await authFetch(`${API_URL}/chat/groups/${activeGroup.id}/members`);
+            if (m.ok) setMembers(await m.json());
+        } catch {
+            setError('Erreur kitm'); setTimeout(() => setError(''), 3000);
+        }
     };
 
     // ── Filtered groups
@@ -367,22 +430,40 @@ export default function ChatManagement() {
                             <p style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>{groups.length} groupes</p>
                         </div>
                         {isAdmin && (
-                            <button
-                                onClick={syncGroups}
-                                disabled={syncing}
-                                title="Synchroniser les groupes par équipe"
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: 6,
-                                    background: syncing ? '#f1f5f9' : 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                                    color: syncing ? '#94a3b8' : '#fff',
-                                    border: 'none', borderRadius: 12, padding: '8px 14px',
-                                    fontSize: 11, fontWeight: 900, cursor: syncing ? 'not-allowed' : 'pointer',
-                                    textTransform: 'uppercase', letterSpacing: '0.05em'
-                                }}
-                            >
-                                <RefreshCw size={14} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
-                                Sync
-                            </button>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                                <button
+                                    onClick={syncCategoryGroups}
+                                    disabled={syncing}
+                                    title="Créer un groupe par catégorie (U10, U11, U11 A, U11 ELITE, ...)"
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 5,
+                                        background: syncing ? '#f1f5f9' : 'linear-gradient(135deg, #d946ef, #ec4899)',
+                                        color: syncing ? '#94a3b8' : '#fff',
+                                        border: 'none', borderRadius: 12, padding: '8px 12px',
+                                        fontSize: 10, fontWeight: 900, cursor: syncing ? 'not-allowed' : 'pointer',
+                                        textTransform: 'uppercase', letterSpacing: '0.05em'
+                                    }}
+                                >
+                                    <RefreshCw size={12} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
+                                    Cat
+                                </button>
+                                <button
+                                    onClick={syncGroups}
+                                    disabled={syncing}
+                                    title="Synchroniser les groupes par équipe (squads)"
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 5,
+                                        background: syncing ? '#f1f5f9' : 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                                        color: syncing ? '#94a3b8' : '#fff',
+                                        border: 'none', borderRadius: 12, padding: '8px 12px',
+                                        fontSize: 10, fontWeight: 900, cursor: syncing ? 'not-allowed' : 'pointer',
+                                        textTransform: 'uppercase', letterSpacing: '0.05em'
+                                    }}
+                                >
+                                    <RefreshCw size={12} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
+                                    Sq
+                                </button>
+                            </div>
                         )}
                     </div>
                     {/* Search */}
@@ -498,6 +579,21 @@ export default function ChatManagement() {
                                     }
                                 </div>
                             </div>
+                            {isAdmin && (
+                                <button
+                                    onClick={toggleGroupLock}
+                                    title={activeGroup.is_locked ? 'Déverrouiller (autoriser tous à écrire)' : 'Verrouiller (seul admin écrit)'}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 6,
+                                        background: activeGroup.is_locked ? '#fef2f2' : 'transparent',
+                                        border: `1px solid ${activeGroup.is_locked ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 10,
+                                        padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                                        fontWeight: 900, color: activeGroup.is_locked ? '#dc2626' : '#6b7280',
+                                    }}
+                                >
+                                    {activeGroup.is_locked ? '🔒 Verrouillé' : '🔓 Libre'}
+                                </button>
+                            )}
                             {canMod && (
                                 <button
                                     onClick={() => setShowMembers(!showMembers)}
@@ -636,8 +732,19 @@ export default function ChatManagement() {
                                     <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
                                         {members.map(m => {
                                             const cfg = ROLE_CONFIG[m.user_role] || ROLE_CONFIG.player;
+                                            const clickable = canMod && m.user_id !== myUserId && !m.is_moderator;
                                             return (
-                                                <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px' }}>
+                                                <div
+                                                    key={m.user_id}
+                                                    onClick={() => clickable && setMuteTarget(m)}
+                                                    style={{
+                                                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
+                                                        cursor: clickable ? 'pointer' : 'default',
+                                                        transition: 'background 0.15s',
+                                                    }}
+                                                    onMouseEnter={e => { if (clickable) e.currentTarget.style.background = '#f8fafc'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                                                >
                                                     <Avatar name={m.user_name} role={m.user_role} size={36} />
                                                     <div style={{ flex: 1, minWidth: 0 }}>
                                                         <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -710,6 +817,69 @@ export default function ChatManagement() {
                 ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
                 .group:hover > button { opacity: 1 !important; }
             `}</style>
+
+            {/* Mute member modal */}
+            {muteTarget && (
+                <div
+                    onClick={() => setMuteTarget(null)}
+                    style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+                >
+                    <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 24, padding: 28, width: '100%', maxWidth: 380, boxShadow: '0 30px 80px rgba(0,0,0,0.3)' }} dir="rtl">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                            <Avatar name={muteTarget.user_name} role={muteTarget.user_role} size={48} />
+                            <div>
+                                <div style={{ fontWeight: 900, fontSize: 16, color: '#0f172a' }}>{muteTarget.user_name}</div>
+                                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>
+                                    {muteTarget.is_muted ? '🔇 محظور حالياً' : 'حظر / كتم'}
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {muteTarget.is_muted ? (
+                                <button
+                                    onClick={() => muteMember('none')}
+                                    style={{ padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', fontWeight: 900, fontSize: 13, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                                >
+                                    ✅ إلغاء الحظر
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => muteMember('temporary', 60)}
+                                        style={{ padding: '12px', borderRadius: 12, border: '1px solid #fcd34d', background: '#fef3c7', color: '#92400e', fontWeight: 900, fontSize: 13, cursor: 'pointer', textAlign: 'right' }}
+                                    >
+                                        ⏱️ كتم 1 ساعة
+                                    </button>
+                                    <button
+                                        onClick={() => muteMember('temporary', 60 * 24)}
+                                        style={{ padding: '12px', borderRadius: 12, border: '1px solid #fcd34d', background: '#fef3c7', color: '#92400e', fontWeight: 900, fontSize: 13, cursor: 'pointer', textAlign: 'right' }}
+                                    >
+                                        🌙 كتم 24 ساعة
+                                    </button>
+                                    <button
+                                        onClick={() => muteMember('temporary', 60 * 24 * 7)}
+                                        style={{ padding: '12px', borderRadius: 12, border: '1px solid #fcd34d', background: '#fef3c7', color: '#92400e', fontWeight: 900, fontSize: 13, cursor: 'pointer', textAlign: 'right' }}
+                                    >
+                                        📅 كتم أسبوع
+                                    </button>
+                                    <button
+                                        onClick={() => muteMember('permanent')}
+                                        style={{ padding: '12px', borderRadius: 12, border: '1px solid #fca5a5', background: '#fee2e2', color: '#991b1b', fontWeight: 900, fontSize: 13, cursor: 'pointer', textAlign: 'right' }}
+                                    >
+                                        🚫 كتم نهائي
+                                    </button>
+                                </>
+                            )}
+                            <button
+                                onClick={() => setMuteTarget(null)}
+                                style={{ marginTop: 8, padding: '10px', borderRadius: 12, border: 'none', background: '#f1f5f9', color: '#475569', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}
+                            >
+                                إلغاء
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
