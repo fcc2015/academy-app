@@ -351,89 +351,115 @@ async def sync_category_chat_groups():
     from core.config import settings as app_settings
     from core.context import academy_id_ctx
 
-    created, updated = [], []
+    created, updated, skipped_players = [], [], 0
     academy_id = academy_id_ctx.get(None)
 
-    async with httpx.AsyncClient() as client:
-        # Fetch this academy's settings (or fallback to first row if no academy_id)
-        if academy_id:
-            url = f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?academy_id=eq.{academy_id}&select=age_categories&limit=1"
-        else:
-            url = f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?select=age_categories&limit=1"
-        s_res = await client.get(url, headers=supabase.headers)
-        s_res.raise_for_status()
-        s_rows = s_res.json()
-        categories = (s_rows[0] if s_rows else {}).get("age_categories") or []
-        if not categories:
-            return {"success": False, "error": f"No age categories in settings (academy_id={academy_id}). Add some in Settings → Age Categories first."}
-
-        # Players to map category → user_ids
-        p_res = await client.get(
-            f"{app_settings.SUPABASE_URL}/rest/v1/players?select=user_id,full_name,u_category",
-            headers=supabase.headers,
-        )
-        p_res.raise_for_status()
-        players = p_res.json()
-
-        # Existing category-only groups (no squad_id)
-        g_res = await client.get(
-            f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups?squad_id=is.null&select=id,name,category",
-            headers=supabase.headers,
-        )
-        g_res.raise_for_status()
-        existing = {g["category"]: g for g in g_res.json() if g.get("category")}
-
-        for cat in categories:
-            if cat in existing:
-                group = existing[cat]
-                group_id = group["id"]
-                updated.append(group_id)
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Fetch this academy's settings (or fallback to first row if no academy_id)
+            if academy_id:
+                url = f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?academy_id=eq.{academy_id}&select=age_categories&limit=1"
             else:
-                gd = {
-                    "name": f"{cat} — Groupe Officiel",
-                    "description": f"Groupe de chat de la catégorie {cat}",
-                    "type": "group",
-                    "category": cat,
-                    "squad_id": None,
-                    "created_by": "00000000-0000-0000-0000-000000000000",
-                }
-                cr = await client.post(
-                    f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups",
-                    json=gd,
-                    headers={**supabase.headers, "Prefer": "return=representation"},
-                )
-                cr.raise_for_status()
-                group_id = cr.json()[0]["id"]
-                created.append(group_id)
+                url = f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?select=age_categories&limit=1"
+            s_res = await client.get(url, headers=supabase.headers)
+            if s_res.status_code != 200:
+                logger.error(f"sync-category-groups: settings fetch {s_res.status_code} {s_res.text}")
+                raise HTTPException(status_code=500, detail=f"Settings fetch failed: HTTP {s_res.status_code}")
+            s_rows = s_res.json()
+            categories = (s_rows[0] if s_rows else {}).get("age_categories") or []
+            if not categories:
+                return {"success": False, "error": f"No age categories in settings (academy_id={academy_id}). Add some in Settings → Age Categories first."}
 
-            # Add players whose u_category matches this entry
-            for pl in players:
-                if pl.get("u_category") != cat:
-                    continue
-                check = await client.get(
-                    f"{app_settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&user_id=eq.{pl['user_id']}&select=id",
+            # Players (best-effort — if column missing, skip player auto-add)
+            players = []
+            try:
+                p_res = await client.get(
+                    f"{app_settings.SUPABASE_URL}/rest/v1/players?select=user_id,full_name,u_category",
                     headers=supabase.headers,
                 )
-                if check.status_code == 200 and check.json():
-                    continue
-                await client.post(
-                    f"{app_settings.SUPABASE_URL}/rest/v1/chat_group_members",
-                    json={
-                        "group_id": group_id,
-                        "user_id": pl["user_id"],
-                        "user_name": pl["full_name"],
-                        "user_role": "player",
-                        "is_moderator": False,
-                    },
-                    headers={**supabase.headers, "Prefer": "return=minimal"},
-                )
+                if p_res.status_code == 200:
+                    players = p_res.json()
+                else:
+                    logger.warning(f"sync-category-groups: players fetch failed {p_res.status_code} — continuing without players")
+            except Exception as pe:
+                logger.warning(f"sync-category-groups: players fetch raised — continuing: {pe}")
 
-    return {
-        "success": True,
-        "groups_created": len(created),
-        "groups_updated": len(updated),
-        "categories": categories,
-    }
+            # Existing category-only groups (no squad_id)
+            g_res = await client.get(
+                f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups?squad_id=is.null&select=id,name,category",
+                headers=supabase.headers,
+            )
+            if g_res.status_code != 200:
+                logger.error(f"sync-category-groups: chat_groups fetch {g_res.status_code} {g_res.text}")
+                raise HTTPException(status_code=500, detail=f"chat_groups fetch failed: HTTP {g_res.status_code}")
+            existing = {g["category"]: g for g in g_res.json() if g.get("category")}
+
+            for cat in categories:
+                if cat in existing:
+                    group = existing[cat]
+                    group_id = group["id"]
+                    updated.append(group_id)
+                else:
+                    gd = {
+                        "name": f"{cat} — Groupe Officiel",
+                        "description": f"Groupe de chat de la catégorie {cat}",
+                        "type": "group",
+                        "category": cat,
+                        "squad_id": None,
+                        "created_by": "00000000-0000-0000-0000-000000000000",
+                    }
+                    cr = await client.post(
+                        f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups",
+                        json=gd,
+                        headers={**supabase.headers, "Prefer": "return=representation"},
+                    )
+                    if cr.status_code not in (200, 201):
+                        logger.error(f"sync-category-groups: chat_groups create failed {cr.status_code} {cr.text}")
+                        raise HTTPException(status_code=500, detail=f"Group create failed for '{cat}': HTTP {cr.status_code} — {cr.text[:160]}")
+                    rows = cr.json()
+                    if not rows:
+                        raise HTTPException(status_code=500, detail=f"Group create returned empty for '{cat}'")
+                    group_id = rows[0]["id"]
+                    created.append(group_id)
+
+                # Add players whose u_category matches this entry (best-effort)
+                for pl in players:
+                    if pl.get("u_category") != cat:
+                        continue
+                    try:
+                        check = await client.get(
+                            f"{app_settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&user_id=eq.{pl['user_id']}&select=id",
+                            headers=supabase.headers,
+                        )
+                        if check.status_code == 200 and check.json():
+                            continue
+                        await client.post(
+                            f"{app_settings.SUPABASE_URL}/rest/v1/chat_group_members",
+                            json={
+                                "group_id": group_id,
+                                "user_id": pl["user_id"],
+                                "user_name": pl["full_name"],
+                                "user_role": "player",
+                                "is_moderator": False,
+                            },
+                            headers={**supabase.headers, "Prefer": "return=minimal"},
+                        )
+                    except Exception as me:
+                        skipped_players += 1
+                        logger.warning(f"sync-category-groups: skipped player {pl.get('user_id')}: {me}")
+
+        return {
+            "success": True,
+            "groups_created": len(created),
+            "groups_updated": len(updated),
+            "categories": categories,
+            "skipped_players": skipped_players,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"sync-category-groups failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"sync-category-groups: {type(e).__name__}: {str(e)[:200]}")
 
 
 class LockGroupRequest(BaseModel):
