@@ -1,4 +1,5 @@
 import { authFetch } from '../../api';
+import { API_URL } from '../../config';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Trophy,
@@ -26,8 +27,6 @@ import html2canvas from 'html2canvas';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 const MatchesManagement = () => {
     const { isRTL, dir, t, formatDate } = useLanguage();
