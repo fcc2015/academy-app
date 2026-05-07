@@ -59,7 +59,7 @@ const translations = {
         branches: { ar: 'الفروع', en: 'Branches', fr: 'Succursales' },
         subscription: { ar: 'الاشتراك', en: 'Subscription', fr: 'Abonnement' },
         settings: { ar: 'الإعدادات', en: 'Settings', fr: 'Paramètres' },
-        matches: { ar: 'المباريات', en: 'Matches', fr: 'Matchs' },
+        matches: { ar: 'برمجة المباريات', en: 'Match Scheduler', fr: 'Programmateur Matchs' },
         tactics: { ar: 'الخطط', en: 'Tactics', fr: 'Tactiques' },
         inventory: { ar: 'المخزون', en: 'Inventory', fr: 'Inventaire' },
         training: { ar: 'جدول التداريب', en: 'Training', fr: 'Entraînements' },
