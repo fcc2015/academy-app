@@ -1,14 +1,15 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Edit2, Trash2, Search, X, CheckCircle2, ShieldAlert, Copy, Check, UserCog, Calculator, Briefcase, ChevronDown, Building2 } from 'lucide-react';
+import { Shield, Plus, Edit2, Trash2, Search, X, CheckCircle2, ShieldAlert, Copy, Check, UserCog, Calculator, Briefcase, ChevronDown, Building2, Trophy } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
 const ADMIN_TYPES = [
-    { value: 'admin',      label: 'مدير كامل الصلاحيات', labelFr: 'Administrateur', icon: Shield,    color: '#6366f1', bg: '#eef2ff' },
-    { value: 'sous_admin', label: 'مسؤول مساعد (فرع)',    labelFr: 'Sous-Admin',     icon: Building2, color: '#8b5cf6', bg: '#ede9fe' },
-    { value: 'employee',   label: 'موظف',                  labelFr: 'Employé',        icon: Briefcase, color: '#0ea5e9', bg: '#e0f2fe' },
-    { value: 'accountant', label: 'محاسب',                 labelFr: 'Comptable',      icon: Calculator, color: '#10b981', bg: '#d1fae5' },
+    { value: 'admin',         label: 'مدير كامل الصلاحيات',  labelFr: 'Administrateur',  icon: Shield,    color: '#6366f1', bg: '#eef2ff' },
+    { value: 'sous_admin',    label: 'مسؤول مساعد (فرع)',    labelFr: 'Sous-Admin',      icon: Building2, color: '#8b5cf6', bg: '#ede9fe' },
+    { value: 'match_manager', label: 'مسؤول برمجة المباريات', labelFr: 'Match Manager',  icon: Trophy,    color: '#d946ef', bg: '#fae8ff' },
+    { value: 'employee',      label: 'موظف',                  labelFr: 'Employé',         icon: Briefcase, color: '#0ea5e9', bg: '#e0f2fe' },
+    { value: 'accountant',    label: 'محاسب',                 labelFr: 'Comptable',       icon: Calculator,color: '#10b981', bg: '#d1fae5' },
 ];
 
 const getAdminTypeInfo = (type) => ADMIN_TYPES.find(t => t.value === type) || ADMIN_TYPES[0];
@@ -59,11 +60,11 @@ const AdminsManagement = () => {
                 email: admin.email,
                 admin_type: admin.admin_type || 'admin',
                 status: admin.status,
-                permissions: admin.permissions || { can_manage_users: false, can_manage_financials: false, can_manage_coaches: false }
+                permissions: admin.permissions || { can_manage_users: false, can_manage_financials: false, can_manage_coaches: false, can_manage_matches: false }
             });
         } else {
             setEditingAdmin(null);
-            setFormData({ full_name: '', email: '', admin_type: 'admin', status: 'Active', permissions: { can_manage_users: false, can_manage_financials: false, can_manage_coaches: false } });
+            setFormData({ full_name: '', email: '', admin_type: 'admin', status: 'Active', permissions: { can_manage_users: false, can_manage_financials: false, can_manage_coaches: false, can_manage_matches: false } });
         }
         setSuccessData(null);
         setCopied(false);
@@ -80,10 +81,11 @@ const AdminsManagement = () => {
     // Auto-fill permissions based on role
     const handleAdminTypeChange = (type) => {
         const permMap = {
-            admin:      { can_manage_users: true, can_manage_financials: true, can_manage_coaches: true },
-            sous_admin: { can_manage_users: true, can_manage_financials: false, can_manage_coaches: true },
-            employee:   { can_manage_users: true, can_manage_financials: false, can_manage_coaches: false },
-            accountant: { can_manage_users: false, can_manage_financials: true, can_manage_coaches: false },
+            admin:         { can_manage_users: true,  can_manage_financials: true,  can_manage_coaches: true,  can_manage_matches: true  },
+            sous_admin:    { can_manage_users: true,  can_manage_financials: false, can_manage_coaches: true,  can_manage_matches: true  },
+            match_manager: { can_manage_users: false, can_manage_financials: false, can_manage_coaches: false, can_manage_matches: true  },
+            employee:      { can_manage_users: true,  can_manage_financials: false, can_manage_coaches: false, can_manage_matches: false },
+            accountant:    { can_manage_users: false, can_manage_financials: true,  can_manage_coaches: false, can_manage_matches: false },
         };
         setFormData(prev => ({ ...prev, admin_type: type, permissions: permMap[type] || prev.permissions }));
     };
@@ -239,7 +241,8 @@ const AdminsManagement = () => {
                                                 {admin.permissions?.can_manage_users && <span className="px-2 py-1 text-[10px] font-black uppercase bg-blue-100 text-blue-700 rounded-lg">اللاعبين</span>}
                                                 {admin.permissions?.can_manage_financials && <span className="px-2 py-1 text-[10px] font-black uppercase bg-emerald-100 text-emerald-700 rounded-lg">المالية</span>}
                                                 {admin.permissions?.can_manage_coaches && <span className="px-2 py-1 text-[10px] font-black uppercase bg-amber-100 text-amber-700 rounded-lg">المدربين</span>}
-                                                {(!admin.permissions || (!admin.permissions.can_manage_users && !admin.permissions.can_manage_financials && !admin.permissions.can_manage_coaches)) && (
+                                                {admin.permissions?.can_manage_matches && <span className="px-2 py-1 text-[10px] font-black uppercase bg-fuchsia-100 text-fuchsia-700 rounded-lg flex items-center gap-1"><Trophy size={10}/> المباريات</span>}
+                                                {(!admin.permissions || (!admin.permissions.can_manage_users && !admin.permissions.can_manage_financials && !admin.permissions.can_manage_coaches && !admin.permissions.can_manage_matches)) && (
                                                     <span className="text-slate-400 text-xs">قراءة فقط</span>
                                                 )}
                                             </div>
@@ -343,7 +346,7 @@ const AdminsManagement = () => {
                                 {/* Admin Type Selector */}
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-2">نوع الإداري / الدور</label>
-                                    <div className="grid grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                         {ADMIN_TYPES.map(t => {
                                             const Icon = t.icon;
                                             const isSelected = formData.admin_type === t.value;
@@ -377,6 +380,7 @@ const AdminsManagement = () => {
                                             { name: 'can_manage_users',      label: 'إدارة اللاعبين (إضافة، تعديل، حذف)', accent: '#6366f1' },
                                             { name: 'can_manage_financials', label: 'إدارة المالية والاشتراكات',              accent: '#10b981' },
                                             { name: 'can_manage_coaches',    label: 'إدارة المدربين والأطقم',                accent: '#f59e0b' },
+                                            { name: 'can_manage_matches',    label: 'برمجة المباريات (Weekend Matches)',     accent: '#d946ef' },
                                         ].map(perm => (
                                             <label key={perm.name} className="flex items-center gap-3 cursor-pointer p-3 bg-white rounded-xl border border-slate-100 hover:border-indigo-200 transition-colors">
                                                 <input type="checkbox" name={perm.name}
