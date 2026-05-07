@@ -349,20 +349,23 @@ async def sync_category_chat_groups():
     """
     import httpx
     from core.config import settings as app_settings
+    from core.context import academy_id_ctx
 
     created, updated = [], []
+    academy_id = academy_id_ctx.get(None)
 
     async with httpx.AsyncClient() as client:
-        # Fetch academy settings
-        s_res = await client.get(
-            f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?select=age_categories&limit=1",
-            headers=supabase.headers,
-        )
+        # Fetch this academy's settings (or fallback to first row if no academy_id)
+        if academy_id:
+            url = f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?academy_id=eq.{academy_id}&select=age_categories&limit=1"
+        else:
+            url = f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?select=age_categories&limit=1"
+        s_res = await client.get(url, headers=supabase.headers)
         s_res.raise_for_status()
         s_rows = s_res.json()
         categories = (s_rows[0] if s_rows else {}).get("age_categories") or []
         if not categories:
-            return {"success": False, "error": "No age categories defined in settings."}
+            return {"success": False, "error": f"No age categories in settings (academy_id={academy_id}). Add some in Settings → Age Categories first."}
 
         # Players to map category → user_ids
         p_res = await client.get(

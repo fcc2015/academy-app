@@ -336,17 +336,20 @@ export default function ChatManagement() {
         setSyncing(true);
         try {
             const res = await authFetch(`${API_URL}/chat/sync-category-groups`, { method: 'POST' });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.success === false) {
-                    setError(`⚠️ ${data.error || 'Aucune catégorie configurée'}`);
-                } else {
-                    setError(`✅ ${data.groups_created} catégories créées, ${data.groups_updated} mises à jour`);
-                }
-                setTimeout(() => setError(''), 5000);
-                fetchGroups();
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setError(`❌ HTTP ${res.status}: ${data.detail || 'Erreur serveur'}`);
+            } else if (data.success === false) {
+                setError(`⚠️ ${data.error || 'Aucune catégorie configurée dans Settings'}`);
+            } else {
+                setError(`✅ ${data.groups_created} catégories créées, ${data.groups_updated} mises à jour (${(data.categories || []).join(', ')})`);
             }
-        } catch { setError('Erreur sync catégories'); setTimeout(() => setError(''), 4000); }
+            setTimeout(() => setError(''), 8000);
+            fetchGroups();
+        } catch (e) {
+            setError(`Erreur sync catégories: ${e.message}`);
+            setTimeout(() => setError(''), 5000);
+        }
         finally { setSyncing(false); }
     };
 
