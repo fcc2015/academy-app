@@ -88,10 +88,13 @@ const GroupAvatar = ({ group, size = 48 }) => {
 // ─────────────────────────
 export default function ChatManagement() {
     const myUserId = localStorage.getItem('user_id') || '';
-    const myRole   = localStorage.getItem('role') || 'admin';
+    const rawRole  = localStorage.getItem('role') || 'admin';
     const myName   = localStorage.getItem('user_name') || 'Utilisateur';
-    // Super admin impersonating an academy still gets admin powers
-    const isAdmin  = myRole === 'admin' || myRole === 'super_admin' || myRole === 'sous_admin';
+    // Normalize: super_admin / sous_admin act as 'admin' inside chat
+    // (DB CHECK constraints on user_role / sender_role usually allow only
+    //  admin / coach / player / parent — so we coerce here.)
+    const myRole   = (rawRole === 'super_admin' || rawRole === 'sous_admin') ? 'admin' : rawRole;
+    const isAdmin  = myRole === 'admin';
     const isCoach  = myRole === 'coach';
     const canMod   = isAdmin || isCoach;
 
