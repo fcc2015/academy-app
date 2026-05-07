@@ -90,7 +90,8 @@ export default function ChatManagement() {
     const myUserId = localStorage.getItem('user_id') || '';
     const myRole   = localStorage.getItem('role') || 'admin';
     const myName   = localStorage.getItem('user_name') || 'Utilisateur';
-    const isAdmin  = myRole === 'admin';
+    // Super admin impersonating an academy still gets admin powers
+    const isAdmin  = myRole === 'admin' || myRole === 'super_admin' || myRole === 'sous_admin';
     const isCoach  = myRole === 'coach';
     const canMod   = isAdmin || isCoach;
 
