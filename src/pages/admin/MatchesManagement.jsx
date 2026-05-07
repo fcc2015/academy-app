@@ -97,15 +97,17 @@ const MatchesManagement = () => {
     }, []);
 
     const [matchManagers, setMatchManagers] = useState([]);
+    const [coaches, setCoaches] = useState([]);
 
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [matchesRes, squadsRes, settingsRes, adminsRes] = await Promise.all([
+            const [matchesRes, squadsRes, settingsRes, adminsRes, coachesRes] = await Promise.all([
                 authFetch(`${API_URL}/matches/`),
                 authFetch(`${API_URL}/squads/`).catch(() => ({ ok: false })),
                 authFetch(`${API_URL}/settings/`).catch(() => ({ ok: false })),
                 authFetch(`${API_URL}/admins/`).catch(() => ({ ok: false })),
+                authFetch(`${API_URL}/coaches/`).catch(() => ({ ok: false })),
             ]);
 
             if (matchesRes.ok) {
@@ -131,6 +133,9 @@ const MatchesManagement = () => {
                     a.admin_type === 'match_manager' || a.permissions?.can_manage_matches
                 );
                 setMatchManagers(managers);
+            }
+            if (coachesRes && coachesRes.ok) {
+                setCoaches(await coachesRes.json());
             }
         } catch (error) {
             console.error('Error fetching matches:', error);
@@ -870,8 +875,9 @@ const MatchesManagement = () => {
                                                     className="w-full px-2 py-1.5 bg-white/80 border border-slate-200 rounded-md text-xs font-black outline-none cursor-pointer"
                                                 >
                                                     <option value="Scheduled">⏳ Scheduled</option>
+                                                    <option value="Postponed">⏸ EN ATTENTE</option>
                                                     <option value="Completed">✅ Completed</option>
-                                                    <option value="Cancelled">❌ Cancelled</option>
+                                                    <option value="Cancelled">❌ REPORTÉ</option>
                                                 </select>
                                             </td>
 
@@ -1119,97 +1125,129 @@ const MatchesManagement = () => {
                 message={t('matches.deleteMessage')}
             />
 
-            {/* ─── Hidden export-only table (read-only, html2canvas-friendly) ── */}
-            <div
-                ref={exportRef}
-                style={{
-                    position: 'fixed',
-                    left: '-10000px',
-                    top: 0,
-                    width: '1400px',
-                    backgroundColor: '#ffffff',
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                }}
-                aria-hidden="true"
-            >
-                {/* Header */}
-                <div style={{ padding: '20px 24px', borderBottom: '2px solid #e2e8f0', background: 'linear-gradient(90deg, #fdf4ff, #fce7f3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>PROGRAMMATION DES MATCHS</h2>
-                        <p style={{ margin: '4px 0 0', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#c026d3' }}>
-                            {filteredMatches.length} matches · Generated {new Date().toLocaleDateString('en-GB')}
-                        </p>
-                    </div>
-                    <span style={{ fontSize: '32px' }}>🏆</span>
-                </div>
+            {/* ─── Hidden export-only table (Lanoria-style, html2canvas-friendly) ── */}
+            {(() => {
+                const academyName = (academySettings?.academy_name || 'CLUB').toUpperCase();
+                const academyLogo = academySettings?.logo_url;
+                const academyNameUpper = academyName;
+                // Compute weekend range
+                const dates = filteredMatches.map(m => new Date(m.match_date)).filter(d => !isNaN(d));
+                const dateMin = dates.length ? new Date(Math.min(...dates)) : new Date();
+                const dateMax = dates.length ? new Date(Math.max(...dates)) : new Date();
+                const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+                const monthName = months[dateMin.getMonth()];
+                const sameMonth = dateMin.getMonth() === dateMax.getMonth() && dateMin.getFullYear() === dateMax.getFullYear();
+                const weekendLabel = sameMonth
+                    ? `Week-End ${String(dateMin.getDate()).padStart(2, '0')} et ${String(dateMax.getDate()).padStart(2, '0')} ${monthName} ${dateMax.getFullYear()}`
+                    : `${String(dateMin.getDate()).padStart(2, '0')}/${String(dateMin.getMonth()+1).padStart(2, '0')} — ${String(dateMax.getDate()).padStart(2, '0')}/${String(dateMax.getMonth()+1).padStart(2, '0')} ${dateMax.getFullYear()}`;
 
-                {/* Legend */}
-                <div style={{ padding: '8px 24px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: '16px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b' }}>
-                    <span>Légende:</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><span style={{ width: 12, height: 12, background: '#fde68a', border: '1px solid #f59e0b', borderRadius: 3 }} /> VEN</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><span style={{ width: 12, height: 12, background: '#a5f3fc', border: '1px solid #06b6d4', borderRadius: 3 }} /> SAM</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><span style={{ width: 12, height: 12, background: '#fbcfe8', border: '1px solid #ec4899', borderRadius: 3 }} /> DIM</span>
-                </div>
+                // Helpers
+                const dayFr = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+                const fmtDate = (iso) => {
+                    const d = new Date(iso);
+                    return `${dayFr[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${String(d.getFullYear()).slice(2)}`;
+                };
+                const fmtTime = (iso) => {
+                    const d = new Date(iso);
+                    return `${String(d.getHours()).padStart(2, '0')}H${String(d.getMinutes()).padStart(2, '0')}`;
+                };
+                const coachFor = (match) => {
+                    const sq = squads.find(s => s.id === match.squad_id);
+                    if (!sq) return '';
+                    return sq.coaches?.full_name || sq.coach_name || (coaches.find(c => c.id === sq.coach_id)?.full_name) || '';
+                };
 
-                {/* Table */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                    <thead>
-                        <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-                            {['#', 'JOUR', '📅 DATE', '🕐 HEURE', '⏱️ DURÉE', 'U.', '📍 LIEU', '🏟️ TERRAIN / STADE', '🆚 ADVERSAIRE', '🏆 COMPÉTITION', 'ÉTAT'].map(h => (
-                                <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#334155' }}>{h}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredMatches.map((match, idx) => {
-                            const dStyleRaw = rowDayStyle(match.match_date);
-                            const day = new Date(match.match_date).getDay();
-                            const dayBg = day === 6 ? '#ecfeff' : day === 0 ? '#fdf2f8' : day === 5 ? '#fffbeb' : '#ffffff';
-                            const stripeColor = day === 6 ? '#06b6d4' : day === 0 ? '#ec4899' : day === 5 ? '#f59e0b' : '#cbd5e1';
-                            const meta = parseRowMeta(match.notes);
-                            const d = new Date(match.match_date);
-                            return (
-                                <tr key={match.id} style={{ background: dayBg, borderBottom: '1px solid #e2e8f0', borderLeft: `4px solid ${stripeColor}` }}>
-                                    <td style={{ padding: '10px 8px', fontWeight: 900, color: '#94a3b8', textAlign: 'center' }}>{idx + 1}</td>
-                                    <td style={{ padding: '10px 8px', fontWeight: 900, color: dStyleRaw.text === 'text-pink-700' ? '#be185d' : dStyleRaw.text === 'text-cyan-700' ? '#0e7490' : dStyleRaw.text === 'text-amber-700' ? '#b45309' : '#475569', textAlign: 'center' }}>{dayName(match.match_date)}</td>
-                                    <td style={{ padding: '10px 8px', fontWeight: 900, color: '#1e293b' }}>{d.toLocaleDateString('en-GB')}</td>
-                                    <td style={{ padding: '10px 8px', fontWeight: 900, color: '#a21caf' }}>{d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                                    <td style={{ padding: '10px 8px' }}>
-                                        <span style={{ background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', padding: '3px 8px', borderRadius: 999, fontSize: '10px', fontWeight: 900 }}>{meta.duration || '—'}</span>
-                                    </td>
-                                    <td style={{ padding: '10px 8px' }}>
-                                        {match.category ? <span style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', padding: '3px 8px', borderRadius: 999, fontSize: '10px', fontWeight: 900 }}>{match.category}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}
-                                    </td>
-                                    <td style={{ padding: '10px 8px' }}>
-                                        {meta.isAway ? (
-                                            <span style={{ background: '#fed7aa', color: '#9a3412', border: '1px solid #fb923c', padding: '3px 8px', borderRadius: 6, fontSize: '10px', fontWeight: 900 }}>✈ خارج</span>
-                                        ) : (
-                                            <span style={{ background: '#a7f3d0', color: '#065f46', border: '1px solid #34d399', padding: '3px 8px', borderRadius: 6, fontSize: '10px', fontWeight: 900 }}>🏠 داخل</span>
-                                        )}
-                                    </td>
-                                    <td style={{ padding: '10px 8px', fontWeight: 700, color: '#334155' }}>{match.location || '—'}</td>
-                                    <td style={{ padding: '10px 8px', fontWeight: 900, color: '#0f172a' }}>{match.opponent_name || '—'}</td>
-                                    <td style={{ padding: '10px 8px' }}>
-                                        <span style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d', padding: '3px 8px', borderRadius: 999, fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }}>{match.match_type || '—'}</span>
-                                    </td>
-                                    <td style={{ padding: '10px 8px' }}>
-                                        <span style={{
-                                            background: match.status === 'Completed' ? '#d1fae5' : match.status === 'Cancelled' ? '#fee2e2' : '#e0e7ff',
-                                            color: match.status === 'Completed' ? '#065f46' : match.status === 'Cancelled' ? '#991b1b' : '#3730a3',
-                                            border: `1px solid ${match.status === 'Completed' ? '#34d399' : match.status === 'Cancelled' ? '#fca5a5' : '#a5b4fc'}`,
-                                            padding: '3px 10px',
-                                            borderRadius: 999,
-                                            fontSize: '10px',
-                                            fontWeight: 900,
-                                            textTransform: 'uppercase',
-                                        }}>{match.status || 'Scheduled'}</span>
-                                    </td>
+                const HEADER_BLUE = '#1e40af';
+                const ROW_ALT = '#dbeafe';
+                const RED = '#dc2626';
+                const GREEN = '#16a34a';
+
+                return (
+                    <div
+                        ref={exportRef}
+                        style={{
+                            position: 'fixed',
+                            left: '-10000px',
+                            top: 0,
+                            width: '1280px',
+                            backgroundColor: '#ffffff',
+                            fontFamily: 'Arial, Helvetica, sans-serif',
+                            padding: '32px',
+                        }}
+                        aria-hidden="true"
+                    >
+                        {/* Logos row */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '40px', marginBottom: '20px' }}>
+                            {academyLogo && (
+                                <img src={academyLogo} alt="logo" crossOrigin="anonymous" style={{ height: '90px', objectFit: 'contain' }} />
+                            )}
+                            <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: '#1e3a8a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '12px', fontWeight: 900, textAlign: 'center', padding: '8px', lineHeight: 1.2 }}>
+                                CHALLENGER<br/>CHAMPIONNAT<br/>FOOTBALL
+                            </div>
+                        </div>
+
+                        {/* Title */}
+                        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                            <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900, letterSpacing: '0.02em', color: '#1e293b' }}>
+                                PROGRAMME DES MATCHES <span style={{ color: '#0284c7' }}>{academyNameUpper}</span> <span style={{ color: GREEN }}>CLUB</span>
+                            </h1>
+                        </div>
+
+                        {/* Subtitle */}
+                        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                            <p style={{ margin: 0, fontSize: '20px', fontStyle: 'italic', color: '#1e293b' }}>{weekendLabel}</p>
+                        </div>
+
+                        {/* Table */}
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', border: '2px solid #1e3a8a' }}>
+                            <thead>
+                                <tr style={{ background: HEADER_BLUE, color: '#ffffff' }}>
+                                    {['Cat', 'Date', 'Domicile', 'Visiteur', 'Heure', 'Terrain', 'Coach'].map(h => (
+                                        <th key={h} style={{ padding: '10px 8px', textAlign: 'center', fontSize: '15px', fontWeight: 900, border: '1px solid #1e3a8a' }}>{h}</th>
+                                    ))}
                                 </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+                            </thead>
+                            <tbody>
+                                {filteredMatches.map((match, idx) => {
+                                    const meta = parseRowMeta(match.notes);
+                                    const isAway = meta.isAway;
+                                    const homeTeam = isAway ? (match.opponent_name || '—') : academyNameUpper;
+                                    const visitorTeam = isAway ? academyNameUpper : (match.opponent_name || '—');
+                                    const isPending = match.status === 'Postponed' || match.status === 'Scheduled' && false;
+                                    const isCancelled = match.status === 'Cancelled';
+                                    const showRed = match.status === 'Postponed' ? 'EN ATTENTE' : (isCancelled ? 'REPORTÉ' : null);
+                                    const rowBg = idx % 2 === 0 ? '#ffffff' : ROW_ALT;
+                                    const cell = { padding: '8px 10px', border: '1px solid #93c5fd', textAlign: 'center', fontWeight: 700, fontSize: '14px', color: '#0f172a' };
+                                    const isOurHome = !isAway;
+                                    const isOurVisit = isAway;
+
+                                    return (
+                                        <tr key={match.id} style={{ background: rowBg }}>
+                                            <td style={{ ...cell, color: HEADER_BLUE, fontWeight: 900 }}>
+                                                {match.category || '—'}
+                                            </td>
+                                            <td style={cell}>
+                                                {showRed ? <span style={{ color: RED, fontWeight: 900 }}>{showRed}</span> : fmtDate(match.match_date)}
+                                            </td>
+                                            <td style={{ ...cell, color: isOurHome ? GREEN : '#0f172a', fontWeight: 900 }}>{homeTeam}</td>
+                                            <td style={{ ...cell, color: isOurVisit ? GREEN : '#0f172a', fontWeight: 900 }}>{visitorTeam}</td>
+                                            <td style={cell}>
+                                                {showRed ? '' : fmtTime(match.match_date)}
+                                            </td>
+                                            <td style={cell}>
+                                                {showRed ? <span style={{ color: RED, fontWeight: 900 }}>{showRed}</span> : (match.location || '—')}
+                                            </td>
+                                            <td style={cell}>
+                                                {showRed ? <span style={{ color: RED, fontWeight: 900 }}>{showRed}</span> : (coachFor(match) || '—')}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                );
+            })()}
         </div>
     );
 };
