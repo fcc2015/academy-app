@@ -26,7 +26,9 @@ import {
     ShieldOff,
     KeyRound,
     Loader2,
-    QrCode
+    QrCode,
+    LandPlot,
+    Trophy
 } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
@@ -299,6 +301,54 @@ const SettingsManagement = () => {
         }));
     };
 
+    // ─── Terrains Management ────────────────────────────────────
+    const [newTerrain, setNewTerrain] = useState({ name: '', size: '5/5' });
+    const TERRAIN_SIZES = ['5/5', '6/6', '7/7', '8/8', '9/9', '11/11'];
+
+    const addTerrain = (e) => {
+        e?.preventDefault?.();
+        if (!newTerrain.name.trim() || !settings) return;
+        const list = settings.terrains || [];
+        const next = [...list, { name: newTerrain.name.trim(), size: newTerrain.size }];
+        setSettings(prev => ({ ...prev, terrains: next }));
+        setNewTerrain({ name: '', size: '5/5' });
+    };
+
+    const removeTerrain = (idx) => {
+        setSettings(prev => ({
+            ...prev,
+            terrains: (prev.terrains || []).filter((_, i) => i !== idx),
+        }));
+    };
+
+    // ─── Tournaments List Management ────────────────────────────
+    const [newTournamentInput, setNewTournamentInput] = useState('');
+    const DEFAULT_TOURNAMENTS = ['CHALLENGER CHAMPIONNAT', 'GOLDEN CHAMPIONNAT', 'MASTER LEAGUE', 'MATCH AMICAL'];
+
+    const addTournament = (e) => {
+        e?.preventDefault?.();
+        const val = newTournamentInput.trim().toUpperCase();
+        if (!val || !settings) return;
+        const list = settings.tournaments_list || [];
+        if (list.includes(val)) { setNewTournamentInput(''); return; }
+        setSettings(prev => ({ ...prev, tournaments_list: [...list, val] }));
+        setNewTournamentInput('');
+    };
+
+    const addTournamentPreset = (val) => {
+        if (!settings) return;
+        const list = settings.tournaments_list || [];
+        if (list.includes(val)) return;
+        setSettings(prev => ({ ...prev, tournaments_list: [...list, val] }));
+    };
+
+    const removeTournament = (val) => {
+        setSettings(prev => ({
+            ...prev,
+            tournaments_list: (prev.tournaments_list || []).filter(t => t !== val),
+        }));
+    };
+
     const handleCreateCoupon = async (e) => {
         e.preventDefault();
         try {
@@ -507,6 +557,154 @@ const SettingsManagement = () => {
                                         </div>
                                     )}
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ─── Terrains (Pitches) ────────────────────── */}
+                    <div className="bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
+                        <div className="px-8 py-6 border-b border-slate-100 bg-emerald-50/50 flex items-center gap-3">
+                            <LandPlot className="text-emerald-600" size={20} />
+                            <h3 className="font-extrabold text-slate-800">Terrains / Pitches</h3>
+                        </div>
+                        <div className="p-8 space-y-4" dir="ltr">
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                                Add the pitches available at your academy. These will appear as options when scheduling matches.
+                            </p>
+
+                            <div className="grid grid-cols-12 gap-2">
+                                <input
+                                    type="text"
+                                    value={newTerrain.name}
+                                    onChange={(e) => setNewTerrain(t => ({ ...t, name: e.target.value }))}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTerrain(e); } }}
+                                    placeholder="e.g. Terrain 1, Stade Principal"
+                                    className="col-span-7 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-emerald-500/20"
+                                />
+                                <select
+                                    value={newTerrain.size}
+                                    onChange={(e) => setNewTerrain(t => ({ ...t, size: e.target.value }))}
+                                    className="col-span-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-emerald-500/20"
+                                >
+                                    {TERRAIN_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={addTerrain}
+                                    className="col-span-2 px-3 py-3 bg-emerald-600 text-white hover:bg-emerald-700 font-black rounded-xl flex items-center justify-center gap-1 transition-colors text-sm"
+                                >
+                                    <Plus size={16} /> Add
+                                </button>
+                            </div>
+
+                            <div className="space-y-2 p-4 bg-slate-50 border border-slate-100 rounded-2xl min-h-[80px]">
+                                {settings.terrains && settings.terrains.length > 0 ? (
+                                    settings.terrains.map((tr, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="group flex items-center justify-between gap-3 bg-white border border-slate-200 px-4 py-2.5 rounded-xl shadow-sm hover:border-emerald-300 transition-all"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <LandPlot className="text-emerald-500" size={16} />
+                                                <span className="font-bold text-slate-800 text-sm">{tr.name}</span>
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">
+                                                    {tr.size}
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeTerrain(idx)}
+                                                className="text-slate-300 opacity-50 group-hover:opacity-100 hover:text-red-500 transition-all p-1 rounded-md hover:bg-red-50"
+                                                title={`Remove ${tr.name}`}
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="w-full text-center text-sm font-medium text-slate-400 py-2">
+                                        No terrains yet. Add your first pitch above.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ─── Tournaments List ──────────────────────── */}
+                    <div className="bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
+                        <div className="px-8 py-6 border-b border-slate-100 bg-amber-50/50 flex items-center gap-3">
+                            <Trophy className="text-amber-600" size={20} />
+                            <h3 className="font-extrabold text-slate-800">Tournaments / Competitions</h3>
+                        </div>
+                        <div className="p-8 space-y-4" dir="ltr">
+                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                                Pre-define the tournaments your academy participates in. The match scheduler will use this list.
+                            </p>
+
+                            {/* Quick presets */}
+                            <div className="flex flex-wrap gap-2">
+                                {DEFAULT_TOURNAMENTS.map(preset => {
+                                    const exists = (settings.tournaments_list || []).includes(preset);
+                                    return (
+                                        <button
+                                            key={preset}
+                                            type="button"
+                                            disabled={exists}
+                                            onClick={() => addTournamentPreset(preset)}
+                                            className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all ${exists
+                                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 active:scale-95'
+                                                }`}
+                                        >
+                                            {exists ? <Check size={11} className="inline mr-1" /> : <Plus size={11} className="inline mr-1" />}
+                                            {preset}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={newTournamentInput}
+                                    onChange={(e) => setNewTournamentInput(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTournament(e); } }}
+                                    placeholder="Custom tournament name..."
+                                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-amber-500/20 uppercase"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={addTournament}
+                                    className="px-5 py-3 bg-amber-600 text-white hover:bg-amber-700 font-black rounded-xl flex items-center gap-2 transition-colors text-sm"
+                                >
+                                    <Plus size={16} /> Add
+                                </button>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 p-4 bg-slate-50 border border-slate-100 rounded-2xl min-h-[80px]">
+                                {settings.tournaments_list && settings.tournaments_list.length > 0 ? (
+                                    settings.tournaments_list.map((tr, idx) => (
+                                        <span
+                                            key={idx}
+                                            className="group flex items-center gap-1.5 bg-white border border-amber-200 text-amber-800 text-xs font-black px-3 py-1.5 rounded-xl shadow-sm hover:border-amber-400 transition-all uppercase tracking-wider"
+                                        >
+                                            <Trophy size={12} />
+                                            {tr}
+                                            <button
+                                                type="button"
+                                                onClick={() => removeTournament(tr)}
+                                                className="ml-1 text-amber-300 opacity-50 group-hover:opacity-100 hover:text-red-500 transition-all bg-amber-50 group-hover:bg-red-50 rounded-md p-0.5"
+                                                title={`Remove ${tr}`}
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </span>
+                                    ))
+                                ) : (
+                                    <div className="w-full text-center text-sm font-medium text-slate-400 py-2">
+                                        No tournaments defined. Tap a preset above or add your own.
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

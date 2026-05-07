@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime
 
 class AcademySettingsBase(BaseModel):
@@ -17,6 +17,10 @@ class AcademySettingsBase(BaseModel):
     age_categories: list[str] = ["U5", "U7", "U9", "U11", "U13", "U15", "U17", "U19", "Senior"]
     season_start: Optional[str] = None
     season_end: Optional[str] = None
+    # Terrains: list of { name: str, size: str } e.g. {"name":"Terrain 1","size":"5/5"}
+    terrains: Optional[list[dict[str, Any]]] = None
+    # Pre-defined tournaments academy participates in (for match scheduler dropdown)
+    tournaments_list: Optional[list[str]] = None
     # Public landing page content
     hero_title: Optional[str] = None
     hero_subtitle: Optional[str] = None
@@ -41,6 +45,8 @@ class AcademySettingsUpdate(BaseModel):
     age_categories: Optional[list[str]] = None
     season_start: Optional[str] = None
     season_end: Optional[str] = None
+    terrains: Optional[list[dict[str, Any]]] = None
+    tournaments_list: Optional[list[str]] = None
     hero_title: Optional[str] = None
     hero_subtitle: Optional[str] = None
     about_text: Optional[str] = None
