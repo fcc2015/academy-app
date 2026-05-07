@@ -64,16 +64,28 @@ const MatchesManagement = () => {
     const DURATION_OPTIONS = ['2x20', '2x25', '2x30', '2x35', '2x40', '2x45'];
 
     // Stored as plain text in `notes` so we don't need a DB migration.
-    // Format: "[DUR:2x30] notes here"
+    // Format: "[DUR:2x30][AWAY] free notes"
+    const parseRowMeta = (notes) => {
+        const s = notes || '';
+        const dur = s.match(/\[DUR:([^\]]+)\]/);
+        const isAway = /\[AWAY\]/.test(s);
+        const cleanNotes = s.replace(/\[DUR:[^\]]+\]/g, '').replace(/\[AWAY\]/g, '').trim();
+        return { duration: dur ? dur[1] : '', isAway, cleanNotes };
+    };
+    const buildRowNotes = ({ duration, isAway, cleanNotes }) => {
+        let out = '';
+        if (duration) out += `[DUR:${duration}]`;
+        if (isAway) out += '[AWAY]';
+        if (cleanNotes) out += (out ? ' ' : '') + cleanNotes;
+        return out;
+    };
+    // Backwards-compat helpers used elsewhere in this file
     const parseDuration = (notes) => {
-        const m = (notes || '').match(/^\[DUR:([^\]]+)\]\s*/);
-        return { duration: m ? m[1] : '', cleanNotes: notes ? notes.replace(/^\[DUR:[^\]]+\]\s*/, '') : '' };
+        const meta = parseRowMeta(notes);
+        return { duration: meta.duration, cleanNotes: meta.cleanNotes };
     };
-    const buildNotes = (duration, notes) => {
-        if (!duration) return notes || '';
-        return `[DUR:${duration}] ${notes || ''}`.trim();
-    };
-    const matchDuration = (m) => parseDuration(m?.notes).duration || '—';
+    const buildNotes = (duration, cleanNotes) => buildRowNotes({ duration, isAway: false, cleanNotes });
+    const matchDuration = (m) => parseRowMeta(m?.notes).duration || '—';
 
     const tableRef = useRef(null);
     const [exportOpen, setExportOpen] = useState(false);
@@ -363,16 +375,17 @@ const MatchesManagement = () => {
         const d = new Date(m.match_date);
         const date = d.toLocaleDateString('en-GB');
         const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const homeAway = m.location === 'Away' ? 'Outside' : (m.location === 'Home' ? 'Home' : 'Home');
+        const meta = parseRowMeta(m.notes);
         return {
             Date: date,
+            Day: dayName(m.match_date),
             Time: time,
+            Duration: meta.duration || '—',
             Category: m.category || '—',
+            Lieu: meta.isAway ? 'Khariji (Away)' : 'Dakhili (Home)',
+            'Terrain/Stade': m.location || '—',
             Opponent: m.opponent_name || '',
-            'Home/Away': homeAway,
-            Terrain: m.location || '—',
             Tournament: m.match_type || '—',
-            Duration: matchDuration(m),
             Status: m.status || 'Scheduled',
         };
     };
@@ -690,10 +703,10 @@ const MatchesManagement = () => {
                                 <th className="px-2 py-3">🕐 Heure</th>
                                 <th className="px-2 py-3">⏱️ Durée</th>
                                 <th className="px-2 py-3">U.</th>
-                                <th className="px-2 py-3">🏟️ Terrain</th>
+                                <th className="px-2 py-3 text-center">📍 Lieu</th>
+                                <th className="px-2 py-3">🏟️ Terrain / Stade</th>
                                 <th className="px-2 py-3">🆚 Adversaire</th>
                                 <th className="px-2 py-3">🏆 Compétition</th>
-                                <th className="px-2 py-3 text-center">Score</th>
                                 <th className="px-2 py-3">État</th>
                                 <th className="px-2 py-3 text-center w-16" data-export-skip>⚙</th>
                             </tr>
@@ -720,8 +733,9 @@ const MatchesManagement = () => {
                                     const dayLabel = dayName(match.match_date);
                                     const isSaving = savingRow === match.id;
                                     const isSaved = savedRow === match.id;
-                                    const isAway = match.location === 'Away';
-                                    const { duration: matchDur } = parseDuration(match.notes);
+                                    const meta = parseRowMeta(match.notes);
+                                    const isAway = meta.isAway;
+                                    const matchDur = meta.duration;
 
                                     return (
                                         <tr
@@ -755,7 +769,7 @@ const MatchesManagement = () => {
                                             <td className="px-1 py-1">
                                                 <select
                                                     value={matchDur || '2x30'}
-                                                    onChange={(e) => updateMatchField(match.id, { notes: buildNotes(e.target.value, parseDuration(match.notes).cleanNotes) })}
+                                                    onChange={(e) => updateMatchField(match.id, { notes: buildRowNotes({ ...meta, duration: e.target.value }) })}
                                                     className="w-full px-2 py-1.5 bg-purple-50 border border-purple-200 rounded-md text-xs font-black uppercase outline-none cursor-pointer"
                                                 >
                                                     {DURATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
@@ -774,19 +788,50 @@ const MatchesManagement = () => {
                                                 </select>
                                             </td>
 
-                                            {/* Terrain (with Home/Away) */}
+                                            {/* DAKHIL / KHARIJ toggle */}
                                             <td className="px-1 py-1">
-                                                <select
-                                                    value={match.location || ''}
-                                                    onChange={(e) => updateMatchField(match.id, { location: e.target.value })}
-                                                    className={`w-full px-2 py-1.5 ${isAway ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'} border rounded-md text-xs font-black outline-none cursor-pointer`}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const goingAway = !isAway;
+                                                        const newLocation = goingAway ? '' : (terrains[0] ? `${terrains[0].name} (${terrains[0].size})` : 'Home');
+                                                        updateMatchField(match.id, {
+                                                            location: newLocation,
+                                                            notes: buildRowNotes({ ...meta, isAway: goingAway }),
+                                                        });
+                                                    }}
+                                                    className={`w-full px-2 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider border transition-all ${isAway
+                                                        ? 'bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200'
+                                                        : 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200'
+                                                        }`}
+                                                    title="Click to toggle Home/Away"
                                                 >
-                                                    <option value="Home">🏠 Home</option>
-                                                    <option value="Away">✈ Outside</option>
-                                                    {terrains.map((tr, i) => (
-                                                        <option key={i} value={`${tr.name} (${tr.size})`}>{tr.name} — {tr.size}</option>
-                                                    ))}
-                                                </select>
+                                                    {isAway ? '✈ خارج' : '🏠 داخل'}
+                                                </button>
+                                            </td>
+
+                                            {/* Terrain (Home) OR Stade name (Away) */}
+                                            <td className="px-1 py-1">
+                                                {isAway ? (
+                                                    <input
+                                                        type="text"
+                                                        value={match.location || ''}
+                                                        onChange={(e) => updateMatchField(match.id, { location: e.target.value })}
+                                                        placeholder="Nom du stade / Mal3ab khariji"
+                                                        className="w-full px-2 py-1.5 bg-orange-50 border border-orange-200 rounded-md text-xs font-black focus:ring-2 focus:ring-orange-400/30 outline-none"
+                                                    />
+                                                ) : (
+                                                    <select
+                                                        value={match.location || ''}
+                                                        onChange={(e) => updateMatchField(match.id, { location: e.target.value })}
+                                                        className="w-full px-2 py-1.5 bg-emerald-50 border border-emerald-200 rounded-md text-xs font-black outline-none cursor-pointer"
+                                                    >
+                                                        <option value="Home">🏠 Home</option>
+                                                        {terrains.map((tr, i) => (
+                                                            <option key={i} value={`${tr.name} (${tr.size})`}>{tr.name} — {tr.size}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
                                             </td>
 
                                             {/* Adversaire */}
@@ -795,6 +840,7 @@ const MatchesManagement = () => {
                                                     type="text"
                                                     value={match.opponent_name || ''}
                                                     onChange={(e) => updateMatchField(match.id, { opponent_name: e.target.value })}
+                                                    placeholder="Ism al-fariq al-monnafis"
                                                     className="w-full px-2 py-1.5 bg-white/80 border border-slate-200 rounded-md text-xs font-black focus:ring-2 focus:ring-fuchsia-400/30 outline-none"
                                                 />
                                             </td>
@@ -809,25 +855,6 @@ const MatchesManagement = () => {
                                                     <option value="Friendly">FRIENDLY / AMICAL</option>
                                                     {tournamentsList.map(tn => <option key={tn} value={tn}>{tn}</option>)}
                                                 </select>
-                                            </td>
-
-                                            {/* Score */}
-                                            <td className="px-1 py-1">
-                                                <div className="flex items-center gap-1">
-                                                    <input
-                                                        type="number" min="0"
-                                                        value={match.our_score ?? 0}
-                                                        onChange={(e) => updateMatchField(match.id, { our_score: parseInt(e.target.value) || 0 })}
-                                                        className="w-12 px-1 py-1.5 bg-emerald-50 border border-emerald-200 rounded-md text-xs font-black text-center outline-none"
-                                                    />
-                                                    <span className="text-slate-400 font-black">-</span>
-                                                    <input
-                                                        type="number" min="0"
-                                                        value={match.their_score ?? 0}
-                                                        onChange={(e) => updateMatchField(match.id, { their_score: parseInt(e.target.value) || 0 })}
-                                                        className="w-12 px-1 py-1.5 bg-red-50 border border-red-200 rounded-md text-xs font-black text-center outline-none"
-                                                    />
-                                                </div>
                                             </td>
 
                                             {/* État */}
