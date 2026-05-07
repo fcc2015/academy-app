@@ -47,6 +47,7 @@ const TournamentsManagement = lazy(() => import('./pages/admin/TournamentsManage
 const TryoutsManagement = lazy(() => import('./pages/admin/TryoutsManagement'));
 const SettingsManagement = lazy(() => import('./pages/admin/SettingsManagement'));
 const AdminsManagement = lazy(() => import('./pages/admin/AdminsManagement'));
+const MatchManagerInvite = lazy(() => import('./pages/admin/MatchManagerInvite'));
 const ChatManagement = lazy(() => import('./pages/admin/ChatManagement'));
 const MatchesManagement = lazy(() => import('./pages/admin/MatchesManagement'));
 const TrainingManagement = lazy(() => import('./pages/admin/TrainingManagement'));
@@ -143,6 +144,7 @@ function App() {
             <Route path="inventory" element={<InventoryManagement />} />
             <Route path="expenses" element={<ExpensesManagement />} />
             <Route path="admins" element={<AdminsManagement />} />
+            <Route path="programmateur" element={<MatchManagerInvite />} />
             <Route path="branches" element={<BranchesManagement />} />
             <Route path="subscription" element={<SubscriptionPage />} />
             <Route path="chat" element={<ChatManagement />} />

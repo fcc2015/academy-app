@@ -238,6 +238,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
                 { to: '/admin/chat',            icon: MessageCircle, labelKey: 'sidebar.chat' },
                 { to: '/admin/pending-parents', icon: UserCheck,     labelKey: 'sidebar.pendingParents' },
                 { to: '/admin/admins',          icon: Shield,        labelKey: 'sidebar.admins' },
+                { to: '/admin/programmateur',   icon: CalendarClock, labelKey: 'sidebar.programmateur' },
                 ...(hasFeature('branches') ? [{ to: '/admin/branches', icon: Building2, labelKey: 'sidebar.branches' }] : []),
                 { to: '/admin/subscription', icon: SubscriptionIcon, labelKey: 'sidebar.subscription' },
                 { to: '/admin/settings',        icon: Settings,      labelKey: 'sidebar.settings' },
