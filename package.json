@@ -34,6 +34,7 @@
     "capacitor-native-biometric": "^4.2.2",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.11.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.5",
@@ -41,7 +42,8 @@
     "react-qr-code": "^2.0.18",
     "react-router-dom": "^7.14.2",
     "recharts": "^3.8.1",
-    "sweetalert2": "^11.26.24"
+    "sweetalert2": "^11.26.24",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
