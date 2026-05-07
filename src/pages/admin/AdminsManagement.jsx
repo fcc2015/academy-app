@@ -1,7 +1,7 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Edit2, Trash2, Search, X, CheckCircle2, ShieldAlert, Copy, Check, UserCog, Calculator, Briefcase, ChevronDown, Building2, Trophy } from 'lucide-react';
+import { Shield, Plus, Edit2, Trash2, Search, X, CheckCircle2, ShieldAlert, Copy, Check, UserCog, Calculator, Briefcase, ChevronDown, Building2, Trophy, KeyRound } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
 const ADMIN_TYPES = [
@@ -144,6 +144,30 @@ const AdminsManagement = () => {
         }
     };
 
+    const [resetConfirm, setResetConfirm] = useState(null); // admin row pending confirm
+    const [resetting, setResetting] = useState(false);
+
+    const handleResetPassword = async (admin) => {
+        setResetting(true);
+        try {
+            const res = await authFetch(`${API_URL}/admins/${admin.id}/reset-password`, { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Reset failed');
+            setSuccessData({
+                email: data.email || admin.email,
+                password: data.temp_password,
+                name: data.full_name || admin.full_name,
+                type: admin.admin_type,
+            });
+            setIsModalOpen(true);
+            setResetConfirm(null);
+        } catch (err) {
+            showFeedback(err.message || 'فشل تجديد كلمة المرور', 'error');
+        } finally {
+            setResetting(false);
+        }
+    };
+
     const filteredAdmins = admins.filter(a =>
         a.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -252,6 +276,13 @@ const AdminsManagement = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex justify-center gap-2">
+                                                <button
+                                                    onClick={() => setResetConfirm(admin)}
+                                                    className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                                    title="تجديد كلمة المرور / Regenerate password"
+                                                >
+                                                    <KeyRound size={18} />
+                                                </button>
                                                 <button onClick={() => handleOpenModal(admin)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"><Edit2 size={18} /></button>
                                                 <button onClick={() => handleDelete(admin.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={18} /></button>
                                             </div>
@@ -418,6 +449,16 @@ const AdminsManagement = () => {
                 isRTL={true}
                 title="حذف الإداري"
                 message="هل أنت متأكد من حذف هذا الإداري؟ لا يمكن التراجع عن هذا الإجراء."
+            />
+
+            <ConfirmDialog
+                isOpen={!!resetConfirm}
+                onConfirm={() => resetConfirm && handleResetPassword(resetConfirm)}
+                onCancel={() => setResetConfirm(null)}
+                isRTL={true}
+                title="تجديد كلمة المرور"
+                message={resetConfirm ? `سيتم إنشاء كلمة مرور جديدة لـ ${resetConfirm.full_name}. كلمة المرور القديمة لن تعمل بعد ذلك.` : ''}
+                confirmDisabled={resetting}
             />
         </div>
     );

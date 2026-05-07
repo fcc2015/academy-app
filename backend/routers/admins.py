@@ -162,3 +162,45 @@ async def delete_admin(admin_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred. Please try again."
         )
+
+
+@router.post("/{admin_id}/reset-password")
+async def reset_admin_password(admin_id: str):
+    """Generate a new temp password for an admin and update Supabase Auth."""
+    import httpx
+    from core.config import settings as _settings
+    try:
+        # Look up the admin row to get user_id + email
+        rows = await supabase._get(f"/rest/v1/admins?id=eq.{admin_id}&select=user_id,email,full_name")
+        if not rows:
+            raise HTTPException(status_code=404, detail="Admin not found")
+        admin_row = rows[0]
+        user_id = admin_row.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=400, detail="Admin has no linked auth user")
+
+        new_password = generate_temp_password()
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            res = await client.put(
+                f"{_settings.SUPABASE_URL}/auth/v1/admin/users/{user_id}",
+                json={"password": new_password},
+                headers=supabase.admin_headers,
+            )
+            if res.status_code != 200:
+                logger.error(f"Password reset failed for admin {admin_id}: {res.status_code} {res.text}")
+                raise HTTPException(status_code=500, detail="Failed to reset password in Supabase Auth")
+
+        return {
+            "email": admin_row.get("email"),
+            "full_name": admin_row.get("full_name"),
+            "temp_password": new_password,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error resetting admin password: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
