@@ -88,6 +88,7 @@ const MatchesManagement = () => {
     const matchDuration = (m) => parseRowMeta(m?.notes).duration || '—';
 
     const tableRef = useRef(null);
+    const exportRef = useRef(null);
     const [exportOpen, setExportOpen] = useState(false);
 
     useEffect(() => {
@@ -405,10 +406,13 @@ const MatchesManagement = () => {
         setExportOpen(false);
     };
 
+    const captureTarget = () => exportRef.current || tableRef.current;
+
     const exportImage = async () => {
-        if (!tableRef.current) return;
+        const target = captureTarget();
+        if (!target) return;
         try {
-            const canvas = await html2canvas(tableRef.current, {
+            const canvas = await html2canvas(target, {
                 backgroundColor: '#ffffff',
                 scale: 2,
                 useCORS: true,
@@ -425,10 +429,11 @@ const MatchesManagement = () => {
     };
 
     const exportPDF = async () => {
-        if (!tableRef.current) return;
+        const target = captureTarget();
+        if (!target) return;
         try {
             const { jsPDF } = await import('jspdf');
-            const canvas = await html2canvas(tableRef.current, {
+            const canvas = await html2canvas(target, {
                 backgroundColor: '#ffffff',
                 scale: 2,
                 useCORS: true,
@@ -1113,6 +1118,98 @@ const MatchesManagement = () => {
                 title={t('matches.deleteTitle')}
                 message={t('matches.deleteMessage')}
             />
+
+            {/* ─── Hidden export-only table (read-only, html2canvas-friendly) ── */}
+            <div
+                ref={exportRef}
+                style={{
+                    position: 'fixed',
+                    left: '-10000px',
+                    top: 0,
+                    width: '1400px',
+                    backgroundColor: '#ffffff',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                }}
+                aria-hidden="true"
+            >
+                {/* Header */}
+                <div style={{ padding: '20px 24px', borderBottom: '2px solid #e2e8f0', background: 'linear-gradient(90deg, #fdf4ff, #fce7f3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>PROGRAMMATION DES MATCHS</h2>
+                        <p style={{ margin: '4px 0 0', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#c026d3' }}>
+                            {filteredMatches.length} matches · Generated {new Date().toLocaleDateString('en-GB')}
+                        </p>
+                    </div>
+                    <span style={{ fontSize: '32px' }}>🏆</span>
+                </div>
+
+                {/* Legend */}
+                <div style={{ padding: '8px 24px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: '16px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', color: '#64748b' }}>
+                    <span>Légende:</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><span style={{ width: 12, height: 12, background: '#fde68a', border: '1px solid #f59e0b', borderRadius: 3 }} /> VEN</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><span style={{ width: 12, height: 12, background: '#a5f3fc', border: '1px solid #06b6d4', borderRadius: 3 }} /> SAM</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><span style={{ width: 12, height: 12, background: '#fbcfe8', border: '1px solid #ec4899', borderRadius: 3 }} /> DIM</span>
+                </div>
+
+                {/* Table */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                    <thead>
+                        <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                            {['#', 'JOUR', '📅 DATE', '🕐 HEURE', '⏱️ DURÉE', 'U.', '📍 LIEU', '🏟️ TERRAIN / STADE', '🆚 ADVERSAIRE', '🏆 COMPÉTITION', 'ÉTAT'].map(h => (
+                                <th key={h} style={{ padding: '10px 8px', textAlign: 'left', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#334155' }}>{h}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredMatches.map((match, idx) => {
+                            const dStyleRaw = rowDayStyle(match.match_date);
+                            const day = new Date(match.match_date).getDay();
+                            const dayBg = day === 6 ? '#ecfeff' : day === 0 ? '#fdf2f8' : day === 5 ? '#fffbeb' : '#ffffff';
+                            const stripeColor = day === 6 ? '#06b6d4' : day === 0 ? '#ec4899' : day === 5 ? '#f59e0b' : '#cbd5e1';
+                            const meta = parseRowMeta(match.notes);
+                            const d = new Date(match.match_date);
+                            return (
+                                <tr key={match.id} style={{ background: dayBg, borderBottom: '1px solid #e2e8f0', borderLeft: `4px solid ${stripeColor}` }}>
+                                    <td style={{ padding: '10px 8px', fontWeight: 900, color: '#94a3b8', textAlign: 'center' }}>{idx + 1}</td>
+                                    <td style={{ padding: '10px 8px', fontWeight: 900, color: dStyleRaw.text === 'text-pink-700' ? '#be185d' : dStyleRaw.text === 'text-cyan-700' ? '#0e7490' : dStyleRaw.text === 'text-amber-700' ? '#b45309' : '#475569', textAlign: 'center' }}>{dayName(match.match_date)}</td>
+                                    <td style={{ padding: '10px 8px', fontWeight: 900, color: '#1e293b' }}>{d.toLocaleDateString('en-GB')}</td>
+                                    <td style={{ padding: '10px 8px', fontWeight: 900, color: '#a21caf' }}>{d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                                    <td style={{ padding: '10px 8px' }}>
+                                        <span style={{ background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', padding: '3px 8px', borderRadius: 999, fontSize: '10px', fontWeight: 900 }}>{meta.duration || '—'}</span>
+                                    </td>
+                                    <td style={{ padding: '10px 8px' }}>
+                                        {match.category ? <span style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', padding: '3px 8px', borderRadius: 999, fontSize: '10px', fontWeight: 900 }}>{match.category}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}
+                                    </td>
+                                    <td style={{ padding: '10px 8px' }}>
+                                        {meta.isAway ? (
+                                            <span style={{ background: '#fed7aa', color: '#9a3412', border: '1px solid #fb923c', padding: '3px 8px', borderRadius: 6, fontSize: '10px', fontWeight: 900 }}>✈ خارج</span>
+                                        ) : (
+                                            <span style={{ background: '#a7f3d0', color: '#065f46', border: '1px solid #34d399', padding: '3px 8px', borderRadius: 6, fontSize: '10px', fontWeight: 900 }}>🏠 داخل</span>
+                                        )}
+                                    </td>
+                                    <td style={{ padding: '10px 8px', fontWeight: 700, color: '#334155' }}>{match.location || '—'}</td>
+                                    <td style={{ padding: '10px 8px', fontWeight: 900, color: '#0f172a' }}>{match.opponent_name || '—'}</td>
+                                    <td style={{ padding: '10px 8px' }}>
+                                        <span style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d', padding: '3px 8px', borderRadius: 999, fontSize: '10px', fontWeight: 900, textTransform: 'uppercase' }}>{match.match_type || '—'}</span>
+                                    </td>
+                                    <td style={{ padding: '10px 8px' }}>
+                                        <span style={{
+                                            background: match.status === 'Completed' ? '#d1fae5' : match.status === 'Cancelled' ? '#fee2e2' : '#e0e7ff',
+                                            color: match.status === 'Completed' ? '#065f46' : match.status === 'Cancelled' ? '#991b1b' : '#3730a3',
+                                            border: `1px solid ${match.status === 'Completed' ? '#34d399' : match.status === 'Cancelled' ? '#fca5a5' : '#a5b4fc'}`,
+                                            padding: '3px 10px',
+                                            borderRadius: 999,
+                                            fontSize: '10px',
+                                            fontWeight: 900,
+                                            textTransform: 'uppercase',
+                                        }}>{match.status || 'Scheduled'}</span>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 };
