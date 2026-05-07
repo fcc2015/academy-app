@@ -215,6 +215,116 @@ const MatchesManagement = () => {
         setConfirmDialog({ isOpen: true, id });
     };
 
+    // ─── Inline edit helpers (Excel-like) ─────────────────
+    const [savingRow, setSavingRow] = useState(null); // match id currently saving
+    const [savedRow, setSavedRow] = useState(null);   // match id flashed green
+    const saveTimers = useRef({});
+
+    const updateMatchField = (matchId, patch) => {
+        setMatches(prev => prev.map(m => m.id === matchId ? { ...m, ...patch } : m));
+        if (saveTimers.current[matchId]) clearTimeout(saveTimers.current[matchId]);
+        saveTimers.current[matchId] = setTimeout(() => persistMatch(matchId, patch), 500);
+    };
+
+    const persistMatch = async (matchId, patch) => {
+        setSavingRow(matchId);
+        try {
+            const current = matches.find(m => m.id === matchId);
+            const merged = { ...current, ...patch };
+            const body = {
+                squad_id: merged.squad_id,
+                opponent_name: merged.opponent_name,
+                match_date: new Date(merged.match_date).toISOString(),
+                location: merged.location,
+                our_score: parseInt(merged.our_score) || 0,
+                their_score: parseInt(merged.their_score) || 0,
+                match_type: merged.match_type,
+                status: merged.status,
+                notes: merged.notes,
+                category: merged.category || null,
+            };
+            const res = await authFetch(`${API_URL}/matches/${matchId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) throw new Error('Save failed');
+            setSavedRow(matchId);
+            setTimeout(() => setSavedRow(null), 1200);
+        } catch (e) {
+            toast.error('Save failed');
+        } finally {
+            setSavingRow(null);
+        }
+    };
+
+    const handleAddRow = async () => {
+        try {
+            const sat = nextSaturday();
+            const newRow = {
+                squad_id: squads[0]?.id || 'default',
+                opponent_name: 'New Opponent',
+                match_date: sat.toISOString(),
+                location: defaultLocation(),
+                our_score: 0,
+                their_score: 0,
+                match_type: defaultMatchType(),
+                status: 'Scheduled',
+                notes: buildNotes('2x30', ''),
+                category: ageCategories[0] || null,
+            };
+            const res = await authFetch(`${API_URL}/matches/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newRow),
+            });
+            if (!res.ok) throw new Error('Create failed');
+            await fetchData();
+        } catch (e) {
+            toast.error('Failed to add row');
+        }
+    };
+
+    const nextSaturday = () => {
+        const d = new Date();
+        const diff = (6 - d.getDay() + 7) % 7 || 7;
+        d.setDate(d.getDate() + diff);
+        d.setHours(15, 0, 0, 0);
+        return d;
+    };
+
+    // Color mapping by day-of-week
+    const dayColors = {
+        0: { bg: 'bg-pink-50', stripe: 'border-l-pink-500', label: 'DIM', text: 'text-pink-700' },        // Sunday
+        5: { bg: 'bg-amber-50', stripe: 'border-l-amber-500', label: 'VEN', text: 'text-amber-700' },     // Friday
+        6: { bg: 'bg-cyan-50', stripe: 'border-l-cyan-500', label: 'SAM', text: 'text-cyan-700' },        // Saturday
+    };
+    const rowDayStyle = (iso) => {
+        const day = new Date(iso).getDay();
+        return dayColors[day] || { bg: '', stripe: 'border-l-slate-200', label: '—', text: 'text-slate-500' };
+    };
+    const dayName = (iso) => {
+        const d = new Date(iso).getDay();
+        return ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'][d];
+    };
+    const isoDate = (iso) => {
+        const d = new Date(iso);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    };
+    const isoTime = (iso) => {
+        const d = new Date(iso);
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+    const composeIso = (date, time) => {
+        if (!date) return new Date().toISOString();
+        const [y, m, d] = date.split('-').map(Number);
+        const [h = 15, min = 0] = (time || '15:00').split(':').map(Number);
+        return new Date(y, m - 1, d, h, min).toISOString();
+    };
+
     const confirmDelete = async () => {
         const id = confirmDialog.id;
         setConfirmDialog({ isOpen: false, id: null });
@@ -242,7 +352,7 @@ const MatchesManagement = () => {
             m.category?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesWeekend = !weekendOnly || isWeekend(m.match_date);
         return matchesSearch && matchesWeekend;
-    });
+    }).sort((a, b) => new Date(a.match_date) - new Date(b.match_date));
 
     // ─── Exports ──────────────────────────────────────────
     const formatRow = (m) => {
@@ -557,24 +667,34 @@ const MatchesManagement = () => {
                         </div>
                         <Trophy className="text-fuchsia-400" size={32} />
                     </div>
+
+                    {/* Day-color legend */}
+                    <div className="px-6 py-2 border-b border-slate-100 bg-slate-50 flex items-center gap-3 text-[10px] font-black uppercase tracking-widest" data-export-skip>
+                        <span className="text-slate-400">Légende:</span>
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-200 border border-amber-400" /> VEN</span>
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-cyan-200 border border-cyan-400" /> SAM</span>
+                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-pink-200 border border-pink-400" /> DIM</span>
+                        <span className="ml-auto text-slate-400">💾 Auto-save</span>
+                    </div>
+
                     <table className="w-full text-left border-collapse" dir="ltr">
                         <thead>
                             <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase tracking-[0.15em] font-black border-b-2 border-slate-300">
-                                <th className="px-3 py-4 text-center">#</th>
-                                <th className="px-3 py-4">📅 Date</th>
-                                <th className="px-3 py-4">🕐 Heure</th>
-                                <th className="px-3 py-4">⏱️ Durée</th>
-                                <th className="px-3 py-4">U.</th>
-                                <th className="px-3 py-4">🏟️ Terrain</th>
-                                <th className="px-3 py-4">📍 Lieu</th>
-                                <th className="px-3 py-4">🆚 Adversaire</th>
-                                <th className="px-3 py-4">🏆 Compétition</th>
-                                <th className="px-3 py-4">Score</th>
-                                <th className="px-3 py-4">État</th>
-                                <th className="px-3 py-4 text-center" data-export-skip>⚙</th>
+                                <th className="px-2 py-3 text-center w-8">#</th>
+                                <th className="px-2 py-3 w-12">Jour</th>
+                                <th className="px-2 py-3">📅 Date</th>
+                                <th className="px-2 py-3">🕐 Heure</th>
+                                <th className="px-2 py-3">⏱️ Durée</th>
+                                <th className="px-2 py-3">U.</th>
+                                <th className="px-2 py-3">🏟️ Terrain</th>
+                                <th className="px-2 py-3">🆚 Adversaire</th>
+                                <th className="px-2 py-3">🏆 Compétition</th>
+                                <th className="px-2 py-3 text-center">Score</th>
+                                <th className="px-2 py-3">État</th>
+                                <th className="px-2 py-3 text-center w-16" data-export-skip>⚙</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-slate-200">
                             {isLoading ? (
                                 <tr>
                                     <td colSpan="12" className="px-8 py-20 text-center">
@@ -586,66 +706,151 @@ const MatchesManagement = () => {
                                 </tr>
                             ) : filteredMatches.length === 0 ? (
                                 <tr>
-                                    <td colSpan="12" className="px-8 py-20 text-center text-slate-300 font-black uppercase tracking-widest text-xs opacity-50">
-                                        {t('matches.noMatches')}
+                                    <td colSpan="12" className="px-8 py-12 text-center text-slate-300 font-black uppercase tracking-widest text-xs opacity-50">
+                                        {t('matches.noMatches')} — Click "+ Add Row" below to start
                                     </td>
                                 </tr>
                             ) : (
                                 filteredMatches.map((match, idx) => {
-                                    const d = new Date(match.match_date);
-                                    const dateStr = d.toLocaleDateString('en-GB');
-                                    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                    const dStyle = rowDayStyle(match.match_date);
+                                    const dayLabel = dayName(match.match_date);
+                                    const isSaving = savingRow === match.id;
+                                    const isSaved = savedRow === match.id;
                                     const isAway = match.location === 'Away';
-                                    const isHome = match.location === 'Home' || (!isAway && match.location?.toLowerCase().includes('home'));
+                                    const { duration: matchDur } = parseDuration(match.notes);
+
                                     return (
-                                        <tr key={match.id} className="hover:bg-fuchsia-50/30 transition-colors text-xs">
-                                            <td className="px-3 py-3 text-center font-black text-slate-400">{idx + 1}</td>
-                                            <td className="px-3 py-3 font-black text-slate-800 whitespace-nowrap">{dateStr}</td>
-                                            <td className="px-3 py-3 font-black text-fuchsia-700 whitespace-nowrap">{timeStr}</td>
-                                            <td className="px-3 py-3">
-                                                <span className="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
-                                                    {matchDuration(match)}
-                                                </span>
+                                        <tr
+                                            key={match.id}
+                                            className={`${dStyle.bg} hover:brightness-95 transition-all text-xs border-l-4 ${dStyle.stripe}`}
+                                        >
+                                            <td className="px-2 py-2 text-center font-black text-slate-400">{idx + 1}</td>
+                                            <td className={`px-2 py-2 text-center font-black tracking-widest ${dStyle.text}`}>{dayLabel}</td>
+
+                                            {/* Date */}
+                                            <td className="px-1 py-1">
+                                                <input
+                                                    type="date"
+                                                    value={isoDate(match.match_date)}
+                                                    onChange={(e) => updateMatchField(match.id, { match_date: composeIso(e.target.value, isoTime(match.match_date)) })}
+                                                    className="w-full px-2 py-1.5 bg-white/80 border border-slate-200 rounded-md text-xs font-black focus:ring-2 focus:ring-fuchsia-400/30 outline-none"
+                                                />
                                             </td>
-                                            <td className="px-3 py-3">
-                                                {match.category ? (
-                                                    <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
-                                                        {match.category}
-                                                    </span>
-                                                ) : <span className="text-slate-300">—</span>}
+
+                                            {/* Time */}
+                                            <td className="px-1 py-1">
+                                                <input
+                                                    type="time"
+                                                    value={isoTime(match.match_date)}
+                                                    onChange={(e) => updateMatchField(match.id, { match_date: composeIso(isoDate(match.match_date), e.target.value) })}
+                                                    className="w-full px-2 py-1.5 bg-white/80 border border-slate-200 rounded-md text-xs font-black text-fuchsia-700 focus:ring-2 focus:ring-fuchsia-400/30 outline-none"
+                                                />
                                             </td>
-                                            <td className="px-3 py-3 font-bold text-slate-700 whitespace-nowrap max-w-[160px] truncate">
-                                                {match.location || '—'}
+
+                                            {/* Durée */}
+                                            <td className="px-1 py-1">
+                                                <select
+                                                    value={matchDur || '2x30'}
+                                                    onChange={(e) => updateMatchField(match.id, { notes: buildNotes(e.target.value, parseDuration(match.notes).cleanNotes) })}
+                                                    className="w-full px-2 py-1.5 bg-purple-50 border border-purple-200 rounded-md text-xs font-black uppercase outline-none cursor-pointer"
+                                                >
+                                                    {DURATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                                                </select>
                                             </td>
-                                            <td className="px-3 py-3">
-                                                {isAway ? (
-                                                    <span className="bg-orange-50 text-orange-700 border border-orange-200 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
-                                                        ✈ Outside
-                                                    </span>
-                                                ) : (
-                                                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
-                                                        🏠 Home
-                                                    </span>
-                                                )}
+
+                                            {/* Catégorie U */}
+                                            <td className="px-1 py-1">
+                                                <select
+                                                    value={match.category || ''}
+                                                    onChange={(e) => updateMatchField(match.id, { category: e.target.value })}
+                                                    className="w-full px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded-md text-xs font-black uppercase outline-none cursor-pointer"
+                                                >
+                                                    <option value="">—</option>
+                                                    {ageCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                                                </select>
                                             </td>
-                                            <td className="px-3 py-3 font-black text-slate-900 max-w-[160px] truncate">{match.opponent_name}</td>
-                                            <td className="px-3 py-3">
-                                                <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap max-w-[180px] truncate inline-block">
-                                                    {getTypeBadge(match.match_type)}
-                                                </span>
+
+                                            {/* Terrain (with Home/Away) */}
+                                            <td className="px-1 py-1">
+                                                <select
+                                                    value={match.location || ''}
+                                                    onChange={(e) => updateMatchField(match.id, { location: e.target.value })}
+                                                    className={`w-full px-2 py-1.5 ${isAway ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'} border rounded-md text-xs font-black outline-none cursor-pointer`}
+                                                >
+                                                    <option value="Home">🏠 Home</option>
+                                                    <option value="Away">✈ Outside</option>
+                                                    {terrains.map((tr, i) => (
+                                                        <option key={i} value={`${tr.name} (${tr.size})`}>{tr.name} — {tr.size}</option>
+                                                    ))}
+                                                </select>
                                             </td>
-                                            <td className="px-3 py-3 font-black text-slate-900 whitespace-nowrap">
-                                                <span className={match.our_score > match.their_score ? 'text-emerald-600' : match.our_score < match.their_score ? 'text-red-600' : 'text-amber-600'}>
-                                                    {match.our_score}
-                                                </span>
-                                                <span className="text-slate-300 mx-1">-</span>
-                                                <span>{match.their_score}</span>
+
+                                            {/* Adversaire */}
+                                            <td className="px-1 py-1">
+                                                <input
+                                                    type="text"
+                                                    value={match.opponent_name || ''}
+                                                    onChange={(e) => updateMatchField(match.id, { opponent_name: e.target.value })}
+                                                    className="w-full px-2 py-1.5 bg-white/80 border border-slate-200 rounded-md text-xs font-black focus:ring-2 focus:ring-fuchsia-400/30 outline-none"
+                                                />
                                             </td>
-                                            <td className="px-3 py-3">{getStatusBadge(match.status)}</td>
-                                            <td className="px-3 py-3 text-center" data-export-skip>
-                                                <div className="flex justify-center gap-1">
-                                                    <button onClick={() => handleEditClick(match)} className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-slate-100/50 rounded-lg transition-all"><Edit2 size={14} /></button>
-                                                    <button onClick={() => handleDelete(match.id)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={14} /></button>
+
+                                            {/* Compétition */}
+                                            <td className="px-1 py-1">
+                                                <select
+                                                    value={match.match_type || ''}
+                                                    onChange={(e) => updateMatchField(match.id, { match_type: e.target.value })}
+                                                    className="w-full px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-md text-xs font-black uppercase outline-none cursor-pointer"
+                                                >
+                                                    <option value="Friendly">FRIENDLY / AMICAL</option>
+                                                    {tournamentsList.map(tn => <option key={tn} value={tn}>{tn}</option>)}
+                                                </select>
+                                            </td>
+
+                                            {/* Score */}
+                                            <td className="px-1 py-1">
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number" min="0"
+                                                        value={match.our_score ?? 0}
+                                                        onChange={(e) => updateMatchField(match.id, { our_score: parseInt(e.target.value) || 0 })}
+                                                        className="w-12 px-1 py-1.5 bg-emerald-50 border border-emerald-200 rounded-md text-xs font-black text-center outline-none"
+                                                    />
+                                                    <span className="text-slate-400 font-black">-</span>
+                                                    <input
+                                                        type="number" min="0"
+                                                        value={match.their_score ?? 0}
+                                                        onChange={(e) => updateMatchField(match.id, { their_score: parseInt(e.target.value) || 0 })}
+                                                        className="w-12 px-1 py-1.5 bg-red-50 border border-red-200 rounded-md text-xs font-black text-center outline-none"
+                                                    />
+                                                </div>
+                                            </td>
+
+                                            {/* État */}
+                                            <td className="px-1 py-1">
+                                                <select
+                                                    value={match.status || 'Scheduled'}
+                                                    onChange={(e) => updateMatchField(match.id, { status: e.target.value })}
+                                                    className="w-full px-2 py-1.5 bg-white/80 border border-slate-200 rounded-md text-xs font-black outline-none cursor-pointer"
+                                                >
+                                                    <option value="Scheduled">⏳ Scheduled</option>
+                                                    <option value="Completed">✅ Completed</option>
+                                                    <option value="Cancelled">❌ Cancelled</option>
+                                                </select>
+                                            </td>
+
+                                            {/* Actions */}
+                                            <td className="px-2 py-2 text-center" data-export-skip>
+                                                <div className="flex items-center justify-center gap-1">
+                                                    {isSaving && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="Saving..." />}
+                                                    {isSaved && <span className="w-2 h-2 rounded-full bg-emerald-500" title="Saved" />}
+                                                    <button
+                                                        onClick={() => handleDelete(match.id)}
+                                                        className="p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
+                                                        title="Delete row"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -654,6 +859,18 @@ const MatchesManagement = () => {
                             )}
                         </tbody>
                     </table>
+
+                    {/* Add Row button */}
+                    <div className="px-4 py-3 bg-slate-50/50 border-t-2 border-dashed border-slate-200" data-export-skip>
+                        <button
+                            type="button"
+                            onClick={handleAddRow}
+                            className="w-full flex items-center justify-center gap-2 py-3 bg-white hover:bg-fuchsia-50 border-2 border-dashed border-slate-300 hover:border-fuchsia-400 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:text-fuchsia-600 transition-all"
+                        >
+                            <PlusCircle size={16} />
+                            Add Row (Saturday default)
+                        </button>
+                    </div>
                 </div>
             </div>
 
