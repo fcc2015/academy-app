@@ -1,5 +1,5 @@
 import { authFetch } from '../../api';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Trophy,
     Calendar,
@@ -14,8 +14,14 @@ import {
     XCircle,
     Activity,
     LandPlot,
-    CalendarDays
+    CalendarDays,
+    FileText,
+    FileImage,
+    FileSpreadsheet,
+    Download,
+    Clock,
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
 
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -50,11 +56,28 @@ const MatchesManagement = () => {
         status: 'Scheduled',
         notes: '',
         category: '',
+        match_duration: '2x30',
     });
 
     const terrains = academySettings?.terrains || [];
     const tournamentsList = academySettings?.tournaments_list || [];
     const ageCategories = academySettings?.age_categories || [];
+    const DURATION_OPTIONS = ['2x20', '2x25', '2x30', '2x35', '2x40', '2x45'];
+
+    // Stored as plain text in `notes` so we don't need a DB migration.
+    // Format: "[DUR:2x30] notes here"
+    const parseDuration = (notes) => {
+        const m = (notes || '').match(/^\[DUR:([^\]]+)\]\s*/);
+        return { duration: m ? m[1] : '', cleanNotes: notes ? notes.replace(/^\[DUR:[^\]]+\]\s*/, '') : '' };
+    };
+    const buildNotes = (duration, notes) => {
+        if (!duration) return notes || '';
+        return `[DUR:${duration}] ${notes || ''}`.trim();
+    };
+    const matchDuration = (m) => parseDuration(m?.notes).duration || '—';
+
+    const tableRef = useRef(null);
+    const [exportOpen, setExportOpen] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -130,6 +153,7 @@ const MatchesManagement = () => {
             status: 'Scheduled',
             notes: '',
             category: ageCategories[0] || '',
+            match_duration: '2x30',
         });
         setIsEditMode(false);
         setEditingId(null);
@@ -137,6 +161,7 @@ const MatchesManagement = () => {
     };
 
     const handleEditClick = (match) => {
+        const { duration, cleanNotes } = parseDuration(match.notes);
         setFormData({
             squad_id: match.squad_id,
             opponent_name: match.opponent_name,
@@ -146,8 +171,9 @@ const MatchesManagement = () => {
             their_score: match.their_score || 0,
             match_type: match.match_type || defaultMatchType(),
             status: match.status || 'Scheduled',
-            notes: match.notes || '',
+            notes: cleanNotes,
             category: match.category || (ageCategories[0] || ''),
+            match_duration: duration || '2x30',
         });
         setIsEditMode(true);
         setEditingId(match.id);
@@ -160,8 +186,10 @@ const MatchesManagement = () => {
             const url = isEditMode ? `${API_URL}/matches/${editingId}` : `${API_URL}/matches/`;
             const method = isEditMode ? 'PATCH' : 'POST';
             
+            const { match_duration, ...rest } = formData;
             const payload = {
-                ...formData,
+                ...rest,
+                notes: buildNotes(match_duration, formData.notes),
                 our_score: parseInt(formData.our_score),
                 their_score: parseInt(formData.their_score),
                 match_date: new Date(formData.match_date).toISOString(),
@@ -215,6 +243,92 @@ const MatchesManagement = () => {
         const matchesWeekend = !weekendOnly || isWeekend(m.match_date);
         return matchesSearch && matchesWeekend;
     });
+
+    // ─── Exports ──────────────────────────────────────────
+    const formatRow = (m) => {
+        const d = new Date(m.match_date);
+        const date = d.toLocaleDateString('en-GB');
+        const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const homeAway = m.location === 'Away' ? 'Outside' : (m.location === 'Home' ? 'Home' : 'Home');
+        return {
+            Date: date,
+            Time: time,
+            Category: m.category || '—',
+            Opponent: m.opponent_name || '',
+            'Home/Away': homeAway,
+            Terrain: m.location || '—',
+            Tournament: m.match_type || '—',
+            Duration: matchDuration(m),
+            Status: m.status || 'Scheduled',
+        };
+    };
+
+    const exportExcel = async () => {
+        try {
+            const XLSX = await import('xlsx');
+            const rows = filteredMatches.map(formatRow);
+            const ws = XLSX.utils.json_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Programmation');
+            XLSX.writeFile(wb, `match-programmation-${new Date().toISOString().slice(0, 10)}.xlsx`);
+        } catch (e) {
+            console.error(e);
+            toast.error('Excel export failed');
+        }
+        setExportOpen(false);
+    };
+
+    const exportImage = async () => {
+        if (!tableRef.current) return;
+        try {
+            const canvas = await html2canvas(tableRef.current, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                useCORS: true,
+            });
+            const link = document.createElement('a');
+            link.download = `match-programmation-${new Date().toISOString().slice(0, 10)}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (e) {
+            console.error(e);
+            toast.error('Image export failed');
+        }
+        setExportOpen(false);
+    };
+
+    const exportPDF = async () => {
+        if (!tableRef.current) return;
+        try {
+            const { jsPDF } = await import('jspdf');
+            const canvas = await html2canvas(tableRef.current, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                useCORS: true,
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4',
+            });
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const ratio = canvas.height / canvas.width;
+            let imgWidth = pageWidth - 20;
+            let imgHeight = imgWidth * ratio;
+            if (imgHeight > pageHeight - 20) {
+                imgHeight = pageHeight - 20;
+                imgWidth = imgHeight / ratio;
+            }
+            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            pdf.save(`match-programmation-${new Date().toISOString().slice(0, 10)}.pdf`);
+        } catch (e) {
+            console.error(e);
+            toast.error('PDF export failed');
+        }
+        setExportOpen(false);
+    };
 
     const totalMatches = matches.length;
     const completedMatches = matches.filter(m => m.status === 'Completed');
@@ -367,7 +481,7 @@ const MatchesManagement = () => {
                         <Trophy size={20} className="text-fuchsia-500" /> {t('matches.archiveSchedule')}
                     </h3>
 
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
                         <button
                             type="button"
                             onClick={() => setWeekendOnly(v => !v)}
@@ -379,7 +493,47 @@ const MatchesManagement = () => {
                         >
                             <CalendarDays size={14} /> Weekend
                         </button>
-                        <div className="relative flex-1 sm:w-80">
+
+                        {/* Export menu */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setExportOpen(v => !v)}
+                                className="flex items-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border bg-slate-900 text-white border-slate-900 hover:bg-slate-800"
+                            >
+                                <Download size={14} /> Export
+                            </button>
+                            {exportOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-30" onClick={() => setExportOpen(false)} />
+                                    <div className="absolute top-full mt-2 right-0 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden w-56" dir="ltr">
+                                        <button onClick={exportPDF} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-red-50 text-left transition-colors border-b border-slate-100">
+                                            <div className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center"><FileText size={16} /></div>
+                                            <div>
+                                                <p className="text-xs font-black text-slate-800">Download PDF</p>
+                                                <p className="text-[10px] text-slate-400 font-bold">Landscape A4</p>
+                                            </div>
+                                        </button>
+                                        <button onClick={exportImage} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-blue-50 text-left transition-colors border-b border-slate-100">
+                                            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center"><FileImage size={16} /></div>
+                                            <div>
+                                                <p className="text-xs font-black text-slate-800">Download PNG</p>
+                                                <p className="text-[10px] text-slate-400 font-bold">High-res image</p>
+                                            </div>
+                                        </button>
+                                        <button onClick={exportExcel} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-emerald-50 text-left transition-colors">
+                                            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><FileSpreadsheet size={16} /></div>
+                                            <div>
+                                                <p className="text-xs font-black text-slate-800">Download Excel</p>
+                                                <p className="text-[10px] text-slate-400 font-bold">.xlsx spreadsheet</p>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        <div className="relative flex-1 sm:w-72">
                             <Search className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-300`} size={18} />
                             <input
                                 type="text"
@@ -392,21 +546,38 @@ const MatchesManagement = () => {
                     </div>
                 </div>
 
-                <div className="overflow-x-auto min-h-[400px]">
-                    <table className={`w-full ${isRTL ? 'text-right' : 'text-left'} border-collapse`} dir={dir}>
+                <div ref={tableRef} className="overflow-x-auto min-h-[400px] bg-white">
+                    {/* Export header (visible in PDF/PNG) */}
+                    <div className="px-6 py-4 border-b-2 border-slate-200 bg-gradient-to-r from-fuchsia-50 to-pink-50 flex items-center justify-between">
+                        <div>
+                            <h2 className="text-xl font-black text-slate-900 tracking-tight">PROGRAMMATION DES MATCHS</h2>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-fuchsia-600 mt-1">
+                                {filteredMatches.length} matches · Generated {new Date().toLocaleDateString('en-GB')}
+                            </p>
+                        </div>
+                        <Trophy className="text-fuchsia-400" size={32} />
+                    </div>
+                    <table className="w-full text-left border-collapse" dir="ltr">
                         <thead>
-                            <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase tracking-[0.2em] font-black border-b border-slate-100">
-                                <th className="px-8 py-6 text-center">{t('matches.matchup')}</th>
-                                <th className="px-8 py-6 text-center">{t('matches.score')}</th>
-                                <th className="px-8 py-6">{t('matches.dateLocation')}</th>
-                                <th className="px-8 py-6">{t('matches.typeStatus')}</th>
-                                <th className="px-8 py-6">{t('matches.edit')}</th>
+                            <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase tracking-[0.15em] font-black border-b-2 border-slate-300">
+                                <th className="px-3 py-4 text-center">#</th>
+                                <th className="px-3 py-4">📅 Date</th>
+                                <th className="px-3 py-4">🕐 Heure</th>
+                                <th className="px-3 py-4">⏱️ Durée</th>
+                                <th className="px-3 py-4">U.</th>
+                                <th className="px-3 py-4">🏟️ Terrain</th>
+                                <th className="px-3 py-4">📍 Lieu</th>
+                                <th className="px-3 py-4">🆚 Adversaire</th>
+                                <th className="px-3 py-4">🏆 Compétition</th>
+                                <th className="px-3 py-4">Score</th>
+                                <th className="px-3 py-4">État</th>
+                                <th className="px-3 py-4 text-center" data-export-skip>⚙</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
+                        <tbody className="divide-y divide-slate-100">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan="5" className="px-8 py-20 text-center">
+                                    <td colSpan="12" className="px-8 py-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-fuchsia-600"></div>
                                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('matches.loadingMatches')}</span>
@@ -415,62 +586,71 @@ const MatchesManagement = () => {
                                 </tr>
                             ) : filteredMatches.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="px-8 py-20 text-center text-slate-300 font-black uppercase tracking-widest text-xs opacity-50">
+                                    <td colSpan="12" className="px-8 py-20 text-center text-slate-300 font-black uppercase tracking-widest text-xs opacity-50">
                                         {t('matches.noMatches')}
                                     </td>
                                 </tr>
                             ) : (
-                                filteredMatches.map((match) => (
-                                    <tr key={match.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-8 py-6">
-                                            <div className="flex justify-center items-center gap-6">
-                                                <div className="font-extrabold text-slate-900 text-[16px] tracking-tight truncate w-24 text-center">
-                                                    {squads.find(s => s.id === match.squad_id)?.name || t('matches.ourTeam')}
-                                                </div>
-                                                <div className="text-[10px] font-black text-slate-300 uppercase tracking-widest border border-slate-200 px-2 py-1 rounded-lg">{t('matches.vs')}</div>
-                                                <div className="font-extrabold text-indigo-700 text-[16px] tracking-tight truncate w-24 text-center">
-                                                    {match.opponent_name}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="flex justify-center items-center text-3xl font-black">
-                                                <span className={`${match.our_score > match.their_score ? 'text-emerald-500' : match.our_score < match.their_score ? 'text-red-500' : 'text-amber-500'}`}>
-                                                    {match.our_score}
+                                filteredMatches.map((match, idx) => {
+                                    const d = new Date(match.match_date);
+                                    const dateStr = d.toLocaleDateString('en-GB');
+                                    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                    const isAway = match.location === 'Away';
+                                    const isHome = match.location === 'Home' || (!isAway && match.location?.toLowerCase().includes('home'));
+                                    return (
+                                        <tr key={match.id} className="hover:bg-fuchsia-50/30 transition-colors text-xs">
+                                            <td className="px-3 py-3 text-center font-black text-slate-400">{idx + 1}</td>
+                                            <td className="px-3 py-3 font-black text-slate-800 whitespace-nowrap">{dateStr}</td>
+                                            <td className="px-3 py-3 font-black text-fuchsia-700 whitespace-nowrap">{timeStr}</td>
+                                            <td className="px-3 py-3">
+                                                <span className="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
+                                                    {matchDuration(match)}
                                                 </span>
-                                                <span className="text-slate-200 mx-2">-</span>
-                                                <span className="text-slate-800">
-                                                    {match.their_score}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="flex flex-col gap-1 text-[11px] font-extrabold text-slate-500">
-                                                <span className="flex items-center gap-1"><Calendar size={12}/> {formatDate(match.match_date)}</span>
-                                                <span className="flex items-center gap-1"><MapPin size={12}/> {match.location || t('matches.notSpecified')}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="flex flex-col gap-2">
-                                                <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-1 rounded-full border border-amber-100 uppercase tracking-wider truncate max-w-[180px]">
-                                                    {getTypeBadge(match.match_type)}
-                                                </span>
-                                                {match.category && (
-                                                    <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100 uppercase tracking-wider">
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                {match.category ? (
+                                                    <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
                                                         {match.category}
                                                     </span>
+                                                ) : <span className="text-slate-300">—</span>}
+                                            </td>
+                                            <td className="px-3 py-3 font-bold text-slate-700 whitespace-nowrap max-w-[160px] truncate">
+                                                {match.location || '—'}
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                {isAway ? (
+                                                    <span className="bg-orange-50 text-orange-700 border border-orange-200 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
+                                                        ✈ Outside
+                                                    </span>
+                                                ) : (
+                                                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
+                                                        🏠 Home
+                                                    </span>
                                                 )}
-                                                {getStatusBadge(match.status)}
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6 text-left">
-                                            <div className={`flex justify-start gap-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                                                <button onClick={() => handleEditClick(match)} className="p-3 text-slate-300 hover:text-indigo-600 hover:bg-slate-100/50 rounded-xl transition-all"><Edit2 size={18} /></button>
-                                                <button onClick={() => handleDelete(match.id)} className="p-3 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                            </td>
+                                            <td className="px-3 py-3 font-black text-slate-900 max-w-[160px] truncate">{match.opponent_name}</td>
+                                            <td className="px-3 py-3">
+                                                <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap max-w-[180px] truncate inline-block">
+                                                    {getTypeBadge(match.match_type)}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-3 font-black text-slate-900 whitespace-nowrap">
+                                                <span className={match.our_score > match.their_score ? 'text-emerald-600' : match.our_score < match.their_score ? 'text-red-600' : 'text-amber-600'}>
+                                                    {match.our_score}
+                                                </span>
+                                                <span className="text-slate-300 mx-1">-</span>
+                                                <span>{match.their_score}</span>
+                                            </td>
+                                            <td className="px-3 py-3">{getStatusBadge(match.status)}</td>
+                                            <td className="px-3 py-3 text-center" data-export-skip>
+                                                <div className="flex justify-center gap-1">
+                                                    <button onClick={() => handleEditClick(match)} className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-slate-100/50 rounded-lg transition-all"><Edit2 size={14} /></button>
+                                                    <button onClick={() => handleDelete(match.id)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={14} /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
@@ -517,7 +697,7 @@ const MatchesManagement = () => {
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-3 gap-4">
                                 <div className="col-span-2">
                                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('matches.dateTime')}</label>
                                     <input
@@ -526,8 +706,23 @@ const MatchesManagement = () => {
                                         value={formData.match_date}
                                         onChange={handleInputChange}
                                         required
-                                        className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-fuchsia-500/10 text-right shadow-sm"
+                                        className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-fuchsia-500/10 text-right shadow-sm"
                                     />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
+                                        <Clock size={11} /> Durée
+                                    </label>
+                                    <select
+                                        name="match_duration"
+                                        value={formData.match_duration}
+                                        onChange={handleInputChange}
+                                        className="w-full px-3 py-4 bg-purple-50 border border-purple-200 rounded-2xl text-sm font-black outline-none cursor-pointer appearance-none text-center"
+                                    >
+                                        {DURATION_OPTIONS.map(d => (
+                                            <option key={d} value={d}>{d}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
