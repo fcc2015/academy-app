@@ -196,7 +196,7 @@ async def get_chat_groups(user_id: Optional[str] = None, role: Optional[str] = N
     import httpx
     
     async with httpx.AsyncClient() as client:
-        if role == "admin" or not role:
+        if role in ("admin", "super_admin", "sous_admin") or not role:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/chat_groups?select=*&order=created_at.asc",
                 headers=supabase.headers
