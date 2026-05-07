@@ -56,6 +56,7 @@ const translations = {
         attendance: { ar: 'الحضور', en: 'Attendance', fr: 'Présence' },
         evaluations: { ar: 'التقييمات', en: 'Evaluations', fr: 'Évaluations' },
         admins: { ar: 'الإداريون', en: 'Admins', fr: 'Administrateurs' },
+        programmateur: { ar: 'البرمجة (Programmateur)', en: 'Programmateur', fr: 'Programmateur' },
         branches: { ar: 'الفروع', en: 'Branches', fr: 'Succursales' },
         subscription: { ar: 'الاشتراك', en: 'Subscription', fr: 'Abonnement' },
         settings: { ar: 'الإعدادات', en: 'Settings', fr: 'Paramètres' },

@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from core.auth_middleware import verify_token
+from core.context import academy_id_ctx
 from typing import List
+from pydantic import BaseModel, EmailStr, Field
 from schemas.admins import AdminCreate, AdminResponse
 from services.supabase_client import supabase
+from services.email_service import send_match_manager_invite
 from urllib.parse import quote
 import secrets
 import string
@@ -162,6 +165,64 @@ async def delete_admin(admin_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred. Please try again."
         )
+
+
+class MatchManagerInvite(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=100)
+    email: EmailStr
+
+
+@router.post("/invite-match-manager")
+async def invite_match_manager(req: MatchManagerInvite):
+    """Create a match_manager admin and send the invitation email with credentials."""
+    import httpx as _httpx
+    from core.config import settings as _settings
+
+    payload = AdminCreate(
+        full_name=req.full_name,
+        email=req.email,
+        permissions={
+            "can_manage_users": False,
+            "can_manage_financials": False,
+            "can_manage_coaches": False,
+            "can_manage_matches": True,
+        },
+        admin_type="match_manager",
+        status="Active",
+    )
+    created = await create_admin(payload)
+    temp_password = created.get("temp_password")
+
+    academy_name = "your academy"
+    try:
+        academy_id = academy_id_ctx.get(None)
+        if academy_id:
+            async with _httpx.AsyncClient(timeout=10.0) as client:
+                ar = await client.get(
+                    f"{_settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=name",
+                    headers=supabase.admin_headers,
+                )
+                if ar.status_code == 200 and ar.json():
+                    academy_name = ar.json()[0].get("name") or academy_name
+    except Exception as e:
+        logger.warning(f"Could not resolve academy name for invite email: {e}")
+
+    sent = False
+    if temp_password:
+        try:
+            sent = send_match_manager_invite(
+                to=req.email,
+                name=req.full_name,
+                temp_password=temp_password,
+                academy_name=academy_name,
+            )
+        except Exception as e:
+            logger.error(f"Match manager invite email failed: {e}", exc_info=True)
+
+    return {
+        **created,
+        "email_sent": sent,
+    }
 
 
 @router.post("/{admin_id}/reset-password")

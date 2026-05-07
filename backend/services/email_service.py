@@ -67,6 +67,40 @@ def send_welcome_email(to: str, name: str):
     return _send_email(to, f"Bienvenue à {ACADEMY_NAME}!", html)
 
 
+def send_match_manager_invite(to: str, name: str, temp_password: str, academy_name: str = "your academy"):
+    """Invite someone to be Match Manager (Programmateur). Includes login credentials."""
+    login_url = f"{_frontend_url()}/login"
+    safe_name = name or "Champion"
+    html = f"""
+    <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
+        <div style="background: linear-gradient(135deg, #d946ef, #ec4899); border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 24px;">
+            <div style="font-size: 36px; margin-bottom: 8px;">🏆</div>
+            <h1 style="color: white; font-size: 24px; margin: 0;">Match Manager Invitation</h1>
+            <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 13px;">Programmateur des matchs du week-end</p>
+        </div>
+        <p style="font-size: 16px; color: #374151;">Bonjour <strong>{safe_name}</strong>,</p>
+        <p style="color: #6b7280; line-height: 1.6;">
+            You've been designated as the <strong>Match Manager</strong> for <strong>{academy_name}</strong>.
+            Your role: schedule weekend matches across the academy's terrains and tournaments.
+        </p>
+        <div style="background: #fdf4ff; border: 1px solid #f5d0fe; border-radius: 12px; padding: 20px; margin: 24px 0;">
+            <p style="margin: 0 0 8px; font-size: 11px; color: #a21caf; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Login Email</p>
+            <p style="margin: 0 0 16px; font-size: 15px; color: #0f172a; font-weight: 700;">{to}</p>
+            <p style="margin: 0 0 8px; font-size: 11px; color: #a21caf; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Temporary Password</p>
+            <p style="margin: 0; font-size: 22px; font-family: monospace; color: #d946ef; font-weight: 900; letter-spacing: 2px;">{temp_password}</p>
+        </div>
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="{login_url}" style="background: linear-gradient(135deg, #d946ef, #ec4899); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 900; font-size: 14px;">Sign in now →</a>
+        </div>
+        <p style="font-size: 12px; color: #9ca3af; text-align: center; margin-top: 24px;">
+            ⚠️ Change your password after first login. Keep these credentials private.
+        </p>
+        <p style="font-size: 11px; color: #cbd5e1; text-align: center; margin-top: 16px;">{ACADEMY_NAME}</p>
+    </div>
+    """
+    return _send_email(to, f"You're the Match Manager for {academy_name}", html)
+
+
 def send_payment_reminder(to: str, player_name: str, amount: float, due_date: str):
     """Send payment reminder email."""
     html = f"""
