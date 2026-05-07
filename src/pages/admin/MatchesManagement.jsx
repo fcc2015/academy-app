@@ -267,41 +267,36 @@ const MatchesManagement = () => {
                 </div>
             </div>
 
-            {/* Match Managers Banner */}
-            {matchManagers.length > 0 && (
-                <div className="mb-6 bg-gradient-to-r from-fuchsia-50 via-pink-50 to-fuchsia-50 border border-fuchsia-200 rounded-2xl px-6 py-4 flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-fuchsia-600 text-white flex items-center justify-center">
-                            <Trophy size={16} />
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-fuchsia-500">Match Managers</p>
-                            <p className="text-xs font-bold text-slate-600">In charge of weekend match scheduling</p>
-                        </div>
+            {/* Match Managers Banner — optional delegation, admin handles by default */}
+            <div className="mb-6 bg-gradient-to-r from-fuchsia-50 via-pink-50 to-fuchsia-50 border border-fuchsia-200 rounded-2xl px-6 py-4 flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-fuchsia-600 text-white flex items-center justify-center">
+                        <Trophy size={16} />
                     </div>
-                    <div className="flex flex-wrap gap-2 ml-auto">
-                        {matchManagers.map(mgr => (
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-fuchsia-500">Match Scheduler</p>
+                        <p className="text-xs font-bold text-slate-600">
+                            {matchManagers.length > 0
+                                ? 'Delegated to:'
+                                : 'Managed by Admin (you can optionally delegate to a Match Manager)'}
+                        </p>
+                    </div>
+                </div>
+                <div className="flex flex-wrap gap-2 ml-auto">
+                    {matchManagers.length > 0 ? (
+                        matchManagers.map(mgr => (
                             <span key={mgr.id} className="bg-white border border-fuchsia-200 text-fuchsia-800 text-xs font-black px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                                 {mgr.full_name}
                             </span>
-                        ))}
-                    </div>
+                        ))
+                    ) : (
+                        <span className="bg-white border border-fuchsia-200 text-fuchsia-700 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm">
+                            Admin
+                        </span>
+                    )}
                 </div>
-            )}
-            {matchManagers.length === 0 && (
-                <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl px-6 py-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center">
-                            <AlertTriangle size={16} />
-                        </div>
-                        <div>
-                            <p className="text-xs font-black text-amber-900 uppercase tracking-wider">No match manager assigned</p>
-                            <p className="text-[11px] font-bold text-amber-700">Go to Admins → Add admin → role "Match Manager".</p>
-                        </div>
-                    </div>
-                </div>
-            )}
+            </div>
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
