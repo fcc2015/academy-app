@@ -339,6 +339,122 @@ async def create_group(req: CreateGroupRequest):
         return result[0] if result else {}
 
 
+@router.post("/sync-category-groups")
+async def sync_category_chat_groups():
+    """
+    Auto-create one chat group per age category defined in academy_settings.age_categories.
+    Sub-divisions (U11 A, U11 B, U11 ELITE) are individual entries in age_categories
+    so they each get their own group. All players matching that category are added.
+    Idempotent.
+    """
+    import httpx
+    from core.config import settings as app_settings
+
+    created, updated = [], []
+
+    async with httpx.AsyncClient() as client:
+        # Fetch academy settings
+        s_res = await client.get(
+            f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?select=age_categories&limit=1",
+            headers=supabase.headers,
+        )
+        s_res.raise_for_status()
+        s_rows = s_res.json()
+        categories = (s_rows[0] if s_rows else {}).get("age_categories") or []
+        if not categories:
+            return {"success": False, "error": "No age categories defined in settings."}
+
+        # Players to map category → user_ids
+        p_res = await client.get(
+            f"{app_settings.SUPABASE_URL}/rest/v1/players?select=user_id,full_name,u_category",
+            headers=supabase.headers,
+        )
+        p_res.raise_for_status()
+        players = p_res.json()
+
+        # Existing category-only groups (no squad_id)
+        g_res = await client.get(
+            f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups?squad_id=is.null&select=id,name,category",
+            headers=supabase.headers,
+        )
+        g_res.raise_for_status()
+        existing = {g["category"]: g for g in g_res.json() if g.get("category")}
+
+        for cat in categories:
+            if cat in existing:
+                group = existing[cat]
+                group_id = group["id"]
+                updated.append(group_id)
+            else:
+                gd = {
+                    "name": f"{cat} — Groupe Officiel",
+                    "description": f"Groupe de chat de la catégorie {cat}",
+                    "type": "group",
+                    "category": cat,
+                    "squad_id": None,
+                    "created_by": "00000000-0000-0000-0000-000000000000",
+                }
+                cr = await client.post(
+                    f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups",
+                    json=gd,
+                    headers={**supabase.headers, "Prefer": "return=representation"},
+                )
+                cr.raise_for_status()
+                group_id = cr.json()[0]["id"]
+                created.append(group_id)
+
+            # Add players whose u_category matches this entry
+            for pl in players:
+                if pl.get("u_category") != cat:
+                    continue
+                check = await client.get(
+                    f"{app_settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&user_id=eq.{pl['user_id']}&select=id",
+                    headers=supabase.headers,
+                )
+                if check.status_code == 200 and check.json():
+                    continue
+                await client.post(
+                    f"{app_settings.SUPABASE_URL}/rest/v1/chat_group_members",
+                    json={
+                        "group_id": group_id,
+                        "user_id": pl["user_id"],
+                        "user_name": pl["full_name"],
+                        "user_role": "player",
+                        "is_moderator": False,
+                    },
+                    headers={**supabase.headers, "Prefer": "return=minimal"},
+                )
+
+    return {
+        "success": True,
+        "groups_created": len(created),
+        "groups_updated": len(updated),
+        "categories": categories,
+    }
+
+
+class LockGroupRequest(BaseModel):
+    group_id: str
+    is_locked: bool
+
+
+@router.post("/moderation/lock-group")
+async def lock_unlock_group(req: LockGroupRequest):
+    """Lock/unlock writing in a group. When locked, only admins can write."""
+    import httpx
+    from core.config import settings as app_settings
+    async with httpx.AsyncClient() as client:
+        res = await client.patch(
+            f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups?id=eq.{req.group_id}",
+            json={"is_locked": req.is_locked},
+            headers=supabase.headers,
+        )
+        res.raise_for_status()
+    action = "🔒 الكتابة محظورة (Admin فقط)" if req.is_locked else "🔓 الكتابة مسموحة للجميع"
+    await _send_system_message_async(req.group_id, action)
+    return {"success": True, "is_locked": req.is_locked}
+
+
 @router.post("/sync-groups")
 async def sync_chat_groups():
     """
@@ -480,6 +596,15 @@ async def send_message(req: SendMessageRequest):
     from core.config import settings
 
     async with httpx.AsyncClient() as client:
+        # Check if group is locked (admin-only writing)
+        gres = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_groups?id=eq.{req.group_id}&select=is_locked",
+            headers=supabase.headers,
+        )
+        if gres.status_code == 200 and gres.json():
+            if gres.json()[0].get("is_locked") and req.sender_role != "admin":
+                raise HTTPException(status_code=403, detail="هذه المجموعة مغلقة. فقط الإداريون يستطيعون الكتابة.")
+
         # Check if user is muted or banned
         member_res = await client.get(
             f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{req.group_id}&user_id=eq.{req.sender_id}&select=*",
