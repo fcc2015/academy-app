@@ -64,18 +64,24 @@ const MatchesManagement = () => {
     const DURATION_OPTIONS = ['2x20', '2x25', '2x30', '2x35', '2x40', '2x45'];
 
     // Stored as plain text in `notes` so we don't need a DB migration.
-    // Format: "[DUR:2x30][AWAY] free notes"
+    // Format: "[DUR:2x30][AWAY][COACH:Othmane] free notes"
     const parseRowMeta = (notes) => {
         const s = notes || '';
         const dur = s.match(/\[DUR:([^\]]+)\]/);
+        const coach = s.match(/\[COACH:([^\]]+)\]/);
         const isAway = /\[AWAY\]/.test(s);
-        const cleanNotes = s.replace(/\[DUR:[^\]]+\]/g, '').replace(/\[AWAY\]/g, '').trim();
-        return { duration: dur ? dur[1] : '', isAway, cleanNotes };
+        const cleanNotes = s
+            .replace(/\[DUR:[^\]]+\]/g, '')
+            .replace(/\[COACH:[^\]]+\]/g, '')
+            .replace(/\[AWAY\]/g, '')
+            .trim();
+        return { duration: dur ? dur[1] : '', coachName: coach ? coach[1] : '', isAway, cleanNotes };
     };
-    const buildRowNotes = ({ duration, isAway, cleanNotes }) => {
+    const buildRowNotes = ({ duration, isAway, coachName, cleanNotes }) => {
         let out = '';
         if (duration) out += `[DUR:${duration}]`;
         if (isAway) out += '[AWAY]';
+        if (coachName) out += `[COACH:${coachName}]`;
         if (cleanNotes) out += (out ? ' ' : '') + cleanNotes;
         return out;
     };
@@ -717,6 +723,7 @@ const MatchesManagement = () => {
                                 <th className="px-2 py-3">🏟️ Terrain / Stade</th>
                                 <th className="px-2 py-3">🆚 Adversaire</th>
                                 <th className="px-2 py-3">🏆 Compétition</th>
+                                <th className="px-2 py-3">👤 Coach</th>
                                 <th className="px-2 py-3">État</th>
                                 <th className="px-2 py-3 text-center w-16" data-export-skip>⚙</th>
                             </tr>
@@ -724,7 +731,7 @@ const MatchesManagement = () => {
                         <tbody className="divide-y divide-slate-200">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan="12" className="px-8 py-20 text-center">
+                                    <td colSpan="13" className="px-8 py-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-fuchsia-600"></div>
                                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('matches.loadingMatches')}</span>
@@ -733,7 +740,7 @@ const MatchesManagement = () => {
                                 </tr>
                             ) : filteredMatches.length === 0 ? (
                                 <tr>
-                                    <td colSpan="12" className="px-8 py-12 text-center text-slate-300 font-black uppercase tracking-widest text-xs opacity-50">
+                                    <td colSpan="13" className="px-8 py-12 text-center text-slate-300 font-black uppercase tracking-widest text-xs opacity-50">
                                         {t('matches.noMatches')} — Click "+ Add Row" below to start
                                     </td>
                                 </tr>
@@ -865,6 +872,17 @@ const MatchesManagement = () => {
                                                     <option value="Friendly">FRIENDLY / AMICAL</option>
                                                     {tournamentsList.map(tn => <option key={tn} value={tn}>{tn}</option>)}
                                                 </select>
+                                            </td>
+
+                                            {/* Coach (free text) */}
+                                            <td className="px-1 py-1">
+                                                <input
+                                                    type="text"
+                                                    value={meta.coachName}
+                                                    onChange={(e) => updateMatchField(match.id, { notes: buildRowNotes({ ...meta, coachName: e.target.value }) })}
+                                                    placeholder="Othmane, Amine..."
+                                                    className="w-full px-2 py-1.5 bg-cyan-50 border border-cyan-200 rounded-md text-xs font-black focus:ring-2 focus:ring-cyan-400/30 outline-none"
+                                                />
                                             </td>
 
                                             {/* État */}
@@ -1152,6 +1170,9 @@ const MatchesManagement = () => {
                     return `${String(d.getHours()).padStart(2, '0')}H${String(d.getMinutes()).padStart(2, '0')}`;
                 };
                 const coachFor = (match) => {
+                    // Prefer the manually-typed coach in the inline editor
+                    const typed = parseRowMeta(match.notes).coachName;
+                    if (typed) return typed;
                     const sq = squads.find(s => s.id === match.squad_id);
                     if (!sq) return '';
                     return sq.coaches?.full_name || sq.coach_name || (coaches.find(c => c.id === sq.coach_id)?.full_name) || '';
@@ -1176,14 +1197,15 @@ const MatchesManagement = () => {
                         }}
                         aria-hidden="true"
                     >
-                        {/* Logos row */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '40px', marginBottom: '20px' }}>
-                            {academyLogo && (
-                                <img src={academyLogo} alt="logo" crossOrigin="anonymous" style={{ height: '90px', objectFit: 'contain' }} />
+                        {/* Academy logo */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+                            {academyLogo ? (
+                                <img src={academyLogo} alt="logo" crossOrigin="anonymous" style={{ height: '110px', objectFit: 'contain' }} />
+                            ) : (
+                                <div style={{ width: '110px', height: '110px', borderRadius: '50%', background: '#1e3a8a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '24px', fontWeight: 900 }}>
+                                    {academyNameUpper.charAt(0)}
+                                </div>
                             )}
-                            <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: '#1e3a8a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '12px', fontWeight: 900, textAlign: 'center', padding: '8px', lineHeight: 1.2 }}>
-                                CHALLENGER<br/>CHAMPIONNAT<br/>FOOTBALL
-                            </div>
                         </div>
 
                         {/* Title */}
