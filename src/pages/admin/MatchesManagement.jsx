@@ -64,24 +64,33 @@ const MatchesManagement = () => {
     const DURATION_OPTIONS = ['2x20', '2x25', '2x30', '2x35', '2x40', '2x45'];
 
     // Stored as plain text in `notes` so we don't need a DB migration.
-    // Format: "[DUR:2x30][AWAY][COACH:Othmane] free notes"
+    // Format: "[DUR:2x30][AWAY][COACH:Othmane][KIT:#ff0000] free notes"
     const parseRowMeta = (notes) => {
         const s = notes || '';
         const dur = s.match(/\[DUR:([^\]]+)\]/);
         const coach = s.match(/\[COACH:([^\]]+)\]/);
+        const kit = s.match(/\[KIT:([^\]]+)\]/);
         const isAway = /\[AWAY\]/.test(s);
         const cleanNotes = s
             .replace(/\[DUR:[^\]]+\]/g, '')
             .replace(/\[COACH:[^\]]+\]/g, '')
+            .replace(/\[KIT:[^\]]+\]/g, '')
             .replace(/\[AWAY\]/g, '')
             .trim();
-        return { duration: dur ? dur[1] : '', coachName: coach ? coach[1] : '', isAway, cleanNotes };
+        return {
+            duration: dur ? dur[1] : '',
+            coachName: coach ? coach[1] : '',
+            kitColor: kit ? kit[1] : '',
+            isAway,
+            cleanNotes,
+        };
     };
-    const buildRowNotes = ({ duration, isAway, coachName, cleanNotes }) => {
+    const buildRowNotes = ({ duration, isAway, coachName, kitColor, cleanNotes }) => {
         let out = '';
         if (duration) out += `[DUR:${duration}]`;
         if (isAway) out += '[AWAY]';
         if (coachName) out += `[COACH:${coachName}]`;
+        if (kitColor) out += `[KIT:${kitColor}]`;
         if (cleanNotes) out += (out ? ' ' : '') + cleanNotes;
         return out;
     };
@@ -724,6 +733,7 @@ const MatchesManagement = () => {
                                 <th className="px-2 py-3">🆚 Adversaire</th>
                                 <th className="px-2 py-3">🏆 Compétition</th>
                                 <th className="px-2 py-3">👤 Coach</th>
+                                <th className="px-2 py-3 text-center">👕 Kit</th>
                                 <th className="px-2 py-3">État</th>
                                 <th className="px-2 py-3 text-center w-16" data-export-skip>⚙</th>
                             </tr>
@@ -731,7 +741,7 @@ const MatchesManagement = () => {
                         <tbody className="divide-y divide-slate-200">
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan="13" className="px-8 py-20 text-center">
+                                    <td colSpan="14" className="px-8 py-20 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-fuchsia-600"></div>
                                             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('matches.loadingMatches')}</span>
@@ -740,7 +750,7 @@ const MatchesManagement = () => {
                                 </tr>
                             ) : filteredMatches.length === 0 ? (
                                 <tr>
-                                    <td colSpan="13" className="px-8 py-12 text-center text-slate-300 font-black uppercase tracking-widest text-xs opacity-50">
+                                    <td colSpan="14" className="px-8 py-12 text-center text-slate-300 font-black uppercase tracking-widest text-xs opacity-50">
                                         {t('matches.noMatches')} — Click "+ Add Row" below to start
                                     </td>
                                 </tr>
@@ -793,11 +803,22 @@ const MatchesManagement = () => {
                                                 </select>
                                             </td>
 
-                                            {/* Catégorie U */}
+                                            {/* Catégorie U — auto-fills coach if a coach is assigned to that U */}
                                             <td className="px-1 py-1">
                                                 <select
                                                     value={match.category || ''}
-                                                    onChange={(e) => updateMatchField(match.id, { category: e.target.value })}
+                                                    onChange={(e) => {
+                                                        const newCat = e.target.value;
+                                                        const patch = { category: newCat };
+                                                        // Auto-fill coach name if not already typed
+                                                        if (newCat && !meta.coachName) {
+                                                            const c = coaches.find(co => (co.u_category || '').toUpperCase() === newCat.toUpperCase());
+                                                            if (c) {
+                                                                patch.notes = buildRowNotes({ ...meta, coachName: c.full_name });
+                                                            }
+                                                        }
+                                                        updateMatchField(match.id, patch);
+                                                    }}
                                                     className="w-full px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded-md text-xs font-black uppercase outline-none cursor-pointer"
                                                 >
                                                     <option value="">—</option>
@@ -883,6 +904,29 @@ const MatchesManagement = () => {
                                                     placeholder="Othmane, Amine..."
                                                     className="w-full px-2 py-1.5 bg-cyan-50 border border-cyan-200 rounded-md text-xs font-black focus:ring-2 focus:ring-cyan-400/30 outline-none"
                                                 />
+                                            </td>
+
+                                            {/* Kit Color picker */}
+                                            <td className="px-1 py-1">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <input
+                                                        type="color"
+                                                        value={meta.kitColor || '#1e40af'}
+                                                        onChange={(e) => updateMatchField(match.id, { notes: buildRowNotes({ ...meta, kitColor: e.target.value }) })}
+                                                        className="w-7 h-7 rounded border border-slate-200 cursor-pointer"
+                                                        title="Couleur du maillot"
+                                                    />
+                                                    {meta.kitColor && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => updateMatchField(match.id, { notes: buildRowNotes({ ...meta, kitColor: '' }) })}
+                                                            className="text-slate-300 hover:text-red-500 text-xs"
+                                                            title="Effacer"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
 
                                             {/* État */}
@@ -1224,7 +1268,7 @@ const MatchesManagement = () => {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', border: '2px solid #1e3a8a' }}>
                             <thead>
                                 <tr style={{ background: HEADER_BLUE, color: '#ffffff' }}>
-                                    {['Cat', 'Date', 'Domicile', 'Visiteur', 'Heure', 'Terrain', 'Coach'].map(h => (
+                                    {['Cat', 'Date', 'Domicile', 'Visiteur', 'Heure', 'Terrain', 'Coach', 'Kit'].map(h => (
                                         <th key={h} style={{ padding: '10px 8px', textAlign: 'center', fontSize: '15px', fontWeight: 900, border: '1px solid #1e3a8a' }}>{h}</th>
                                     ))}
                                 </tr>
@@ -1261,6 +1305,11 @@ const MatchesManagement = () => {
                                             </td>
                                             <td style={cell}>
                                                 {showRed ? <span style={{ color: RED, fontWeight: 900 }}>{showRed}</span> : (coachFor(match) || '—')}
+                                            </td>
+                                            <td style={cell}>
+                                                {meta.kitColor ? (
+                                                    <span style={{ display: 'inline-block', width: 28, height: 28, borderRadius: 6, background: meta.kitColor, border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.15)' }} title={meta.kitColor} />
+                                                ) : '—'}
                                             </td>
                                         </tr>
                                     );

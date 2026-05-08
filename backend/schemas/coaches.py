@@ -9,6 +9,7 @@ class CoachBase(BaseModel):
     specialization: str = Field(..., min_length=1, max_length=100)
     status: Literal['Active', 'Inactive', 'Suspended'] = "Active"
     branch_id: Optional[str] = None
+    u_category: Optional[str] = Field(None, max_length=50, description="U category this coach is responsible for")
 
 class CoachCreate(CoachBase):
     pass

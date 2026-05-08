@@ -128,6 +128,7 @@ const CoachesManagement = () => {
         photo_url: '', diploma_url: '', branch_id: ''
     });
     const [branches, setBranches] = useState([]);
+    const [ageCategories, setAgeCategories] = useState([]);
     const toast = useToast();
 
     const showBanner = (message, type = 'success') => {
@@ -136,7 +137,19 @@ const CoachesManagement = () => {
     };
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => { fetchCoaches(); fetchBranches(); }, []);
+    useEffect(() => {
+        fetchCoaches();
+        fetchBranches();
+        (async () => {
+            try {
+                const r = await authFetch(`${API_URL}/settings/`);
+                if (r.ok) {
+                    const s = await r.json();
+                    setAgeCategories(s?.age_categories || []);
+                }
+            } catch { /* non-blocking */ }
+        })();
+    }, []);
 
     const fetchBranches = async () => {
         try {
@@ -161,7 +174,7 @@ const CoachesManagement = () => {
     };
 
     const handleAddClick = () => {
-        setFormData({ full_name: '', email: '', phone: '', specialization: 'Technical', status: 'Active', photo_url: '', diploma_url: '', branch_id: '' });
+        setFormData({ full_name: '', email: '', phone: '', specialization: 'Technical', status: 'Active', photo_url: '', diploma_url: '', branch_id: '', u_category: '' });
         setIsEditMode(false);
         setEditingId(null);
         setIsAddModalOpen(true);
@@ -176,7 +189,8 @@ const CoachesManagement = () => {
             status: coach.status,
             photo_url: coach.photo_url || '',
             diploma_url: coach.diploma_url || '',
-            branch_id: coach.branch_id || ''
+            branch_id: coach.branch_id || '',
+            u_category: coach.u_category || ''
         });
         setIsEditMode(true);
         setEditingId(coach.id);
@@ -198,7 +212,7 @@ const CoachesManagement = () => {
             if (res.ok) {
                 const savedCoach = await res.json();
                 setIsAddModalOpen(false);
-                setFormData({ full_name: '', email: '', phone: '', specialization: 'Technical', status: 'Active', photo_url: '', diploma_url: '', branch_id: '' });
+                setFormData({ full_name: '', email: '', phone: '', specialization: 'Technical', status: 'Active', photo_url: '', diploma_url: '', branch_id: '', u_category: '' });
                 
                 // Miza (Synchronization) - immediately update local state
                 if (isEditMode) {
@@ -461,6 +475,27 @@ const CoachesManagement = () => {
                                         </select>
                                     </div>
                                 )}
+
+                                {/* U Category assignment */}
+                                <div>
+                                    <label className={`block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 ${isRTL ? 'text-right' : ''}`}>
+                                        {isRTL ? 'الفئة العمرية المسؤول عنها (U)' : 'Assigned U Category'}
+                                    </label>
+                                    <select
+                                        name="u_category"
+                                        value={formData.u_category || ''}
+                                        onChange={handleInputChange}
+                                        className={`w-full bg-indigo-50 border border-indigo-200 rounded-2xl px-5 py-3.5 text-sm font-black outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all ${isRTL ? 'text-right' : ''}`}
+                                    >
+                                        <option value="">— {isRTL ? 'بدون فئة' : 'No category'} —</option>
+                                        {ageCategories.map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-[10px] text-slate-400 font-bold mt-1.5">
+                                        {isRTL ? 'كاتسهل برمجة المباريات: كي يتزاد فريق U مفروض عليه، اسم المدرب كيتعمر تلقائياً.' : 'Used by Match Scheduler: when this U is selected, this coach name is auto-filled.'}
+                                    </p>
+                                </div>
                             </div>
 
                             {/* Modal Footer */}
