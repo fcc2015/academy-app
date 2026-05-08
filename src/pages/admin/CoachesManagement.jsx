@@ -1,10 +1,11 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
+import { impersonateUser } from '../../utils/impersonate';
 import React, { useState, useEffect } from 'react';
 import {
     UserPlus, Mail, Phone, Shield, Trash2, Search,
     X, AlertCircle, Loader2, CheckCircle, Dumbbell,
-    Target, Star, Users, RefreshCw, Edit2, Plus
+    Target, Star, Users, RefreshCw, Edit2, Plus, LogIn
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -30,7 +31,7 @@ const getGradient = (name = '') =>
     AVATAR_GRADIENTS[name.charCodeAt(0) % AVATAR_GRADIENTS.length];
 
 // ─── Coach Card ───────────────────────────────────────────────────────
-const CoachCard = ({ coach, onEdit, onDelete, isRTL }) => {
+const CoachCard = ({ coach, onEdit, onDelete, onLoginAs, isRTL }) => {
     const spec = SPEC_CONFIG[coach.specialization] || SPEC_CONFIG.Technical;
     const SpecIcon = spec.icon;
     const gradient = getGradient(coach.full_name);
@@ -96,6 +97,16 @@ const CoachCard = ({ coach, onEdit, onDelete, isRTL }) => {
                         >
                             <Edit2 size={14} strokeWidth={2.5} />
                         </button>
+                        {coach.user_id && onLoginAs && (
+                            <button
+                                type="button"
+                                onClick={() => onLoginAs(coach)}
+                                className="p-2.5 text-fuchsia-500 bg-fuchsia-50 border border-fuchsia-100 rounded-xl hover:bg-fuchsia-600 hover:text-white transition-all"
+                                title={isRTL ? 'دخول كمدرب' : 'Login as coach'}
+                            >
+                                <LogIn size={14} strokeWidth={2.5} />
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={() => onDelete(coach.id)}
@@ -380,7 +391,17 @@ const CoachesManagement = () => {
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filtered.map(coach => (
-                        <CoachCard key={coach.id} coach={coach} onEdit={handleEditClick} onDelete={handleDelete} isRTL={isRTL} />
+                        <CoachCard
+                            key={coach.id}
+                            coach={coach}
+                            onEdit={handleEditClick}
+                            onDelete={handleDelete}
+                            onLoginAs={async (c) => {
+                                try { await impersonateUser(c.user_id); }
+                                catch (e) { showBanner(e.message || 'Login as failed', 'error'); }
+                            }}
+                            isRTL={isRTL}
+                        />
                     ))}
                 </div>
             )}

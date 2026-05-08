@@ -95,6 +95,26 @@ async def verify_token(request: Request):
                 role = "admin"
                 impersonating = True
 
+            # User-level impersonation — admin / super_admin acting as parent / player / coach
+            # Frontend sets X-Impersonate-User to the target user_id. We swap user_id, role,
+            # and academy_id (verified to match the caller's academy unless super_admin).
+            impersonated_user = request.headers.get("X-Impersonate-User")
+            if impersonated_user and role in ("admin", "super_admin", "sous_admin"):
+                u_res = await client.get(
+                    f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{impersonated_user}&select=role,academy_id",
+                    headers=supabase.admin_headers,
+                )
+                if u_res.status_code == 200 and u_res.json():
+                    target = u_res.json()[0]
+                    target_role = target.get("role") or "parent"
+                    target_academy = target.get("academy_id")
+                    # Same-academy check (skip for super_admin which can cross academies)
+                    if role == "super_admin" or target_academy == academy_id:
+                        user_id = impersonated_user
+                        role = target_role
+                        academy_id = target_academy or academy_id
+                        impersonating = True
+
             # Set Global Context for downstream injection
             academy_id_ctx.set(academy_id)
             user_id_ctx.set(user_id)
