@@ -895,15 +895,44 @@ const MatchesManagement = () => {
                                                 </select>
                                             </td>
 
-                                            {/* Coach (free text) */}
+                                            {/* Coach — dropdown filtered by selected U; falls back to all coaches */}
                                             <td className="px-1 py-1">
-                                                <input
-                                                    type="text"
-                                                    value={meta.coachName}
-                                                    onChange={(e) => updateMatchField(match.id, { notes: buildRowNotes({ ...meta, coachName: e.target.value }) })}
-                                                    placeholder="Othmane, Amine..."
-                                                    className="w-full px-2 py-1.5 bg-cyan-50 border border-cyan-200 rounded-md text-xs font-black focus:ring-2 focus:ring-cyan-400/30 outline-none"
-                                                />
+                                                {(() => {
+                                                    const cat = (match.category || '').toUpperCase();
+                                                    const filtered = coaches.filter(c => (c.u_category || '').toUpperCase() === cat);
+                                                    const list = filtered.length ? filtered : coaches;
+                                                    const namesInList = list.map(c => c.full_name);
+                                                    const isCustom = meta.coachName && !namesInList.includes(meta.coachName);
+                                                    return (
+                                                        <select
+                                                            value={isCustom ? '__custom__' : meta.coachName}
+                                                            onChange={(e) => {
+                                                                let next = e.target.value;
+                                                                if (next === '__custom__') {
+                                                                    const v = window.prompt('Coach name', meta.coachName || '');
+                                                                    if (v == null) return;
+                                                                    next = v;
+                                                                }
+                                                                updateMatchField(match.id, { notes: buildRowNotes({ ...meta, coachName: next }) });
+                                                            }}
+                                                            className="w-full px-2 py-1.5 bg-cyan-50 border border-cyan-200 rounded-md text-xs font-black outline-none cursor-pointer"
+                                                        >
+                                                            <option value="">— Coach —</option>
+                                                            {filtered.length > 0 && (
+                                                                <optgroup label={`Coaches ${match.category}`}>
+                                                                    {filtered.map(c => <option key={c.id} value={c.full_name}>{c.full_name}</option>)}
+                                                                </optgroup>
+                                                            )}
+                                                            {filtered.length === 0 && coaches.length > 0 && (
+                                                                <optgroup label="Tous les coaches">
+                                                                    {coaches.map(c => <option key={c.id} value={c.full_name}>{c.full_name}{c.u_category ? ` (${c.u_category})` : ''}</option>)}
+                                                                </optgroup>
+                                                            )}
+                                                            {isCustom && <option value={meta.coachName}>{meta.coachName}</option>}
+                                                            <option value="__custom__">✏ Autre / Saisir...</option>
+                                                        </select>
+                                                    );
+                                                })()}
                                             </td>
 
                                             {/* Kit Color picker */}
