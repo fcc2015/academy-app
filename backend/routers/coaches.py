@@ -60,8 +60,18 @@ async def create_coach(coach: CoachCreate):
         if "user_id" in coach_dict:
             del coach_dict["user_id"]
 
-        # Insert directly into coaches table
-        response = await supabase.insert_coach(coach_dict)
+        # Insert directly into coaches table — gracefully drop u_category if
+        # the column doesn't exist yet (admin hasn't run the migration).
+        try:
+            response = await supabase.insert_coach(coach_dict)
+        except Exception as ie:
+            ie_msg = str(ie).lower()
+            if "u_category" in ie_msg or "column" in ie_msg or "schema" in ie_msg:
+                logger.warning("insert_coach failed; retrying without u_category (run migrate_coach_u_category.sql to fix)")
+                coach_dict.pop("u_category", None)
+                response = await supabase.insert_coach(coach_dict)
+            else:
+                raise
 
         created_coach = response[0]
         # Show the temp password to the admin once
@@ -87,7 +97,16 @@ async def create_coach(coach: CoachCreate):
 async def update_coach(coach_id: str, coach: CoachCreate):
     try:
         coach_dict = coach.model_dump(exclude_none=True)
-        response = await supabase.update_coach(coach_id, coach_dict)
+        try:
+            response = await supabase.update_coach(coach_id, coach_dict)
+        except Exception as ie:
+            ie_msg = str(ie).lower()
+            if "u_category" in ie_msg or "column" in ie_msg or "schema" in ie_msg:
+                logger.warning("update_coach: retrying without u_category (run migrate_coach_u_category.sql to fix)")
+                coach_dict.pop("u_category", None)
+                response = await supabase.update_coach(coach_id, coach_dict)
+            else:
+                raise
         return response[0] if isinstance(response, list) else response
     except Exception as e:
         logger.error("Error updating coach: %s", e, exc_info=True)

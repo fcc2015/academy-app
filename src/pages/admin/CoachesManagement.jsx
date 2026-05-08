@@ -204,10 +204,13 @@ const CoachesManagement = () => {
             const url = isEditMode ? `${API_URL}/coaches/${editingId}` : `${API_URL}/coaches/`;
             const method = isEditMode ? 'PUT' : 'POST';
 
+            const payload = { ...formData };
+            if (!payload.u_category) delete payload.u_category;
+            if (!payload.branch_id) delete payload.branch_id;
             const res = await authFetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
             if (res.ok) {
                 const savedCoach = await res.json();
