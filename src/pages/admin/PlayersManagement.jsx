@@ -704,19 +704,40 @@ const PlayersManagement = () => {
 
 
 
+    // Compute U category from birth date based on football season
+    // (season starts in September; player's age at season start determines U)
+    const computeUCategory = (birthDateStr, ageCategories) => {
+        if (!birthDateStr || !ageCategories?.length) return null;
+        const birth = new Date(birthDateStr);
+        if (isNaN(birth)) return null;
+        const today = new Date();
+        // If we're past July, season is the current calendar year, else previous
+        const seasonYear = today.getMonth() >= 7 ? today.getFullYear() : today.getFullYear() - 1;
+        const ageAtSeasonStart = seasonYear - birth.getFullYear();
+        const targetU = `U${ageAtSeasonStart}`;
+        // Prefer exact match; otherwise the first entry whose prefix matches (U11 -> "U11 A", "U11 ELITE")
+        const exact = ageCategories.find(c => c.toUpperCase() === targetU);
+        if (exact) return exact;
+        const prefix = ageCategories.find(c =>
+            c.toUpperCase() === targetU ||
+            c.toUpperCase().startsWith(targetU + ' ') ||
+            c.toUpperCase().startsWith(targetU + '-')
+        );
+        if (prefix) return prefix;
+        if (ageAtSeasonStart >= 18) {
+            const senior = ageCategories.find(c => c.toLowerCase().includes('senior'));
+            if (senior) return senior;
+        }
+        return null;
+    };
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => {
             const newData = { ...prev, [name]: value };
             if (name === 'birth_date' && value) {
-                const age = new Date().getFullYear() - new Date(value).getFullYear();
-                if (settings?.age_categories) {
-                    const matched = settings.age_categories.find(cat =>
-                        cat.toUpperCase() === `U${age}` || cat.toUpperCase() === `U${age + 1}`
-                    );
-                    if (matched) newData.u_category = matched;
-                    else if (age >= 18) newData.u_category = 'Senior';
-                }
+                const auto = computeUCategory(value, settings?.age_categories);
+                if (auto) newData.u_category = auto;
             }
             return newData;
         });
@@ -789,6 +810,31 @@ const PlayersManagement = () => {
                 const data = await res.json();
                 setPlayers([data, ...players]);
                 setIsAddModalOpen(false); setModalStep(1);
+
+                // ─── Auto-add player to the chat group of their U category ──
+                try {
+                    const grpRes = await authFetch(`${API_URL}/chat/groups`);
+                    if (grpRes.ok) {
+                        const groups = await grpRes.json();
+                        const target = (groups || []).find(g =>
+                            g.category && g.category.toUpperCase() === (data.u_category || '').toUpperCase()
+                        );
+                        if (target) {
+                            await authFetch(`${API_URL}/chat/groups/${target.id}/add_member`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    user_id: data.user_id,
+                                    user_name: data.full_name,
+                                    user_role: 'player',
+                                    is_moderator: false,
+                                }),
+                            });
+                        }
+                    }
+                } catch (chatErr) {
+                    console.warn('Auto-add to chat group failed:', chatErr);
+                }
 
                 // Show prominent success confirmation using SweetAlert2
                 Swal.fire({
