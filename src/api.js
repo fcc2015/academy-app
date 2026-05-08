@@ -101,6 +101,13 @@ export async function authFetch(url, options = {}) {
     headers['X-Impersonate-Academy'] = impersonateId;
   }
 
+  // User-level impersonation — admin acting as a parent / player / coach.
+  // Backend swaps user_id + role to the target if the caller is admin/super_admin.
+  const impersonateUser = localStorage.getItem('impersonating_user_id');
+  if (impersonateUser && !headers['X-Impersonate-User']) {
+    headers['X-Impersonate-User'] = impersonateUser;
+  }
+
   let lastError = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {

@@ -65,7 +65,7 @@ app.add_middleware(
     allow_origin_regex=r"https://(.*\.netlify\.app|.*\.vercel\.app)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "X-CSRF-Token", "X-Impersonate-Academy"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "X-CSRF-Token", "X-Impersonate-Academy", "X-Impersonate-User"],
     expose_headers=["Content-Disposition"],
 )
 

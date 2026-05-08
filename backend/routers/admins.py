@@ -172,6 +172,63 @@ class MatchManagerInvite(BaseModel):
     email: EmailStr
 
 
+@router.get("/impersonate-user/{user_id}")
+async def get_impersonation_target(user_id: str):
+    """Return metadata for impersonating a parent / player / coach.
+    Frontend stores user_id + role + name and sends X-Impersonate-User header.
+    Auth middleware verifies the target belongs to the caller's academy."""
+    import httpx as _httpx
+    from core.config import settings as _settings
+    caller_academy = academy_id_ctx.get(None)
+
+    async with _httpx.AsyncClient(timeout=10.0) as client:
+        u_res = await client.get(
+            f"{_settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=id,email,full_name,role,academy_id",
+            headers=supabase.admin_headers,
+        )
+        if u_res.status_code != 200 or not u_res.json():
+            raise HTTPException(status_code=404, detail="User not found")
+        target = u_res.json()[0]
+
+        # Same-academy check (super_admin can cross)
+        caller_role = role_ctx.get(None)
+        if caller_role != "super_admin" and target.get("academy_id") != caller_academy:
+            raise HTTPException(status_code=403, detail="Cannot impersonate user from another academy")
+
+        # Resolve a friendly display name from the relevant detail table
+        display_name = target.get("full_name") or target.get("email")
+        details = None
+        role_l = (target.get("role") or "").lower()
+        try:
+            if role_l == "player":
+                d = await client.get(
+                    f"{_settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=full_name,u_category,photo_url",
+                    headers=supabase.admin_headers,
+                )
+                if d.status_code == 200 and d.json():
+                    details = d.json()[0]
+                    display_name = details.get("full_name") or display_name
+            elif role_l == "coach":
+                d = await client.get(
+                    f"{_settings.SUPABASE_URL}/rest/v1/coaches?user_id=eq.{user_id}&select=full_name,u_category,photo_url",
+                    headers=supabase.admin_headers,
+                )
+                if d.status_code == 200 and d.json():
+                    details = d.json()[0]
+                    display_name = details.get("full_name") or display_name
+        except Exception:
+            pass
+
+    return {
+        "user_id": user_id,
+        "role": target.get("role"),
+        "email": target.get("email"),
+        "full_name": display_name,
+        "academy_id": target.get("academy_id"),
+        "details": details,
+    }
+
+
 @router.post("/invite-match-manager")
 async def invite_match_manager(req: MatchManagerInvite):
     """Create a match_manager admin and send the invitation email with credentials."""
