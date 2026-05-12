@@ -207,6 +207,9 @@ export function logout() {
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('impersonating_academy_id');
   localStorage.removeItem('impersonating_academy_name');
+  localStorage.removeItem('impersonating_user_id');
+  localStorage.removeItem('impersonating_user_name');
+  localStorage.removeItem('impersonating_user_role');
   // Legacy cleanup
   localStorage.removeItem('token_expires');
 
