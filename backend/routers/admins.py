@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from core.auth_middleware import verify_token
-from core.context import academy_id_ctx
+from core.context import academy_id_ctx, role_ctx
 from typing import List
 from pydantic import BaseModel, EmailStr, Field
 from schemas.admins import AdminCreate, AdminResponse
