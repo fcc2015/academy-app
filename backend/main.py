@@ -1,4 +1,5 @@
 import time
+import asyncio
 import uuid
 import logging
 from collections import defaultdict
@@ -278,4 +279,51 @@ async def health_check():
     except Exception:
         db_ok = False
     return {"status": "ok", "database": "connected" if db_ok else "unreachable"}
+
+
+# ─── Daily Alert Check Scheduler ─────────────────────────────
+# Runs alert-check automatically every day at 8:00 AM (server time)
+# No need for the admin to click manually.
+
+async def _daily_alert_scheduler():
+    """Background task: runs the payment alert check once per day at 8 AM."""
+    from routers.finances import run_alert_check
+    from datetime import datetime, timedelta as _td
+
+    logger.info("📅 Daily alert scheduler started")
+
+    while True:
+        try:
+            now = datetime.now()
+            # Calculate seconds until next 8:00 AM
+            target = now.replace(hour=8, minute=0, second=0, microsecond=0)
+            if now >= target:
+                target += _td(days=1)
+            wait_seconds = (target - now).total_seconds()
+
+            logger.info(f"⏰ Next alert check in {wait_seconds / 3600:.1f} hours (at {target.isoformat()})")
+            await asyncio.sleep(wait_seconds)
+
+            # Run the alert check
+            logger.info("🔔 Running daily alert check...")
+            result = await run_alert_check()
+            logger.info(
+                f"✅ Alert check complete: {result.get('alerts_sent', 0)} alerts, "
+                f"{result.get('players_suspended', 0)} suspended, "
+                f"{result.get('players_reactivated', 0)} reactivated"
+            )
+        except asyncio.CancelledError:
+            logger.info("Daily alert scheduler cancelled")
+            break
+        except Exception as e:
+            logger.error(f"❌ Daily alert check error: {e}", exc_info=True)
+            # Wait 1 hour before retrying on error
+            await asyncio.sleep(3600)
+
+
+@app.on_event("startup")
+async def start_daily_scheduler():
+    """Launch the daily alert-check background task."""
+    asyncio.create_task(_daily_alert_scheduler())
+    logger.info("📅 Daily alert scheduler registered")
 

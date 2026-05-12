@@ -25,7 +25,8 @@ import {
     User,
     Heart,
     CreditCard,
-    Activity
+    Activity,
+    LogIn
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import PlayerBadgeModal from '../../components/PlayerBadgeModal';
@@ -1186,16 +1187,16 @@ const PlayersManagement = () => {
                                                 <button onClick={() => openMatchesModal(player)} className="p-3 bg-amber-50 text-amber-600 border border-amber-100 hover:bg-amber-500 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={isRTL ? 'المباريات' : 'Matches'}><Trophy size={16} /></button>
                                                 <button onClick={() => { setCurrentPlayer(player); setIsBadgeModalOpen(true); }} className="p-3 bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-500 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={t('players.viewCard')}><QrCode size={16} /></button>
                                                 <button onClick={() => openEditModal(player)} className="p-3 bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-600 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={isRTL ? 'تعديل البيانات' : 'Edit'}><Edit2 size={16} /></button>
-                                                {player.parent_id && (
+                                                {(player.parent_id || player.user_id) && (
                                                     <button
                                                         onClick={async () => {
-                                                            try { await impersonateUser(player.parent_id); }
+                                                            try { await impersonateUser(player.parent_id || player.user_id); }
                                                             catch (e) { Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message }); }
                                                         }}
-                                                        className="p-3 bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-600 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1"
+                                                        className="p-3 bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-600 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1"
                                                         title={isRTL ? 'دخول كولي الأمر' : 'Login as parent'}
                                                     >
-                                                        <User size={16} />
+                                                        <LogIn size={16} />
                                                     </button>
                                                 )}
                                                 <button onClick={() => handleDelete(player.user_id)} className="p-3 bg-red-50 text-red-500 border border-red-100 hover:bg-red-500 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={isRTL ? 'حذف من النظام' : 'Delete'}><Trash2 size={16} /></button>

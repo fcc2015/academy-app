@@ -1,6 +1,14 @@
 """
 Billing Engine — Subscription & Payment Intelligence
 Handles: prorata calculation, next due dates, alert status logic
+
+Alert stages (PRO):
+  - "reminder"    → 1 day before due date
+  - "due_today"   → on the due date
+  - "late_2d"     → 2 days after due date
+  - "late_5d"     → 5 days after due date
+  - "suspended"   → 10 days after due date (player restricted)
+  - "terminated"  → 30+ days (final)
 """
 from datetime import date, timedelta
 from calendar import monthrange
@@ -69,24 +77,35 @@ def get_next_due_date(billing_type: str, from_date: date) -> date:
 def get_alert_status(next_due_date: date, season_end: date | None = None) -> str:
     """
     Get the alert status based on days until/since due date.
-    Returns: 'none', 'approaching', 'late', 'suspended', 'terminated'
+    PRO stages:
+      - "none"       → more than 1 day before due
+      - "reminder"   → exactly 1 day before due
+      - "due_today"  → on the due date
+      - "late_2d"    → 2 days after due
+      - "late_5d"    → 5 days after due
+      - "suspended"  → 10+ days after due (player restricted from groups/evaluations/matches)
+      - "terminated" → 30+ days after due
     """
     today = date.today()
-    
+
     # If a season end is provided, and we are significantly past it (e.g. 15 days), skip alerts
     if season_end and today > (season_end + timedelta(days=15)):
         return "none"
-        
-    days_diff = (next_due_date - today).days
 
-    if days_diff > 3:
+    days_diff = (next_due_date - today).days  # positive = future, negative = past
+
+    if days_diff > 1:
         return "none"
-    elif 0 <= days_diff <= 3:
-        return "approaching"
-    elif -7 <= days_diff < 0:
-        return "late"
-    elif -30 <= days_diff < -7:
-        return "suspended"
+    elif days_diff == 1:
+        return "reminder"      # قبل يوم من الموعد
+    elif days_diff == 0:
+        return "due_today"     # في الموعد المحدد
+    elif -2 <= days_diff < 0:
+        return "late_2d"       # إنذار بعد يومين
+    elif -5 <= days_diff < -2:
+        return "late_5d"       # إنذار بالحضور بعد 5 أيام
+    elif -30 <= days_diff < -5:
+        return "suspended"     # حذف من المجموعة بعد 10 أيام + تقييد
     else:  # > 30 days overdue
         return "terminated"
 
@@ -94,10 +113,8 @@ def get_alert_status(next_due_date: date, season_end: date | None = None) -> str
 def get_alert_notification(alert_status: str, player_name: str, billing_type: str = "monthly", amount: float | None = None) -> dict | None:
     """
     Build a notification dict for a given alert status.
-    Distinguishes monthly vs annual / hybrid billing in the message.
     Returns None if no notification is needed.
     """
-    # Localised billing-type label for the message
     bt = (billing_type or "monthly").lower()
     if bt == "annual":
         cycle_word = "السنوي"
@@ -111,30 +128,53 @@ def get_alert_notification(alert_status: str, player_name: str, billing_type: st
     amount_text = f" ({amount:.2f} درهم)" if amount else ""
 
     messages = {
-        "approaching": {
-            "title": "📅 قرب موعد الأداء",
+        "reminder": {
+            "title": "📅 تذكير — غداً موعد الأداء",
             "message": (
                 f"نذكركم بأن موعد أداء الاشتراك {cycle_word} للاعب {player_name}{amount_text} "
-                "سيحل خلال 3 أيام. يرجى التسوية لتفادي أي انقطاع."
+                "سيحل غداً. يرجى التسوية لتفادي أي انقطاع."
             ),
             "type": "alert"
         },
-        "late": {
-            "title": "⚠️ تأخير في الأداء / تذكير",
+        "due_today": {
+            "title": "🔔 اليوم موعد الأداء",
             "message": (
-                f"هناك تأخير في أداء الاشتراك {cycle_word} للاعب {player_name}{amount_text}. "
-                "يرجى تسوية الوضعية في أقرب وقت ممكن."
+                f"نذكركم بأن اليوم هو آخر موعد لأداء الاشتراك {cycle_word} للاعب {player_name}{amount_text}. "
+                "يرجى التسوية اليوم."
+            ),
+            "type": "alert"
+        },
+        "late_2d": {
+            "title": "⚠️ إنذار — تأخر الأداء يومين",
+            "message": (
+                f"هناك تأخير يومين في أداء الاشتراك {cycle_word} للاعب {player_name}{amount_text}. "
+                "يرجى تسوية الوضعية في أقرب وقت."
+            ),
+            "type": "alert"
+        },
+        "late_5d": {
+            "title": "🟡 إنذار بالحضور — تأخر 5 أيام",
+            "message": (
+                f"تأخر أداء الاشتراك {cycle_word} للاعب {player_name}{amount_text} لأكثر من 5 أيام. "
+                "ننبهكم بأنه في حالة عدم التسوية خلال 5 أيام سيتم تعليق حساب اللاعب."
             ),
             "type": "alert"
         },
         "suspended": {
-            "title": "🚫 تنبيه تعليق الحساب",
-            "message": f"سيتم تعليق حساب {player_name} بسبب تأخير الأداء لأكثر من 7 أيام. يرجى الاتصال بالإدارة.",
+            "title": "🔴 تعليق الحساب — تأخر +10 أيام",
+            "message": (
+                f"تم تعليق حساب {player_name} بسبب تأخر الأداء لأكثر من 10 أيام. "
+                "اللاعب لن يرى التقييمات ولن يصله استدعاءات المقابلات ولن يشارك في المجموعة. "
+                "يرجى الاتصال بالإدارة لتسوية الوضعية."
+            ),
             "type": "alert"
         },
         "terminated": {
-            "title": "🔒 تم تعليق الحساب (توقف)",
-            "message": f"لقد تم تعليق حساب {player_name} نهائياً بسبب تجاوز مدة التأخير (30 يوماً). يرجى تسوية المتأخرات لإعادة التفعيل.",
+            "title": "🔒 إيقاف نهائي — تأخر +30 يوم",
+            "message": (
+                f"تم إيقاف حساب {player_name} نهائياً بسبب تجاوز مدة التأخير (30 يوماً). "
+                "يرجى تسوية المتأخرات لإعادة التفعيل."
+            ),
             "type": "alert"
         }
     }

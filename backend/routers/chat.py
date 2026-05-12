@@ -671,9 +671,9 @@ async def send_message(req: SendMessageRequest):
             if member.get("banned") and not member.get("ban_until"):
                 raise HTTPException(status_code=403, detail="You are permanently banned from this group.")
 
-        # Validate: only admins can send images
-        if req.message_type == "image" and req.sender_role not in ["admin"]:
-            raise HTTPException(status_code=403, detail="Only admins can send images.")
+        # Validate: only admins and coaches can send images
+        if req.message_type == "image" and req.sender_role not in ["admin", "coach"]:
+            raise HTTPException(status_code=403, detail="Only admins and coaches can send images.")
 
         data = {
             "group_id": req.group_id,
@@ -876,9 +876,9 @@ async def upload_chat_image(
     file: UploadFile = File(...),
     sender_role: str = Form(...)
 ):
-    """Upload image for chat (admin only)"""
-    if sender_role != "admin":
-        raise HTTPException(status_code=403, detail="Only admins can upload images.")
+    """Upload image for chat (admin and coach)"""
+    if sender_role not in ("admin", "coach"):
+        raise HTTPException(status_code=403, detail="Only admins and coaches can upload images.")
 
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Only image files are allowed.")
