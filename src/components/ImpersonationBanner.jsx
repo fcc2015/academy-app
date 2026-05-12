@@ -29,8 +29,13 @@ export default function ImpersonationBanner() {
         localStorage.removeItem('impersonating_user_name');
         localStorage.removeItem('impersonating_user_role');
         setState(readState());
-        // Reload so any role-gated layout re-evaluates
-        window.location.reload();
+        // Go back to the correct admin page based on real role
+        const realRole = localStorage.getItem('role');
+        if (realRole === 'super_admin') {
+            window.location.href = '/saas/dashboard';
+        } else {
+            window.location.href = '/admin/players';
+        }
     };
 
     const exitAcademy = () => {
