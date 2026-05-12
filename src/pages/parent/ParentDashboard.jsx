@@ -198,11 +198,17 @@ const ParentDashboard = () => {
     }
 
     const getPaymentStatus = () => {
-        if (!subscriptionData) return { label: isRTL ? 'عادي' : 'Up to date', color: 'indigo' };
+        if (!subscriptionData) return { label: isRTL ? 'عادي' : 'Up to date', color: 'emerald' };
         const status = subscriptionData.alert_status;
+        if (status === 'reminder') return { label: isRTL ? 'تذكير بالأداء' : 'Payment Reminder', color: 'blue' };
+        if (status === 'due_today') return { label: isRTL ? 'موعد الأداء اليوم' : 'Due Today', color: 'blue' };
+        if (status === 'late_2d') return { label: isRTL ? 'متأخر يومين' : '2 Days Late', color: 'amber' };
+        if (status === 'late_5d') return { label: isRTL ? 'متأخر 5 أيام' : '5 Days Late', color: 'amber' };
+        if (status === 'suspended') return { label: isRTL ? 'موقوف' : 'Suspended', color: 'red' };
+        if (status === 'terminated') return { label: isRTL ? 'موقوف نهائياً' : 'Terminated', color: 'red' };
+        // Legacy compatibility
         if (status === 'approaching') return { label: isRTL ? 'اقتراب الأداء' : 'Upcoming Payment', color: 'blue' };
         if (status === 'late') return { label: isRTL ? 'متأخر' : 'Overdue', color: 'amber' };
-        if (status === 'suspended') return { label: isRTL ? 'موقوف' : 'Suspended', color: 'red' };
         return { label: isRTL ? 'عادي' : 'Up to date', color: 'emerald' };
     };
 
@@ -211,12 +217,16 @@ const ParentDashboard = () => {
     const quickStats = [
         {
             label: isRTL ? 'حالة اللاعب' : 'Player Status',
-            value: childData ? (isRTL ? 'نشط' : 'Active') : (isRTL ? 'غير متاح' : 'N/A'),
+            value: childData ? (
+                childData.account_status === 'Suspended'
+                    ? (isRTL ? 'موقوف' : 'Suspended')
+                    : (isRTL ? 'نشط' : 'Active')
+            ) : (isRTL ? 'غير متاح' : 'N/A'),
             icon: User,
-            color: 'sky',
-            bg: 'bg-sky-50',
-            text: 'text-sky-600',
-            border: 'border-sky-100'
+            color: childData?.account_status === 'Suspended' ? 'red' : 'sky',
+            bg: childData?.account_status === 'Suspended' ? 'bg-red-50' : 'bg-sky-50',
+            text: childData?.account_status === 'Suspended' ? 'text-red-600' : 'text-sky-600',
+            border: childData?.account_status === 'Suspended' ? 'border-red-100' : 'border-sky-100'
         },
         {
             label: isRTL ? 'معدل الحضور' : 'Attendance Rate',
@@ -249,11 +259,38 @@ const ParentDashboard = () => {
 
     return (
         <div className={`animate-fade-in space-y-8 ${isRTL ? 'text-right' : 'text-left'}`} dir={dir}>
+            {/* 🔴 Suspended Player Banner */}
+            {childData?.account_status === 'Suspended' && (
+                <div className={`p-5 rounded-2xl border-2 border-red-300 bg-red-50 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div className="p-3 bg-red-100 rounded-xl">
+                            <AlertCircle size={28} className="text-red-600" />
+                        </div>
+                        <div>
+                            <p className="font-black text-red-800 text-lg">
+                                {isRTL ? '⛔ حساب ابنكم موقوف' : '⛔ Your child\'s account is suspended'}
+                            </p>
+                            <p className="text-sm font-bold text-red-600 mt-1">
+                                {isRTL
+                                    ? 'بسبب تأخر الأداء، لن يتمكن اللاعب من المشاركة في المجموعات ولن يرى التقييمات ولن يصله استدعاءات المقابلات. يرجى تسوية الوضعية المالية.'
+                                    : 'Due to late payment, the player cannot participate in groups, view evaluations, or receive match convocations. Please settle the outstanding balance.'}
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => navigate('/parent/payments')}
+                        className="mt-4 w-full px-5 py-3 bg-red-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-red-700 transition-all"
+                    >
+                        {isRTL ? 'تسوية المستحقات' : 'Settle Payment'}
+                    </button>
+                </div>
+            )}
+
             {/* Subscription Alert Banner */}
-            {subscriptionData?.alert_status && subscriptionData.alert_status !== 'none' && (
+            {subscriptionData?.alert_status && subscriptionData.alert_status !== 'none' && childData?.account_status !== 'Suspended' && (
                 <div className={`p-4 rounded-2xl border flex items-center justify-between animate-pulse ${isRTL ? 'flex-row-reverse' : ''} ${
-                    subscriptionData.alert_status === 'approaching' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                    subscriptionData.alert_status === 'late' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                    ['reminder', 'due_today', 'approaching'].includes(subscriptionData.alert_status) ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                    ['late_2d', 'late_5d', 'late'].includes(subscriptionData.alert_status) ? 'bg-amber-50 border-amber-200 text-amber-700' :
                     'bg-red-50 border-red-200 text-red-700'
                 }`}>
                     <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
@@ -443,8 +480,8 @@ const ParentDashboard = () => {
                 )}
             </div>
 
-            {/* Next Match */}
-            {upcomingMatch && (
+            {/* Next Match — hidden if suspended */}
+            {upcomingMatch && childData?.account_status !== 'Suspended' && (
                 <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-[2.5rem] border border-emerald-100 premium-shadow p-6 sm:p-8 animate-fade-in">
                     <div className={`flex items-center justify-between mb-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
                         <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>

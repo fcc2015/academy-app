@@ -339,6 +339,13 @@ const ParentChildProfile = () => {
                 {/* ── UPCOMING MATCHES ── */}
                 {activeTab === 'upcoming' && (
                     <div className="animate-slide-up">
+                        {child.account_status === 'Suspended' ? (
+                            <div className="bg-red-50 border-2 border-red-200 rounded-[2.5rem] p-12 text-center">
+                                <AlertTriangle size={48} className="mx-auto text-red-400 mb-4" />
+                                <p className="text-lg font-black text-red-700">{isRTL ? '⛔ الحساب موقوف — لا يمكن مشاهدة المباريات القادمة' : '⛔ Account suspended — match convocations hidden'}</p>
+                                <p className="text-sm text-red-500 mt-2">{isRTL ? 'يرجى تسوية المستحقات المالية لإعادة تفعيل الحساب.' : 'Please settle outstanding payments to reactivate.'}</p>
+                            </div>
+                        ) : (
                         <div className={`bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden ${isRTL ? 'text-right' : 'text-left'}`}>
                             <div className={`px-10 py-7 border-b border-slate-100 flex items-center gap-5 bg-emerald-50/60 ${isRTL ? 'flex-row-reverse' : ''}`}>
                                 <div className="p-3.5 bg-emerald-100 text-emerald-600 rounded-[1.5rem] shadow-sm"><Calendar size={24} /></div>
@@ -378,7 +385,7 @@ const ParentChildProfile = () => {
                                 )}
                             </div>
                         </div>
-
+                        )}
                     </div>
                 )}
 
@@ -460,6 +467,14 @@ const ParentChildProfile = () => {
                 {/* ── LEVEL ── */}
                 {activeTab === 'level' && (
                     <div className="animate-slide-up space-y-6">
+                        {child.account_status === 'Suspended' ? (
+                            <div className="bg-red-50 border-2 border-red-200 rounded-[2.5rem] p-12 text-center">
+                                <AlertTriangle size={48} className="mx-auto text-red-400 mb-4" />
+                                <p className="text-lg font-black text-red-700">{isRTL ? '⛔ الحساب موقوف — التقييمات غير متاحة' : '⛔ Account suspended — evaluations hidden'}</p>
+                                <p className="text-sm text-red-500 mt-2">{isRTL ? 'يرجى تسوية المستحقات المالية لإعادة تفعيل الحساب.' : 'Please settle outstanding payments to reactivate.'}</p>
+                            </div>
+                        ) : (
+                        <>
                         <div className={`bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden ${isRTL ? 'text-right' : 'text-left'}`}>
                             <div className={`px-10 py-8 border-b border-slate-100 flex items-center gap-6 bg-amber-50/50 ${isRTL ? 'flex-row-reverse' : ''}`}>
                                 <div className="p-4 bg-amber-100 text-amber-600 rounded-[1.5rem] shadow-sm"><TrendingUp size={28} /></div>
@@ -527,6 +542,7 @@ const ParentChildProfile = () => {
                                 </div>
                             </div>
                         )}
+                        </>)}
                     </div>
                 )}
 
@@ -850,6 +866,13 @@ const ParentChildProfile = () => {
 
                 {/* ── PERFORMANCE ── */}
                 {activeTab === 'performance' && (
+                    child.account_status === 'Suspended' ? (
+                        <div className="bg-red-50 border-2 border-red-200 rounded-[2.5rem] p-12 text-center animate-slide-up">
+                            <AlertTriangle size={48} className="mx-auto text-red-400 mb-4" />
+                            <p className="text-lg font-black text-red-700">{isRTL ? '⛔ الحساب موقوف — التقييمات غير متاحة' : '⛔ Account suspended — evaluations hidden'}</p>
+                            <p className="text-sm text-red-500 mt-2">{isRTL ? 'يرجى تسوية المستحقات المالية.' : 'Please settle outstanding payments.'}</p>
+                        </div>
+                    ) : (
                     <div className={`animate-slide-up bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden ${isRTL ? 'text-right' : 'text-left'}`}>
                         <div className={`px-10 py-8 border-b border-slate-100 flex items-center gap-6 bg-amber-50/50 ${isRTL ? 'flex-row-reverse' : ''}`}>
                             <div className="p-4 bg-amber-100 text-amber-600 rounded-[1.5rem] shadow-sm"><Star size={28} /></div>
@@ -891,6 +914,7 @@ const ParentChildProfile = () => {
                             )}
                         </div>
                     </div>
+                    )
                 )}
 
                 {/* ── MEDICAL ── */}

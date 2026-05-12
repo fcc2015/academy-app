@@ -696,15 +696,21 @@ const FinancesManagement = () => {
                                         <td className="px-8 py-4 font-bold text-slate-800 text-sm">{item.player}</td>
                                         <td className="px-8 py-4">
                                             <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase ${
-                                                item.new_alert === 'approaching' ? 'bg-blue-100 text-blue-700' :
-                                                item.new_alert === 'late' ? 'bg-amber-100 text-amber-700' :
+                                                item.new_alert === 'reminder' || item.new_alert === 'due_today' || item.new_alert === 'approaching' ? 'bg-blue-100 text-blue-700' :
+                                                item.new_alert === 'late_2d' || item.new_alert === 'late_5d' || item.new_alert === 'late' ? 'bg-amber-100 text-amber-700' :
                                                 item.new_alert === 'suspended' ? 'bg-red-100 text-red-700' :
+                                                item.new_alert === 'terminated' ? 'bg-slate-800 text-white' :
                                                 'bg-slate-100 text-slate-700'
                                             }`}>
-                                                {item.new_alert === 'approaching' ? 'قرب الموعد' :
+                                                {item.new_alert === 'reminder' ? 'تذكير — غداً' :
+                                                 item.new_alert === 'due_today' ? 'موعد الأداء اليوم' :
+                                                 item.new_alert === 'late_2d' ? 'تأخير يومين' :
+                                                 item.new_alert === 'late_5d' ? 'إنذار 5 أيام' :
+                                                 item.new_alert === 'suspended' ? '🔴 تعليق الحساب' :
+                                                 item.new_alert === 'terminated' ? '🔒 إيقاف نهائي' :
+                                                 item.new_alert === 'approaching' ? 'قرب الموعد' :
                                                  item.new_alert === 'late' ? 'تأخير في الأداء' :
-                                                 item.new_alert === 'suspended' ? 'تنبيه التعليق' :
-                                                 item.new_alert === 'terminated' ? 'موقوف نهائياً' : item.new_alert}
+                                                 item.new_alert}
                                             </span>
                                         </td>
                                         <td className="px-8 py-4 text-left">

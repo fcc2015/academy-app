@@ -176,7 +176,8 @@ class MatchManagerInvite(BaseModel):
 async def get_impersonation_target(user_id: str):
     """Return metadata for impersonating a parent / player / coach.
     Frontend stores user_id + role + name and sends X-Impersonate-User header.
-    Auth middleware verifies the target belongs to the caller's academy."""
+    Auth middleware verifies the target belongs to the caller's academy.
+    Falls back to players table if user is not in users table (admin-created players)."""
     import httpx as _httpx
     from core.config import settings as _settings
     caller_academy = academy_id_ctx.get(None)
@@ -186,9 +187,40 @@ async def get_impersonation_target(user_id: str):
             f"{_settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=id,email,full_name,role,academy_id",
             headers=supabase.admin_headers,
         )
-        if u_res.status_code != 200 or not u_res.json():
+        target = None
+        if u_res.status_code == 200 and u_res.json():
+            target = u_res.json()[0]
+
+        # Fallback: look up in players table (admin-created players without auth account)
+        if not target:
+            p_res = await client.get(
+                f"{_settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=user_id,full_name,parent_name,u_category,photo_url,academy_id,parent_id",
+                headers=supabase.admin_headers,
+            )
+            if p_res.status_code == 200 and p_res.json():
+                player = p_res.json()[0]
+                # If player has a parent_id, try to impersonate the parent instead
+                parent_id = player.get("parent_id")
+                if parent_id:
+                    pu_res = await client.get(
+                        f"{_settings.SUPABASE_URL}/rest/v1/users?id=eq.{parent_id}&select=id,email,full_name,role,academy_id",
+                        headers=supabase.admin_headers,
+                    )
+                    if pu_res.status_code == 200 and pu_res.json():
+                        target = pu_res.json()[0]
+
+                # If still no target, build a synthetic one from the player record
+                if not target:
+                    target = {
+                        "id": user_id,
+                        "email": None,
+                        "full_name": player.get("full_name"),
+                        "role": "parent",
+                        "academy_id": player.get("academy_id"),
+                    }
+
+        if not target:
             raise HTTPException(status_code=404, detail="User not found")
-        target = u_res.json()[0]
 
         # Same-academy check (super_admin can cross)
         caller_role = role_ctx.get(None)
@@ -220,7 +252,7 @@ async def get_impersonation_target(user_id: str):
             pass
 
     return {
-        "user_id": user_id,
+        "user_id": target.get("id") or user_id,
         "role": target.get("role"),
         "email": target.get("email"),
         "full_name": display_name,

@@ -334,20 +334,30 @@ async def delete_subscription(sub_id: str):
 @router.post("/alert-check")
 async def run_alert_check():
     """
-    Check all active subscriptions and send alerts based on due date status.
-    Should be called daily (can be triggered manually from admin panel or a scheduler).
+    PRO Alert Check — يعمل يومياً (يدوي أو تلقائي).
+    المراحل:
+      - reminder    → قبل يوم من الموعد
+      - due_today   → في الموعد المحدد
+      - late_2d     → بعد يومين
+      - late_5d     → بعد 5 أيام
+      - suspended   → بعد 10 أيام (تعليق + إزالة من المجموعة)
+      - terminated  → بعد 30 يوم (إيقاف نهائي)
     """
+    import httpx
+    from core.config import settings
+
     try:
         subs = await supabase.get_subscriptions()
         academy_settings = await supabase.get_academy_settings() or {}
         season_end_str = academy_settings.get("season_end")
         season_end = date.fromisoformat(season_end_str) if season_end_str else None
-        
+
         alerts_sent = []
-        today = date.today()
+        players_suspended = []
+        players_reactivated = []
 
         for sub in subs:
-            if sub.get("status") != "active":
+            if sub.get("status") not in ("active", "terminated"):
                 continue
 
             sub_id = sub["id"]
@@ -360,33 +370,46 @@ async def run_alert_check():
             prev_alert = sub.get("alert_status", "none")
 
             # Only send if alert level changed (avoid spam)
-            if alert == prev_alert or alert == "none":
+            if alert == prev_alert:
+                continue
+
+            # If alert went back to "none" (paid), reactivate player
+            if alert == "none" and prev_alert in ("suspended", "terminated"):
+                player_id = sub.get("player_id")
+                if player_id:
+                    try:
+                        await _update_player_account_status(player_id, "Active", settings)
+                        players_reactivated.append(player_id)
+                        if sub.get("status") == "terminated":
+                            await supabase.update_subscription(sub_id, {"status": "active", "alert_status": "none"})
+                        else:
+                            await supabase.update_subscription_alert_status(sub_id, "none")
+                    except Exception as e:
+                        logger.warning(f"Reactivation error for player {player_id}: {e}")
+                continue
+
+            if alert == "none":
                 continue
 
             # Get player name + billing context
             player_info = sub.get("players") or {}
-            player_name = player_info.get("full_name", "Un joueur")
+            player_name = player_info.get("full_name", "لاعب")
+            player_id = sub.get("player_id")
             billing_type = sub.get("billing_type") or sub.get("subscription_type") or "monthly"
             amount = sub.get("amount") or sub.get("monthly_amount")
 
+            # ── Send notification ──
             notif = get_alert_notification(alert, player_name, billing_type=billing_type, amount=amount)
             if notif:
                 try:
-                    await supabase.insert_notification({
-                        **notif,
-                        "target_role": "Admin"
-                    })
-                    # Also notify parent if user_id exists
+                    await supabase.insert_notification({**notif, "target_role": "Admin"})
                     if sub.get("user_id"):
-                        await supabase.insert_notification({
-                            **notif,
-                            "user_id": sub["user_id"]
-                        })
+                        await supabase.insert_notification({**notif, "user_id": sub["user_id"]})
                 except Exception as e:
                     logger.warning(f"Notification error for sub {sub_id}: {e}")
 
-                # Email reminder for "approaching" + "late" only — others are admin-only
-                if alert in ("approaching", "late"):
+                # Email reminder for early stages
+                if alert in ("reminder", "due_today", "late_2d", "late_5d"):
                     parent_email = (player_info.get("parent_email")
                                     or sub.get("parent_email")
                                     or sub.get("contact_email"))
@@ -401,8 +424,29 @@ async def run_alert_check():
                         except Exception as e:
                             logger.warning(f"Email reminder failed for {parent_email}: {e}")
 
-            # Auto-update player status if suspended/terminated
-            if alert == "terminated":
+            # ── Actions based on alert level ──
+            if alert == "suspended" and player_id:
+                # تعليق اللاعب: تغيير account_status + إزالة من مجموعات الشات
+                try:
+                    await _update_player_account_status(player_id, "Suspended", settings)
+                    await _remove_player_from_chat_groups(player_id, settings)
+                    players_suspended.append(player_id)
+                except Exception as e:
+                    logger.warning(f"Suspend actions error for {player_id}: {e}")
+                try:
+                    await supabase.update_subscription_alert_status(sub_id, alert)
+                except Exception as e:
+                    logger.warning(f"Alert status update error: {e}")
+
+            elif alert == "terminated":
+                # إيقاف نهائي
+                if player_id:
+                    try:
+                        await _update_player_account_status(player_id, "Suspended", settings)
+                        await _remove_player_from_chat_groups(player_id, settings)
+                        players_suspended.append(player_id)
+                    except Exception as e:
+                        logger.warning(f"Terminate actions error for {player_id}: {e}")
                 try:
                     await supabase.update_subscription(sub_id, {"status": "terminated", "alert_status": "terminated"})
                 except Exception as e:
@@ -415,10 +459,56 @@ async def run_alert_check():
 
             alerts_sent.append({"sub_id": sub_id, "player": player_name, "new_alert": alert})
 
-        return {"success": True, "alerts_sent": len(alerts_sent), "details": alerts_sent}
+        return {
+            "success": True,
+            "alerts_sent": len(alerts_sent),
+            "players_suspended": len(players_suspended),
+            "players_reactivated": len(players_reactivated),
+            "details": alerts_sent
+        }
     except Exception as e:
         logger.error("Alert check failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+
+
+async def _update_player_account_status(player_id: str, status: str, settings):
+    """Update player account_status in the players table."""
+    import httpx
+    _key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+    headers = {
+        "apikey": _key,
+        "Authorization": f"Bearer {_key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+    async with httpx.AsyncClient() as client:
+        res = await client.patch(
+            f"{settings.SUPABASE_URL}/rest/v1/players?id=eq.{player_id}",
+            json={"account_status": status},
+            headers=headers
+        )
+        res.raise_for_status()
+    logger.info(f"Player {player_id} account_status → {status}")
+
+
+async def _remove_player_from_chat_groups(player_id: str, settings):
+    """Remove a suspended player from all chat groups."""
+    import httpx
+    _key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+    headers = {
+        "apikey": _key,
+        "Authorization": f"Bearer {_key}",
+        "Prefer": "return=minimal"
+    }
+    async with httpx.AsyncClient() as client:
+        res = await client.delete(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?user_id=eq.{player_id}",
+            headers=headers
+        )
+        if res.status_code in (200, 204):
+            logger.info(f"Removed player {player_id} from all chat groups")
+        else:
+            logger.warning(f"Chat group removal for {player_id}: HTTP {res.status_code}")
 
 
 @router.post("/subscriptions/{sub_id}/generate-invoice")
