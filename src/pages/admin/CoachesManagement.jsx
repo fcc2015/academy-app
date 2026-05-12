@@ -397,7 +397,10 @@ const CoachesManagement = () => {
                             onEdit={handleEditClick}
                             onDelete={handleDelete}
                             onLoginAs={async (c) => {
-                                try { await impersonateUser(c.user_id); }
+                                try {
+                                    const data = await impersonateUser(c.user_id);
+                                    showBanner(`Viewing as ${data.full_name || 'Coach'}`, 'success');
+                                }
                                 catch (e) { showBanner(e.message || 'Login as failed', 'error'); }
                             }}
                             isRTL={isRTL}

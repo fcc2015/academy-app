@@ -3,7 +3,7 @@ import { authFetch } from '../api';
 
 // Start impersonating a parent / player / coach.
 // Stores user_id + name + role in localStorage so authFetch sends X-Impersonate-User.
-// Then redirects to the matching dashboard for that role.
+// The admin stays on their current page — the impersonation banner will show.
 export async function impersonateUser(userId) {
     const res = await authFetch(`${API_URL}/admins/impersonate-user/${userId}`);
     if (!res.ok) {
@@ -15,14 +15,9 @@ export async function impersonateUser(userId) {
     localStorage.setItem('impersonating_user_name', data.full_name || data.email || '');
     localStorage.setItem('impersonating_user_role', data.role || '');
 
-    // Send the impersonator to the dashboard the target role normally lands on.
-    const role = (data.role || '').toLowerCase();
-    const target =
-        role === 'parent' ? '/parent/dashboard' :
-        role === 'coach'  ? '/coach/dashboard'  :
-        role === 'player' ? '/parent/dashboard' :  // players use parent layout via QR flow
-        '/admin/dashboard';
-    window.location.href = target;
+    // Stay within the admin layout — the impersonation banner will indicate active session.
+    // This avoids redirect issues with role-gated layouts (ParentLayout, CoachLayout).
+    return data;
 }
 
 export function exitUserImpersonation() {

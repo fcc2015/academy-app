@@ -1190,7 +1190,10 @@ const PlayersManagement = () => {
                                                 {(player.parent_id || player.user_id) && (
                                                     <button
                                                         onClick={async () => {
-                                                            try { await impersonateUser(player.parent_id || player.user_id); }
+                                                            try {
+                                                                const data = await impersonateUser(player.parent_id || player.user_id);
+                                                                Swal.fire({ icon: 'success', title: isRTL ? 'تم تسجيل الدخول' : 'Impersonation active', text: isRTL ? `أنت الآن تشاهد كـ ${data.full_name || 'ولي الأمر'}` : `Viewing as ${data.full_name || 'Parent'}`, timer: 2000, showConfirmButton: false });
+                                                            }
                                                             catch (e) { Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message }); }
                                                         }}
                                                         className="p-3 bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-600 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1"
