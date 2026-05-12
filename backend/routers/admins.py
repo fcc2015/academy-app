@@ -194,7 +194,7 @@ async def get_impersonation_target(user_id: str):
         # Fallback: look up in players table (admin-created players without auth account)
         if not target:
             p_res = await client.get(
-                f"{_settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=user_id,full_name,parent_name,u_category,photo_url,academy_id,parent_id",
+                f"{_settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=user_id,parent_name,u_category,photo_url,academy_id,parent_id",
                 headers=supabase.admin_headers,
             )
             if p_res.status_code == 200 and p_res.json():
@@ -214,7 +214,7 @@ async def get_impersonation_target(user_id: str):
                     target = {
                         "id": user_id,
                         "email": None,
-                        "full_name": player.get("full_name"),
+                        "full_name": player.get("parent_name", "لاعب"),
                         "role": "parent",
                         "academy_id": player.get("academy_id"),
                     }
@@ -234,12 +234,12 @@ async def get_impersonation_target(user_id: str):
         try:
             if role_l == "player":
                 d = await client.get(
-                    f"{_settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=full_name,u_category,photo_url",
+                    f"{_settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=parent_name,u_category,photo_url",
                     headers=supabase.admin_headers,
                 )
                 if d.status_code == 200 and d.json():
                     details = d.json()[0]
-                    display_name = details.get("full_name") or display_name
+                    display_name = details.get("parent_name") or display_name
             elif role_l == "coach":
                 d = await client.get(
                     f"{_settings.SUPABASE_URL}/rest/v1/coaches?user_id=eq.{user_id}&select=full_name,u_category,photo_url",
