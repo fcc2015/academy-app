@@ -467,6 +467,11 @@ const PlayerModal = ({
                                         title="Must be a valid phone number, e.g., +212600000000"
                                         placeholder="+212 6..." className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" dir="ltr" />
                                 </div>
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{isRTL ? 'إيميل ولي الأمر (اختياري)' : 'Parent Email (optional)'}</label>
+                                    <input type="email" name="parent_email" value={formData.parent_email || ''} onChange={handleInputChange} placeholder={isRTL ? 'email@example.com — لإنشاء حساب تلقائي' : 'email@example.com — auto-creates login'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" dir="ltr" />
+                                    <p className="text-[9px] text-indigo-500 font-bold mt-1">{isRTL ? '💡 إلا دخلتي الإيميل، غادي يتخلق حساب تلقائي للأب' : '💡 If provided, a login account is auto-created for the parent'}</p>
+                                </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.address')}</label>
                                     <input required type="text" name="address" value={formData.address} onChange={handleInputChange} placeholder={isRTL ? 'الحي الشارع، المدينة' : 'Neighborhood, Street, City'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
@@ -631,7 +636,7 @@ const PlayersManagement = () => {
     }, []);
 
     const [formData, setFormData] = useState({
-        full_name: '', parent_name: '', parent_whatsapp: '', birth_date: '', address: '',
+        full_name: '', parent_name: '', parent_whatsapp: '', parent_email: '', birth_date: '', address: '',
         u_category: 'U11', technical_level: 'B', subscription_type: 'Monthly',
         discount_type: 'none', discount_value: '', account_status: 'Pending', photo_url: '',
         blood_type: '', medical_cert_valid_until: '', transport_zone: '', allergies: '', emergency_contact: ''
@@ -752,7 +757,7 @@ const PlayersManagement = () => {
 
     const openAddModal = () => {
         setFormData({
-            full_name: '', parent_name: '', parent_whatsapp: '', birth_date: '', address: '',
+            full_name: '', parent_name: '', parent_whatsapp: '', parent_email: '', birth_date: '', address: '',
             u_category: settings?.age_categories?.[0] || 'U11', technical_level: 'B',
             subscription_type: 'Monthly', discount_type: 'none', discount_value: '',
             account_status: 'Pending', photo_url: '',
@@ -765,7 +770,7 @@ const PlayersManagement = () => {
     const reviewRequest = (req) => {
         setFormData({
             full_name: req.player_name || '', parent_name: req.name || '', parent_whatsapp: req.phone || '',
-            birth_date: req.birth_date || '', address: req.address || '',
+            parent_email: req.email || '', birth_date: req.birth_date || '', address: req.address || '',
             u_category: settings?.age_categories?.[0] || 'U11', technical_level: 'B',
             subscription_type: req.plan_name || 'Monthly', discount_type: 'none', discount_value: '',
             account_status: 'Pending', photo_url: '',
@@ -803,7 +808,8 @@ const PlayersManagement = () => {
                 blood_type: formData.blood_type || null,
                 transport_zone: formData.transport_zone || null,
                 allergies: formData.allergies || null,
-                emergency_contact: formData.emergency_contact || null
+                emergency_contact: formData.emergency_contact || null,
+                parent_email: formData.parent_email || null
             };
             const res = await authFetch(`${API_URL}/players/`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
@@ -839,20 +845,61 @@ const PlayersManagement = () => {
                 }
 
                 // Show prominent success confirmation using SweetAlert2
-                Swal.fire({
-                    title: isRTL ? 'نجاح!' : 'Success!',
-                    text: isRTL ? `تم تسجيل اللاعب ${data.full_name} بنجاح.` : `Player ${data.full_name} registered successfully.`,
-                    icon: 'success',
-                    confirmButtonText: isRTL ? 'تأكيد' : 'OK',
-                    confirmButtonColor: '#4f46e5',
-                    background: '#ffffff',
-                    customClass: {
-                        popup: 'rounded-3xl shadow-2xl border border-slate-100',
-                        title: 'font-black text-slate-800 text-2xl',
-                        htmlContainer: 'font-bold text-slate-500 mb-4',
-                        confirmButton: 'px-8 py-3.5 rounded-2xl font-black tracking-widest uppercase text-sm'
-                    }
-                });
+                // Show credentials popup if parent account was auto-created
+                if (data.temp_password && data.parent_email) {
+                    Swal.fire({
+                        title: isRTL ? '✅ تم التسجيل + حساب الأب!' : '✅ Registered + Parent Account!',
+                        html: `
+                            <div style="text-align:${isRTL ? 'right' : 'left'};direction:${isRTL ? 'rtl' : 'ltr'}">
+                                <p style="font-weight:700;color:#334155;margin-bottom:12px">${isRTL ? `تم تسجيل اللاعب <b>${data.full_name}</b> بنجاح.` : `Player <b>${data.full_name}</b> registered successfully.`}</p>
+                                <div style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-radius:16px;padding:16px;border:1px solid #c7d2fe">
+                                    <p style="font-size:11px;font-weight:900;color:#6366f1;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">${isRTL ? '🔐 بيانات دخول ولي الأمر' : '🔐 Parent Login Credentials'}</p>
+                                    <div style="background:#fff;border-radius:12px;padding:12px;font-family:monospace;font-size:14px;font-weight:700;color:#1e293b;border:1px solid #e2e8f0">
+                                        <div style="margin-bottom:6px"><span style="color:#64748b;font-size:11px;font-family:sans-serif">${isRTL ? 'الإيميل:' : 'Email:'}</span><br/>${data.parent_email}</div>
+                                        <div><span style="color:#64748b;font-size:11px;font-family:sans-serif">${isRTL ? 'كلمة السر:' : 'Password:'}</span><br/>${data.temp_password}</div>
+                                    </div>
+                                    <p style="font-size:10px;color:#f59e0b;font-weight:700;margin-top:8px">⚠️ ${isRTL ? 'أرسل هاد المعلومات للأب عبر WhatsApp!' : 'Send these credentials to the parent via WhatsApp!'}</p>
+                                </div>
+                            </div>
+                        `,
+                        icon: 'success',
+                        confirmButtonText: isRTL ? '📋 نسخ المعلومات' : '📋 Copy Credentials',
+                        showCancelButton: true,
+                        cancelButtonText: isRTL ? 'إغلاق' : 'Close',
+                        confirmButtonColor: '#4f46e5',
+                        background: '#ffffff',
+                        customClass: {
+                            popup: 'rounded-3xl shadow-2xl border border-slate-100',
+                            title: 'font-black text-slate-800 text-xl',
+                            confirmButton: 'px-8 py-3.5 rounded-2xl font-black tracking-widest uppercase text-sm'
+                        }
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            const text = `${isRTL ? 'بيانات الدخول للتطبيق' : 'App Login Credentials'}:\nEmail: ${data.parent_email}\nPassword: ${data.temp_password}`;
+                            navigator.clipboard.writeText(text).then(() => {
+                                toast.success(isRTL ? 'تم النسخ!' : 'Copied!');
+                            }).catch(() => {
+                                // Fallback
+                                window.prompt(isRTL ? 'انسخ هاد المعلومات:' : 'Copy these credentials:', text);
+                            });
+                        }
+                    });
+                } else {
+                    Swal.fire({
+                        title: isRTL ? 'نجاح!' : 'Success!',
+                        text: isRTL ? `تم تسجيل اللاعب ${data.full_name} بنجاح.` : `Player ${data.full_name} registered successfully.`,
+                        icon: 'success',
+                        confirmButtonText: isRTL ? 'تأكيد' : 'OK',
+                        confirmButtonColor: '#4f46e5',
+                        background: '#ffffff',
+                        customClass: {
+                            popup: 'rounded-3xl shadow-2xl border border-slate-100',
+                            title: 'font-black text-slate-800 text-2xl',
+                            htmlContainer: 'font-bold text-slate-500 mb-4',
+                            confirmButton: 'px-8 py-3.5 rounded-2xl font-black tracking-widest uppercase text-sm'
+                        }
+                    });
+                }
 
                 if (resolvingRequestId) {
                     try {
