@@ -115,25 +115,44 @@ class TestGetAlertStatus:
         assert get_alert_status(date(2026, 4, 11)) == "none"
 
     @patch("services.billing_engine.date")
-    def test_approaching_within_3_days(self, mock_date):
+    def test_reminder_1_day_before(self, mock_date):
         mock_date.today.return_value = date(2026, 4, 10)
         mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
-        assert get_alert_status(date(2026, 4, 13)) == "approaching"
-        assert get_alert_status(date(2026, 4, 10)) == "approaching"  # due today
+        # Due tomorrow → reminder
+        assert get_alert_status(date(2026, 4, 11)) == "reminder"
 
     @patch("services.billing_engine.date")
-    def test_late_within_7_days_overdue(self, mock_date):
+    def test_due_today(self, mock_date):
         mock_date.today.return_value = date(2026, 4, 10)
         mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
-        assert get_alert_status(date(2026, 4, 5)) == "late"  # 5 days late
-        assert get_alert_status(date(2026, 4, 3)) == "late"  # 7 days late
+        assert get_alert_status(date(2026, 4, 10)) == "due_today"
 
     @patch("services.billing_engine.date")
-    def test_suspended_8_to_30_days_overdue(self, mock_date):
+    def test_late_2d_within_2_days_overdue(self, mock_date):
+        mock_date.today.return_value = date(2026, 4, 10)
+        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+        # Due yesterday (1 day late) → late_2d
+        assert get_alert_status(date(2026, 4, 9)) == "late_2d"
+        # Due 2 days ago → late_2d
+        assert get_alert_status(date(2026, 4, 8)) == "late_2d"
+
+    @patch("services.billing_engine.date")
+    def test_late_5d_3_to_5_days_overdue(self, mock_date):
+        mock_date.today.return_value = date(2026, 4, 10)
+        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
+        # Due 3 days ago → late_5d
+        assert get_alert_status(date(2026, 4, 7)) == "late_5d"
+        # Due 5 days ago → late_5d
+        assert get_alert_status(date(2026, 4, 5)) == "late_5d"
+
+    @patch("services.billing_engine.date")
+    def test_suspended_6_to_30_days_overdue(self, mock_date):
         mock_date.today.return_value = date(2026, 4, 30)
         mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
-        assert get_alert_status(date(2026, 4, 15)) == "suspended"  # 15 days late
-        assert get_alert_status(date(2026, 4, 1)) == "suspended"  # 29 days late
+        # Due 15 days ago → suspended
+        assert get_alert_status(date(2026, 4, 15)) == "suspended"
+        # Due 29 days ago → suspended
+        assert get_alert_status(date(2026, 4, 1)) == "suspended"
 
     @patch("services.billing_engine.date")
     def test_terminated_over_30_days(self, mock_date):
@@ -146,7 +165,6 @@ class TestGetAlertStatus:
         """If today is more than 15 days past season end, no alerts even when overdue."""
         mock_date.today.return_value = date(2026, 7, 1)
         mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
-        # Season ended 2 weeks before today → returns "none" regardless
         assert get_alert_status(date(2026, 5, 1), season_end=date(2026, 6, 10)) == "none"
 
     @patch("services.billing_engine.date")
@@ -154,8 +172,8 @@ class TestGetAlertStatus:
         """Within the 15-day buffer past season end → still evaluate normally."""
         mock_date.today.return_value = date(2026, 6, 15)
         mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
-        # Today=Jun 15, due=Jun 12 → 3 days late → "late". Season ends Jun 30 (buffer not relevant).
-        assert get_alert_status(date(2026, 6, 12), season_end=date(2026, 6, 30)) == "late"
+        # Today=Jun 15, due=Jun 12 → 3 days late → "late_5d"
+        assert get_alert_status(date(2026, 6, 12), season_end=date(2026, 6, 30)) == "late_5d"
 
 
 # ─── get_alert_notification ───────────────────────────────────
@@ -166,17 +184,27 @@ class TestGetAlertNotification:
         assert get_alert_notification("none", "Ahmed") is None
         assert get_alert_notification("unknown", "Ahmed") is None
 
-    def test_approaching_includes_player_name(self):
-        notif = get_alert_notification("approaching", "Ahmed")
+    def test_reminder_includes_player_name(self):
+        notif = get_alert_notification("reminder", "Ahmed")
         assert notif is not None
         assert "Ahmed" in notif["message"]
         assert notif["type"] == "alert"
         assert "title" in notif
 
-    def test_late_message(self):
-        notif = get_alert_notification("late", "Sara")
+    def test_due_today_message(self):
+        notif = get_alert_notification("due_today", "Sara")
         assert notif is not None
         assert "Sara" in notif["message"]
+
+    def test_late_2d_message(self):
+        notif = get_alert_notification("late_2d", "Omar")
+        assert notif is not None
+        assert "Omar" in notif["message"]
+
+    def test_late_5d_message(self):
+        notif = get_alert_notification("late_5d", "Fatima")
+        assert notif is not None
+        assert "Fatima" in notif["message"]
 
     def test_suspended_message(self):
         notif = get_alert_notification("suspended", "Youssef")
@@ -190,9 +218,9 @@ class TestGetAlertNotification:
 
     def test_all_status_titles_unique(self):
         """Each alert level should have a distinct title for UX clarity."""
-        statuses = ["approaching", "late", "suspended", "terminated"]
+        statuses = ["reminder", "due_today", "late_2d", "late_5d", "suspended", "terminated"]
         titles = {get_alert_notification(s, "X")["title"] for s in statuses}
-        assert len(titles) == 4
+        assert len(titles) == 6
 
 
 # ─── generate_invoice_number ─────────────────────────────────

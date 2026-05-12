@@ -171,7 +171,7 @@ class TestSubscriptions:
     """Subscription CRUD + prorata logic."""
 
     def test_list_subscriptions_enriches_with_alert_status(self, admin_client, mocker):
-        future_date = (date.today() + timedelta(days=2)).isoformat()
+        future_date = (date.today() + timedelta(days=1)).isoformat()
         mocker.patch("routers.finances.supabase.get_subscriptions", new_callable=AsyncMock, return_value=[
             {"id": "s1", "status": "active", "next_due_date": future_date, "billing_type": "monthly"}
         ])
@@ -184,7 +184,7 @@ class TestSubscriptions:
         # Should have computed alert_status_realtime and days_until_due
         assert "alert_status_realtime" in data[0]
         assert "days_until_due" in data[0]
-        assert data[0]["alert_status_realtime"] == "approaching"
+        assert data[0]["alert_status_realtime"] == "reminder"
 
     def test_list_subscriptions_with_season_end(self, admin_client, mocker):
         far_future = (date.today() + timedelta(days=60)).isoformat()
@@ -309,7 +309,7 @@ class TestAlertCheck:
 
             mocker.patch("routers.finances.supabase.get_subscriptions", new_callable=AsyncMock, return_value=[
                 {
-                    "id": "s2", "status": "active", "alert_status": "late",
+                    "id": "s2", "status": "active", "alert_status": "late_5d",
                     "next_due_date": overdue_date,
                     "players": {"full_name": "Ahmed"}
                 }
@@ -326,7 +326,7 @@ class TestAlertCheck:
     def test_alert_check_skips_inactive_subscriptions(self, authed_as, mocker):
         with authed_as("admin", user_id="admin-1") as c:
             mocker.patch("routers.finances.supabase.get_subscriptions", new_callable=AsyncMock, return_value=[
-                {"id": "s3", "status": "terminated", "alert_status": "none",
+                {"id": "s3", "status": "terminated", "alert_status": "terminated",
                  "next_due_date": (date.today() - timedelta(days=40)).isoformat()}
             ])
             mocker.patch("routers.finances.supabase.get_academy_settings", new_callable=AsyncMock, return_value={})
