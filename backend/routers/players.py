@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from core.auth_middleware import verify_token, require_role, assert_parent_owns_player
 from core.context import user_id_ctx, role_ctx
 from typing import List
+import secrets
+import string
 
 logger = logging.getLogger("players")
 from schemas.users import PlayerCreate, PlayerResponse, UserBase
@@ -10,6 +12,10 @@ from services.supabase_client import supabase
 from urllib.parse import quote
 
 router = APIRouter(prefix="/players", tags=["Players Engine"], dependencies=[Depends(verify_token)])
+
+def generate_temp_password(length=10):
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    return "".join(secrets.choice(alphabet) for i in range(length))
 
 @router.get("/", response_model=List[PlayerResponse])
 async def get_all_players(user: dict = Depends(require_role("admin", "coach", "super_admin", "sous_admin"))):
@@ -59,6 +65,57 @@ async def create_player(player: PlayerCreate):
         except Exception as dup_err:
             logger.warning("Duplicate check failed (non-critical): %s", dup_err)
 
+        # --- Auto-create parent auth account if parent_email provided ---
+        temp_password = None
+        parent_auth_id = None
+        parent_email = getattr(player, 'parent_email', None)
+
+        if parent_email:
+            temp_password = generate_temp_password()
+            try:
+                # Check if parent with this email already exists
+                import httpx as _httpx
+                from core.config import settings as _s
+                existing_parent = None
+                async with _httpx.AsyncClient(timeout=10.0) as _c:
+                    _check = await _c.get(
+                        f"{_s.SUPABASE_URL}/rest/v1/users?email=eq.{quote(parent_email)}&role=eq.parent&select=id",
+                        headers=supabase.admin_headers
+                    )
+                    if _check.status_code == 200 and _check.json():
+                        existing_parent = _check.json()[0]
+
+                if existing_parent:
+                    # Parent already has an account, just link the player
+                    parent_auth_id = existing_parent["id"]
+                    temp_password = None  # Don't show password for existing parent
+                    logger.info("Linking player to existing parent %s", parent_auth_id)
+                else:
+                    # Create new Supabase Auth user for parent
+                    auth_user = await supabase.admin_create_user(
+                        email=parent_email,
+                        password=temp_password,
+                        role="parent",
+                        full_name=player.parent_name
+                    )
+                    parent_auth_id = auth_user["id"]
+
+                    # Insert parent into users table
+                    await supabase.insert_user({
+                        "id": parent_auth_id,
+                        "full_name": player.parent_name,
+                        "email": parent_email,
+                        "role": "parent"
+                    })
+                    logger.info("Created parent auth account %s for %s", parent_auth_id, parent_email)
+
+            except Exception as parent_err:
+                logger.error("Failed to create parent account: %s", parent_err, exc_info=True)
+                # Don't block player creation if parent account fails
+                # Just log and continue without parent_id
+                parent_auth_id = None
+                temp_password = None
+
         # 1. Insert into users table first (required by FK constraint players_user_id_fkey)
         user_data = {
             "id": player.user_id,
@@ -73,7 +130,12 @@ async def create_player(player: PlayerCreate):
                 raise user_err
 
         # 2. Insert player record
-        player_dict = player.model_dump(exclude={"full_name"}, mode='json')
+        player_dict = player.model_dump(exclude={"full_name", "parent_email"}, mode='json')
+        
+        # Link to parent if we created/found one
+        if parent_auth_id:
+            player_dict["parent_id"] = parent_auth_id
+
         response = await supabase.insert_player(player_dict)
 
         # 3. Notify admins (non-critical)
@@ -89,6 +151,12 @@ async def create_player(player: PlayerCreate):
 
         result = response[0]
         result["full_name"] = player.full_name
+        
+        # Include parent credentials for admin to share
+        if temp_password:
+            result["temp_password"] = temp_password
+            result["parent_email"] = parent_email
+        
         return result
     except HTTPException:
         raise
