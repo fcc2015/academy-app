@@ -13,6 +13,11 @@ const MAX_RETRIES = 2;
 const RETRY_DELAY = 800; // ms, doubles each retry
 const FETCH_TIMEOUT = 30000; // 30s
 
+// ─── Impersonation 401 Lock ───────────────────────────────────
+// Prevents race condition where multiple concurrent 401s each try to
+// handle the impersonation error, causing logout to be called.
+let _isHandlingImpersonationError = false;
+
 // ─── Refresh Token Logic ──────────────────────────────────────
 // Prevents parallel refresh storms: queue concurrent 401s and resolve them
 // after a single refresh call completes.
@@ -123,13 +128,18 @@ export async function authFetch(url, options = {}) {
         const currentPath = window.location.pathname;
         if (!currentPath.includes('/login') && currentPath !== '/') {
           // If we are impersonating a user, exit impersonation instead of logging out the admin
+          // Use a lock to prevent race conditions from multiple concurrent 401 responses
           const isImpersonatingUser = !!localStorage.getItem('impersonating_user_id');
-          if (isImpersonatingUser) {
+          if (isImpersonatingUser && !_isHandlingImpersonationError) {
+            _isHandlingImpersonationError = true;
             localStorage.removeItem('impersonating_user_id');
             localStorage.removeItem('impersonating_user_name');
             localStorage.removeItem('impersonating_user_role');
             // Redirect back to admin players page
             window.location.href = '/admin/players';
+            return res;
+          } else if (isImpersonatingUser || _isHandlingImpersonationError) {
+            // Another handler is already dealing with this — just return the response
             return res;
           }
 
