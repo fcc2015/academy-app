@@ -18,7 +18,10 @@ const ParentEvaluations = () => {
     const [childInfo, setChildInfo] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [showCardModal, setShowCardModal] = useState(false);
-    const userId = localStorage.getItem('user_id');
+    const [selectedMetric, setSelectedMetric] = useState(null);
+    const { t } = useLanguage();
+    const isRTL = useLanguage().isRTL;
+    const userId = localStorage.getItem('impersonating_user_id') || localStorage.getItem('user_id');
 
     useEffect(() => {
         const fetchEvaluations = async () => {

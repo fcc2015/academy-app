@@ -15,6 +15,8 @@ const ParentPayments = () => {
     const [childInfo, setChildInfo] = useState(null);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [receiptFile, setReceiptFile] = useState(null);
+    const [submittingPayment, setSubmittingPayment] = useState(false);
     
     // Upload form state
     const [uploadData, setUploadData] = useState({

@@ -36,7 +36,7 @@ const ParentDashboard = () => {
     const [isSendingTest, setIsSendingTest] = useState(false);
     const [isBadgeModalOpen, setIsBadgeModalOpen] = useState(false);
     const [academySettings, setAcademySettings] = useState(null);
-    const userId = localStorage.getItem('user_id');
+    const userId = localStorage.getItem('impersonating_user_id') || localStorage.getItem('user_id');
 
     const fetchData = async () => {
         try {
@@ -73,11 +73,11 @@ const ParentDashboard = () => {
                 
                 // DEV FALLBACK
                 if (!child) {
-                    const selfRes = await authFetch(`${API_URL}/players/parent/${userId}`).catch(() => null);
+                    const selfRes = await authFetch(`${API_URL}/players/${userId}`).catch(() => null);
                     if (selfRes?.ok) {
-                        const all = await selfRes.json().catch(() => []);
-                        if (Array.isArray(all)) {
-                            child = all.find(p => p.user_id === userId);
+                        const p = await selfRes.json().catch(() => null);
+                        if (p && !p.detail) {
+                            child = p;
                         }
                     }
                 }

@@ -12,7 +12,9 @@ import ChatInputBar from '../../components/chat/ChatInputBar';
 import ChatGroupList from '../../components/chat/ChatGroupList';
 
 export default function ParentChat() {
-    const myUserId = localStorage.getItem('user_id') || '';
+    const [isLoading, setIsLoading] = useState(true);
+    const { isRTL } = useLanguage();
+    const myUserId = localStorage.getItem('impersonating_user_id') || localStorage.getItem('user_id') || '';
     const myRole   = 'parent';
     const myName   = localStorage.getItem('user_name') || 'ولي الأمر';
 
