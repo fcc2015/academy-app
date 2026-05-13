@@ -49,6 +49,7 @@ class PlayerCreate(BaseModel):
 
 class PlayerResponse(PlayerCreate):
     created_at: Optional[str] = None
+    temp_password: Optional[str] = None
     
     class Config:
         from_attributes = True
