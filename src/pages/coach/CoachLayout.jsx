@@ -23,7 +23,9 @@ function checkCoachAuth() {
     const token = localStorage.getItem('token');
     const role = localStorage.getItem('role');
     const expires = parseInt(localStorage.getItem('token_expires') || '0');
-    return token && role === 'coach' && (expires === 0 || Date.now() < expires);
+    const isImpersonating = !!localStorage.getItem('impersonating_user_id');
+    // Allow access if: (1) logged in as coach, OR (2) admin/super_admin impersonating a user
+    return token && (role === 'coach' || isImpersonating) && (expires === 0 || Date.now() < expires);
 }
 
 const CoachLayout = () => {
