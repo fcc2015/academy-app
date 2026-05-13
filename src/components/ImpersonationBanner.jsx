@@ -31,7 +31,9 @@ export default function ImpersonationBanner() {
         setState(readState());
         // Go back to the correct admin page based on real role
         const realRole = localStorage.getItem('role');
-        if (realRole === 'super_admin') {
+        const isAcademyImpersonated = !!localStorage.getItem('impersonating_academy_id');
+        
+        if (realRole === 'super_admin' && !isAcademyImpersonated) {
             window.location.href = '/saas/dashboard';
         } else {
             window.location.href = '/admin/players';
