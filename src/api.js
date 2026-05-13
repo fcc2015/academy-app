@@ -122,6 +122,17 @@ export async function authFetch(url, options = {}) {
       if (res.status === 401) {
         const currentPath = window.location.pathname;
         if (!currentPath.includes('/login') && currentPath !== '/') {
+          // If we are impersonating a user, exit impersonation instead of logging out the admin
+          const isImpersonatingUser = !!localStorage.getItem('impersonating_user_id');
+          if (isImpersonatingUser) {
+            localStorage.removeItem('impersonating_user_id');
+            localStorage.removeItem('impersonating_user_name');
+            localStorage.removeItem('impersonating_user_role');
+            // Redirect back to admin players page
+            window.location.href = '/admin/players';
+            return res;
+          }
+
           const refreshed = await tryRefreshToken();
           if (refreshed) {
             // Update the Authorization header with the new token

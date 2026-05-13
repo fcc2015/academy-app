@@ -104,10 +104,29 @@ async def verify_token(request: Request):
                     f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{impersonated_user}&select=role,academy_id",
                     headers=supabase.admin_headers,
                 )
+                target_role = "parent"
+                target_academy = None
+                found = False
+
                 if u_res.status_code == 200 and u_res.json():
                     target = u_res.json()[0]
                     target_role = target.get("role") or "parent"
                     target_academy = target.get("academy_id")
+                    found = True
+                else:
+                    # Fallback: synthetic user (admin-created player without auth account)
+                    # Try players table via parent_id or user_id match
+                    p_res = await client.get(
+                        f"{settings.SUPABASE_URL}/rest/v1/players?or=(user_id.eq.{impersonated_user},parent_id.eq.{impersonated_user})&select=academy_id&limit=1",
+                        headers=supabase.admin_headers,
+                    )
+                    if p_res.status_code == 200 and p_res.json():
+                        player = p_res.json()[0]
+                        target_academy = player.get("academy_id")
+                        target_role = "parent"
+                        found = True
+
+                if found:
                     # Same-academy check (skip for super_admin which can cross academies)
                     if role == "super_admin" or target_academy == academy_id:
                         user_id = impersonated_user
