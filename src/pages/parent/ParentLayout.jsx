@@ -35,6 +35,17 @@ const ParentLayout = () => {
     const [isValid] = useState(checkParentAuth);
 
     if (!isValid) {
+        const isImpersonating = !!localStorage.getItem('impersonating_user_id');
+        const role = localStorage.getItem('role');
+        // If an admin was trying to impersonate a user, clean up impersonation state
+        // but DO NOT clear the admin's own token/role
+        if (isImpersonating || role === 'admin' || role === 'super_admin') {
+            localStorage.removeItem('impersonating_user_id');
+            localStorage.removeItem('impersonating_user_name');
+            localStorage.removeItem('impersonating_user_role');
+            return <Navigate to="/admin/players" replace />;
+        }
+        // Normal parent session expired — clear everything
         localStorage.removeItem('token');
         localStorage.removeItem('role');
         localStorage.removeItem('user_id');

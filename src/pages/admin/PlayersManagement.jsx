@@ -1252,11 +1252,20 @@ const PlayersManagement = () => {
                                                     <button
                                                         onClick={async () => {
                                                             try {
-                                                                const data = await impersonateUser(player.parent_id || player.user_id);
+                                                                const targetId = player.parent_id || player.user_id;
+                                                                const data = await impersonateUser(targetId);
+                                                                // Verify localStorage was actually set before navigating
+                                                                const storedId = localStorage.getItem('impersonating_user_id');
+                                                                if (!storedId) {
+                                                                    // Manually set it as failsafe
+                                                                    localStorage.setItem('impersonating_user_id', data.id || targetId);
+                                                                    localStorage.setItem('impersonating_user_name', data.full_name || data.email || '');
+                                                                    localStorage.setItem('impersonating_user_role', data.role || 'parent');
+                                                                }
                                                                 Swal.fire({ icon: 'success', title: isRTL ? 'تم تسجيل الدخول' : 'Impersonation active', text: isRTL ? `أنت الآن تشاهد كـ ${data.full_name || 'ولي الأمر'}` : `Viewing as ${data.full_name || 'Parent'}`, timer: 2000, showConfirmButton: false });
                                                                 setTimeout(() => {
                                                                     window.location.href = '/parent/dashboard';
-                                                                }, 1000);
+                                                                }, 1500);
                                                             }
                                                             catch (e) { Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message }); }
                                                         }}
