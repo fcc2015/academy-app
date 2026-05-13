@@ -14,8 +14,8 @@ const RETRY_DELAY = 800; // ms, doubles each retry
 const FETCH_TIMEOUT = 30000; // 30s
 
 // ─── Impersonation 401 Lock ───────────────────────────────────
-// Prevents race condition where multiple concurrent 401s each try to
-// handle the impersonation error, causing logout to be called.
+// Uses sessionStorage so the flag survives page reloads and concurrent calls.
+// This prevents multiple 401s from each trying to handle the impersonation exit.
 let _isHandlingImpersonationError = false;
 
 // ─── Refresh Token Logic ──────────────────────────────────────
@@ -128,17 +128,23 @@ export async function authFetch(url, options = {}) {
         const currentPath = window.location.pathname;
         if (!currentPath.includes('/login') && currentPath !== '/') {
           // If we are impersonating a user, exit impersonation instead of logging out the admin
-          // Use a lock to prevent race conditions from multiple concurrent 401 responses
+          // Use both module flag AND sessionStorage to prevent race conditions
           const isImpersonatingUser = !!localStorage.getItem('impersonating_user_id');
-          if (isImpersonatingUser && !_isHandlingImpersonationError) {
+          const sessionLocked = !!sessionStorage.getItem('_impersonation_401_handled');
+
+          if (isImpersonatingUser && !_isHandlingImpersonationError && !sessionLocked) {
             _isHandlingImpersonationError = true;
+            sessionStorage.setItem('_impersonation_401_handled', '1');
             localStorage.removeItem('impersonating_user_id');
             localStorage.removeItem('impersonating_user_name');
             localStorage.removeItem('impersonating_user_role');
-            // Redirect back to admin players page
-            window.location.href = '/admin/players';
+            // Small delay to let other concurrent 401 handlers see the lock before navigating
+            setTimeout(() => {
+              sessionStorage.removeItem('_impersonation_401_handled');
+              window.location.href = '/admin/players';
+            }, 200);
             return res;
-          } else if (isImpersonatingUser || _isHandlingImpersonationError) {
+          } else if (isImpersonatingUser || _isHandlingImpersonationError || sessionLocked) {
             // Another handler is already dealing with this — just return the response
             return res;
           }
