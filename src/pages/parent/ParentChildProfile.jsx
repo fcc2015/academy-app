@@ -21,7 +21,7 @@ const ParentChildProfile = () => {
     const [injuries, setInjuries] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('sessions');
-    const userId = localStorage.getItem('user_id');
+    const userId = localStorage.getItem('impersonating_user_id') || localStorage.getItem('user_id');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -43,11 +43,11 @@ const ParentChildProfile = () => {
                 }
 
                 if (!currentPlayer || currentPlayer.detail) {
-                    const selfRes = await authFetch(`${API_URL}/players/parent/${userId}`).catch(() => null);
+                    const selfRes = await authFetch(`${API_URL}/players/${userId}`).catch(() => null);
                     if (selfRes?.ok) {
-                        const parentsPlayers = await selfRes.json().catch(() => []);
-                        if (Array.isArray(parentsPlayers) && parentsPlayers.length > 0) {
-                            currentPlayer = parentsPlayers[0];
+                        const p = await selfRes.json().catch(() => null);
+                        if (p && !p.detail) {
+                            currentPlayer = p;
                         }
                     }
                 }

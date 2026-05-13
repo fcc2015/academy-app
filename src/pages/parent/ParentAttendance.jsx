@@ -14,7 +14,7 @@ const ParentAttendance = () => {
     useEffect(() => {
         const fetchAttendance = async () => {
             try {
-                const userId = localStorage.getItem('user_id');
+                const userId = localStorage.getItem('impersonating_user_id') || localStorage.getItem('user_id');
                 const res = await authFetch(`${API_URL}/players/`);
                 if (res.ok) {
                     const players = await res.json();

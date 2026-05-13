@@ -11,7 +11,7 @@ export async function impersonateUser(userId) {
         throw new Error(err.detail || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    localStorage.setItem('impersonating_user_id', data.user_id);
+    localStorage.setItem('impersonating_user_id', data.id || userId);
     localStorage.setItem('impersonating_user_name', data.full_name || data.email || '');
     localStorage.setItem('impersonating_user_role', data.role || '');
 

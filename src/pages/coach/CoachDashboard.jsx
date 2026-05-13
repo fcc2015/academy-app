@@ -16,7 +16,7 @@ const CoachDashboard = () => {
     const [squads, setSquads] = useState([]);
     const [recentEvals, setRecentEvals] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const userId = localStorage.getItem('user_id');
+    const userId = localStorage.getItem('impersonating_user_id') || localStorage.getItem('user_id');
 
     useEffect(() => {
         const fetchStats = async () => {

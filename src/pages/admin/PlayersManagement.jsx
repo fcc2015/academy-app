@@ -884,6 +884,20 @@ const PlayersManagement = () => {
                             });
                         }
                     });
+                } else if (data.parent_email && data.is_new_parent === false) {
+                    Swal.fire({
+                        title: isRTL ? '✅ تم التسجيل والربط!' : '✅ Registered & Linked!',
+                        text: isRTL ? `تم تسجيل اللاعب ${data.full_name} بنجاح وتم ربطه بحساب ولي الأمر الموجود مسبقاً (${data.parent_email}).` : `Player ${data.full_name} registered successfully and linked to existing parent account (${data.parent_email}).`,
+                        icon: 'success',
+                        confirmButtonText: isRTL ? 'حسناً' : 'OK',
+                        confirmButtonColor: '#4f46e5',
+                        background: '#ffffff',
+                        customClass: {
+                            popup: 'rounded-3xl shadow-2xl border border-slate-100',
+                            title: 'font-black text-slate-800 text-xl',
+                            confirmButton: 'px-8 py-3.5 rounded-2xl font-black tracking-widest uppercase text-sm'
+                        }
+                    });
                 } else {
                     Swal.fire({
                         title: isRTL ? 'نجاح!' : 'Success!',
@@ -1240,6 +1254,9 @@ const PlayersManagement = () => {
                                                             try {
                                                                 const data = await impersonateUser(player.parent_id || player.user_id);
                                                                 Swal.fire({ icon: 'success', title: isRTL ? 'تم تسجيل الدخول' : 'Impersonation active', text: isRTL ? `أنت الآن تشاهد كـ ${data.full_name || 'ولي الأمر'}` : `Viewing as ${data.full_name || 'Parent'}`, timer: 2000, showConfirmButton: false });
+                                                                setTimeout(() => {
+                                                                    window.location.href = '/parent/dashboard';
+                                                                }, 1000);
                                                             }
                                                             catch (e) { Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message }); }
                                                         }}

@@ -78,12 +78,16 @@ async def create_player(player: PlayerCreate):
                 from core.config import settings as _s
                 existing_parent = None
                 async with _httpx.AsyncClient(timeout=10.0) as _c:
-                    _check = await _c.get(
-                        f"{_s.SUPABASE_URL}/rest/v1/users?email=eq.{quote(parent_email)}&role=eq.parent&select=id",
+                    # We must query auth users since public.users doesn't have an email column
+                    auth_users_res = await _c.get(
+                        f"{_s.SUPABASE_URL}/auth/v1/admin/users",
                         headers=supabase.admin_headers
                     )
-                    if _check.status_code == 200 and _check.json():
-                        existing_parent = _check.json()[0]
+                    if auth_users_res.status_code == 200:
+                        all_users = auth_users_res.json().get('users', [])
+                        existing = [u for u in all_users if u.get('email') == parent_email]
+                        if existing:
+                            existing_parent = existing[0]
 
                 if existing_parent:
                     # Parent already has an account, just link the player
@@ -92,21 +96,19 @@ async def create_player(player: PlayerCreate):
                     logger.info("Linking player to existing parent %s", parent_auth_id)
                 else:
                     # Create new Supabase Auth user for parent
+                    # The Postgres trigger `on_auth_user_created` will automatically insert this user into public.users
+                    from core.context import academy_id_ctx
+                    academy_id = academy_id_ctx.get(None)
+                    
                     auth_user = await supabase.admin_create_user(
                         email=parent_email,
                         password=temp_password,
                         role="parent",
-                        full_name=player.parent_name
+                        full_name=player.parent_name,
+                        academy_id=academy_id
                     )
                     parent_auth_id = auth_user["id"]
 
-                    # Insert parent into users table
-                    await supabase.insert_user({
-                        "id": parent_auth_id,
-                        "full_name": player.parent_name,
-                        "email": parent_email,
-                        "role": "parent"
-                    })
                     logger.info("Created parent auth account %s for %s", parent_auth_id, parent_email)
 
             except Exception as parent_err:
@@ -153,9 +155,11 @@ async def create_player(player: PlayerCreate):
         result["full_name"] = player.full_name
         
         # Include parent credentials for admin to share
-        if temp_password:
-            result["temp_password"] = temp_password
+        if parent_email:
             result["parent_email"] = parent_email
+            result["is_new_parent"] = bool(temp_password)
+            if temp_password:
+                result["temp_password"] = temp_password
         
         return result
     except HTTPException:
