@@ -5,6 +5,7 @@ import { Star, TrendingUp, Award, Download, XCircle, IdCard } from 'lucide-react
 import FUTCard from '../../components/FUTCard';
 import html2canvas from 'html2canvas';
 import { SkeletonDashboard } from '../../components/Skeleton';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const skills = [
     { key: 'technical_score', label: 'التقييم التقني', color: 'bg-blue-500' },
