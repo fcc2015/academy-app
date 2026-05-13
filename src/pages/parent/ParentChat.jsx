@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import { ArrowLeft } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // Shared chat components
 import { CHAT_BG_PATTERN, CHAT_STYLES } from '../../components/chat/chatConstants';
