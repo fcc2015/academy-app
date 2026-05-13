@@ -177,7 +177,7 @@ async def create_player(player: PlayerCreate):
 @router.put("/{user_id}", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
 async def update_player(user_id: str, player: PlayerCreate):
     try:
-        player_dict = player.model_dump(exclude={"user_id", "full_name"}, mode='json')
+        player_dict = player.model_dump(exclude={"user_id", "full_name", "parent_email"}, mode='json')
         response = await supabase.update_player(user_id, player_dict)
         if not response:
             raise HTTPException(status_code=404, detail="Player not found")
