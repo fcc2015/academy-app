@@ -2,6 +2,7 @@ import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import { impersonateUser } from '../../utils/impersonate';
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Users,
     Search,
@@ -606,6 +607,7 @@ const PlayerModal = ({
 
 const PlayersManagement = () => {
     const { t, isRTL, dir } = useLanguage();
+    const navigate = useNavigate();
     const [players, setPlayers] = useState([]);
     const [pendingRequests, setPendingRequests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1263,8 +1265,10 @@ const PlayersManagement = () => {
                                                                     localStorage.setItem('impersonating_user_role', data.role || 'parent');
                                                                 }
                                                                 Swal.fire({ icon: 'success', title: isRTL ? 'تم تسجيل الدخول' : 'Impersonation active', text: isRTL ? `أنت الآن تشاهد كـ ${data.full_name || 'ولي الأمر'}` : `Viewing as ${data.full_name || 'Parent'}`, timer: 2000, showConfirmButton: false });
+                                                                // Use React Router navigate instead of window.location.href
+                                                                // to avoid browser cache issues with the new parent layout
                                                                 setTimeout(() => {
-                                                                    window.location.href = '/parent/dashboard';
+                                                                    navigate('/parent/dashboard');
                                                                 }, 1500);
                                                             }
                                                             catch (e) { Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message }); }
