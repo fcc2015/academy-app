@@ -30,10 +30,16 @@ const ParentPayments = () => {
     const fetchPayments = React.useCallback(async () => {
         try {
             let childUserId = null;
-            const playersRes = await authFetch(`${API_URL}/players/`);
+            const playersRes = await authFetch(`${API_URL}/players/parent/${userId}`);
             if (playersRes.ok) {
                 const players = await playersRes.json();
-                const child = players.find(p => p.user_id === userId || p.parent_id === userId) || players[0];
+                let child = players.find(p => p.user_id === userId || p.parent_id === userId) || players[0];
+                
+                if (!child) {
+                    const selfRes = await authFetch(`${API_URL}/players/${userId}`);
+                    if (selfRes.ok) child = await selfRes.json();
+                }
+
                 if (child) {
                     childUserId = child.user_id;
                     setChildInfo(child);

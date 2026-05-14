@@ -34,9 +34,10 @@ const ParentEvaluations = () => {
                     
                     // DEV FALLBACK: If no child found directly, try finding self as player
                     if (!child) {
-                        const allRes = await authFetch(`${API_URL}/players/`);
-                        const all = await allRes.json();
-                        child = all.find(p => p.user_id === userId);
+                        const selfRes = await authFetch(`${API_URL}/players/${userId}`);
+                        if (selfRes.ok) {
+                            child = await selfRes.json();
+                        }
                     }
 
                     if (child) {

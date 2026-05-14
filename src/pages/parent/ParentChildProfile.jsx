@@ -33,13 +33,16 @@ const ParentChildProfile = () => {
                 if (cachedSquads) setSquad(JSON.parse(cachedSquads));
 
                 const [playerRes, squadsRes] = await Promise.all([
-                    authFetch(`${API_URL}/players/${userId}`).catch(() => null),
+                    authFetch(`${API_URL}/players/parent/${userId}`).catch(() => null),
                     cachedSquads ? Promise.resolve(null) : authFetch(`${API_URL}/squads/`).catch(() => null)
                 ]);
 
                 let currentPlayer = null;
                 if (playerRes?.ok) {
-                    currentPlayer = await playerRes.json().catch(() => null);
+                    const parentsPlayers = await playerRes.json().catch(() => []);
+                    if (Array.isArray(parentsPlayers) && parentsPlayers.length > 0) {
+                        currentPlayer = parentsPlayers.find(p => p.user_id === userId || p.parent_id === userId) || parentsPlayers[0];
+                    }
                 }
 
                 if (!currentPlayer || currentPlayer.detail) {

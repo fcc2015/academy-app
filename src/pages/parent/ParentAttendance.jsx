@@ -15,10 +15,14 @@ const ParentAttendance = () => {
         const fetchAttendance = async () => {
             try {
                 const userId = localStorage.getItem('impersonating_user_id') || localStorage.getItem('user_id');
-                const res = await authFetch(`${API_URL}/players/`);
+                const res = await authFetch(`${API_URL}/players/parent/${userId}`);
                 if (res.ok) {
                     const players = await res.json();
-                    const child = players.find(p => p.user_id === userId || p.parent_id === userId) || players[0];
+                    let child = players.find(p => p.user_id === userId || p.parent_id === userId) || players[0];
+                    if (!child) {
+                        const selfRes = await authFetch(`${API_URL}/players/${userId}`);
+                        if (selfRes.ok) child = await selfRes.json();
+                    }
                     if (child?.user_id) {
                         const attRes = await authFetch(`${API_URL}/attendance/player/${child.user_id}`);
                         if (attRes.ok) {
