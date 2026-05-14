@@ -1254,24 +1254,28 @@ const PlayersManagement = () => {
                                                     <button
                                                         onClick={async () => {
                                                             try {
+                                                                // Prefer parent_id — that's the actual auth user we want to impersonate
                                                                 const targetId = player.parent_id || player.user_id;
                                                                 const data = await impersonateUser(targetId);
-                                                                // Verify localStorage was actually set before navigating
+                                                                // Verify localStorage was actually set (impersonateUser already does this)
                                                                 const storedId = localStorage.getItem('impersonating_user_id');
                                                                 if (!storedId) {
-                                                                    // Manually set it as failsafe
-                                                                    localStorage.setItem('impersonating_user_id', data.id || targetId);
-                                                                    localStorage.setItem('impersonating_user_name', data.full_name || data.email || '');
-                                                                    localStorage.setItem('impersonating_user_role', data.role || 'parent');
+                                                                    throw new Error(isRTL ? 'فشل حفظ بيانات الجلسة' : 'Failed to save impersonation session');
                                                                 }
-                                                                Swal.fire({ icon: 'success', title: isRTL ? 'تم تسجيل الدخول' : 'Impersonation active', text: isRTL ? `أنت الآن تشاهد كـ ${data.full_name || 'ولي الأمر'}` : `Viewing as ${data.full_name || 'Parent'}`, timer: 2000, showConfirmButton: false });
-                                                                // Use React Router navigate instead of window.location.href
-                                                                // to avoid browser cache issues with the new parent layout
-                                                                setTimeout(() => {
-                                                                    navigate('/parent/dashboard');
-                                                                }, 1500);
+                                                                Swal.fire({
+                                                                    icon: 'success',
+                                                                    title: isRTL ? 'تم تسجيل الدخول' : 'Impersonation active',
+                                                                    text: isRTL
+                                                                        ? `أنت الآن تشاهد كـ ${data.full_name || 'ولي الأمر'}`
+                                                                        : `Viewing as ${data.full_name || 'Parent'}`,
+                                                                    timer: 1500,
+                                                                    showConfirmButton: false
+                                                                });
+                                                                setTimeout(() => navigate('/parent/dashboard'), 1500);
                                                             }
-                                                            catch (e) { Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message }); }
+                                                            catch (e) {
+                                                                Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message });
+                                                            }
                                                         }}
                                                         className="p-3 bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-600 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1"
                                                         title={isRTL ? 'دخول كولي الأمر' : 'Login as parent'}
