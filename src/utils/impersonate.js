@@ -11,13 +11,15 @@ export async function impersonateUser(userId) {
         throw new Error(err.detail || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    localStorage.setItem('impersonating_user_id', data.id || userId);
+    // Backend returns { user_id, role, email, full_name } — use user_id (not id)
+    const resolvedId = data.user_id || data.id || userId;
+    localStorage.setItem('impersonating_user_id', resolvedId);
     localStorage.setItem('impersonating_user_name', data.full_name || data.email || '');
-    localStorage.setItem('impersonating_user_role', data.role || '');
+    localStorage.setItem('impersonating_user_role', data.role || 'parent');
 
     // Stay within the admin layout — the impersonation banner will indicate active session.
     // This avoids redirect issues with role-gated layouts (ParentLayout, CoachLayout).
-    return data;
+    return { ...data, id: resolvedId };
 }
 
 export function exitUserImpersonation() {

@@ -20,10 +20,12 @@ import { useLanguage } from '../../i18n/LanguageContext';
 function checkParentAuth() {
     const token = localStorage.getItem('token');
     const role = localStorage.getItem('role');
-    const expires = parseInt(localStorage.getItem('token_expires') || '0');
     const isImpersonating = !!localStorage.getItem('impersonating_user_id');
-    // Allow access if: (1) logged in as parent, OR (2) admin/super_admin impersonating a user
-    return token && (role === 'parent' || isImpersonating) && (expires === 0 || Date.now() < expires);
+    // Allow access if:
+    // (1) logged in as parent with a token, OR
+    // (2) admin/super_admin impersonating a user (they use their own token)
+    if (isImpersonating && token && (role === 'admin' || role === 'super_admin')) return true;
+    return !!token && role === 'parent';
 }
 
 const ParentLayout = () => {
@@ -32,7 +34,8 @@ const ParentLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const { t, isRTL, dir } = useLanguage();
 
-    const [isValid] = useState(checkParentAuth);
+    // Re-evaluate on every render so that impersonation state changes are picked up
+    const isValid = checkParentAuth();
 
     if (!isValid) {
         const isImpersonating = !!localStorage.getItem('impersonating_user_id');
@@ -52,6 +55,7 @@ const ParentLayout = () => {
         localStorage.removeItem('token_expires');
         return <Navigate to="/login" replace />;
     }
+
 
     const navItems = [
         { path: '/parent/dashboard', name: t('sidebar.dashboard'), icon: LayoutDashboard },
