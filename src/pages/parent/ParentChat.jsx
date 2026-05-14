@@ -38,7 +38,7 @@ export default function ParentChat() {
     const fetchGroups = useCallback(async () => {
         try {
             let uid = myUserId, role = 'player';
-            const r = await authFetch(`${API_URL}/players/`);
+            const r = await authFetch(`${API_URL}/players/parent/${myUserId}`);
             if (r.ok) {
                 const all = await r.json();
                 const child = all.find(p => p.user_id === myUserId || p.parent_id === myUserId) || all[0];

@@ -178,6 +178,33 @@ async def create_player(player: PlayerCreate):
         )
 
 
+@router.get("/{user_id}", response_model=PlayerResponse)
+async def get_player_by_id(user_id: str):
+    try:
+        from core.config import settings
+        res = await supabase.client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=*,users(full_name)"
+        )
+        res.raise_for_status()
+        data = res.json()
+        if not data:
+            raise HTTPException(status_code=404, detail="Player not found")
+        p = data[0]
+        if 'users' in p and p['users']:
+            p['full_name'] = p['users'].get('full_name', 'Unknown')
+        else:
+            p['full_name'] = 'Unknown'
+        return p
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error fetching player %s: %s", user_id, e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
+
+
 @router.put("/{user_id}", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
 async def update_player(user_id: str, player: PlayerCreate):
     try:
