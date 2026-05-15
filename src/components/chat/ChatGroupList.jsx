@@ -9,7 +9,7 @@ export default function ChatGroupList({
     headerActions, emptyHint, errorBanner
 }) {
     const [search, setSearch] = useState('');
-    const filteredGroups = groups.filter(g =>
+    const filteredGroups = (groups || []).filter(g =>
         g.name?.toLowerCase().includes(search.toLowerCase()) ||
         g.category?.toLowerCase().includes(search.toLowerCase())
     );
