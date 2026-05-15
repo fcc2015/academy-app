@@ -56,6 +56,8 @@ const FinancesManagement = () => {
     const [isCheckingAlerts, setIsCheckingAlerts] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null, type: '' });
     const [invoicePayment, setInvoicePayment] = useState(null);
+    const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+    const [receiptUrl, setReceiptUrl] = useState(null);
 
     const showBanner = (message, type = 'success') => {
         if (type === 'error') toast.error(message);
@@ -512,8 +514,29 @@ const FinancesManagement = () => {
                                                     <div className="font-extrabold text-slate-900 text-[15px] tracking-tight mb-1">
                                                         {payment.users?.full_name || 'منخرط غير معروف'}
                                                     </div>
-                                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                                        {payment.notes || 'بدون ملاحظات'}
+                                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-end gap-1 flex-wrap">
+                                                        {payment.notes?.includes('Receipt: ') ? (
+                                                            <>
+                                                                <button 
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        const url = payment.notes.match(/Receipt: (https?:\/\/[^\s]+)/)?.[1];
+                                                                        if (url) {
+                                                                            setReceiptUrl(url);
+                                                                            setIsReceiptModalOpen(true);
+                                                                        }
+                                                                    }}
+                                                                    className="text-sky-500 hover:text-sky-700 flex items-center gap-1 bg-sky-50 px-2 py-0.5 rounded cursor-pointer border border-sky-200 shadow-sm"
+                                                                >
+                                                                    <FileText size={12} /> {isRTL ? 'عرض الإيصال' : 'View Receipt'}
+                                                                </button>
+                                                                <span className="truncate max-w-[150px]">
+                                                                    {payment.notes.replace(/Receipt: https?:\/\/[^\s]+\n?/, '') || 'مرفق إيصال'}
+                                                                </span>
+                                                            </>
+                                                        ) : (
+                                                            payment.notes || 'بدون ملاحظات'
+                                                        )}
                                                     </div>
                                                 </div>
                                                 {payment.users?.parent_whatsapp && (
@@ -974,6 +997,36 @@ const FinancesManagement = () => {
                 academyLogo={academySettings?.logo_url}
                 isRTL={isRTL}
             />
+
+            {/* Receipt Modal */}
+            {isReceiptModalOpen && receiptUrl && (
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in" onClick={() => setIsReceiptModalOpen(false)}>
+                    <div className="relative max-w-4xl max-h-[90vh] flex flex-col bg-white rounded-3xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+                            <h3 className="font-black text-slate-800">{isRTL ? 'إيصال الدفع' : 'Payment Receipt'}</h3>
+                            <button onClick={() => setIsReceiptModalOpen(false)} className="p-2 bg-slate-200 text-slate-600 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-auto p-4 bg-slate-100/50 flex justify-center items-center min-h-[300px]">
+                            {receiptUrl.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)$/) ? (
+                                <img src={receiptUrl} alt="Receipt" className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-sm border border-slate-200" />
+                            ) : (
+                                <iframe src={receiptUrl} className="w-full h-[70vh] rounded-xl shadow-sm border border-slate-200 bg-white" title="Receipt Preview" />
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-slate-100 bg-white flex justify-center gap-4">
+                            <a href={receiptUrl} target="_blank" rel="noreferrer" className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                                <FileText size={16} />
+                                {isRTL ? 'فتح في نافذة جديدة' : 'Open in New Tab'}
+                            </a>
+                            <button onClick={() => setIsReceiptModalOpen(false)} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-slate-200 transition-colors">
+                                {isRTL ? 'إغلاق' : 'Close'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
