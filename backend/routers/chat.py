@@ -190,36 +190,55 @@ class CreateGroupRequest(BaseModel):
 # ─────────────────────────────────────────────
 
 @router.get("/groups")
-async def get_chat_groups(user_id: Optional[str] = None, role: Optional[str] = None):
-    """Get chat groups based on role"""
+async def get_chat_groups(user_id: Optional[str] = None, role: Optional[str] = None, current_user: dict = Depends(verify_token)):
+    """Get chat groups based on role. Uses verified auth context as fallback for impersonated sessions."""
     from core.config import settings
     import httpx
-    
+
+    # Use auth context as fallback (handles impersonation — X-Impersonate-User is already resolved)
+    if not user_id:
+        user_id = current_user.get("user_id")
+    if not role:
+        role = current_user.get("role")
+
     async with httpx.AsyncClient() as client:
         if role in ("admin", "super_admin", "sous_admin") or not role:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/chat_groups?select=*&order=created_at.asc",
                 headers=supabase.headers
             )
+            res.raise_for_status()
+            return res.json()
         else:
             if not user_id:
                 return []
                 
             group_ids_set = set()
             
+            # For parent role: resolve to child's user_id first
+            resolved_uid = user_id
+            if role == "parent":
+                p_res = await client.get(
+                    f"{settings.SUPABASE_URL}/rest/v1/players?parent_id=eq.{user_id}&select=user_id&limit=1",
+                    headers=supabase.admin_headers
+                )
+                if p_res.status_code == 200 and p_res.json():
+                    resolved_uid = p_res.json()[0].get("user_id", user_id)
+                    role = "player"  # Treat parent as player for group lookup
+
             # 1. Get groups they are already members of
             member_res = await client.get(
-                f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?user_id=eq.{user_id}&select=group_id",
-                headers=supabase.headers
+                f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?user_id=eq.{resolved_uid}&select=group_id",
+                headers=supabase.admin_headers
             )
             if member_res.status_code == 200 and member_res.json():
                 for m in member_res.json():
                     group_ids_set.add(m["group_id"])
                     
-            # 2. Get groups that match their squad (if role is player)
+            # 2. Get groups that match their squad (player)
             if role == "player":
                 p_res = await client.get(
-                    f"{settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=squad_id",
+                    f"{settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{resolved_uid}&select=squad_id",
                     headers=supabase.admin_headers
                 )
                 if p_res.status_code == 200 and p_res.json():
@@ -227,7 +246,7 @@ async def get_chat_groups(user_id: Optional[str] = None, role: Optional[str] = N
                     if squad_id:
                         sg_res = await client.get(
                             f"{settings.SUPABASE_URL}/rest/v1/chat_groups?squad_id=eq.{squad_id}&select=id",
-                            headers=supabase.headers
+                            headers=supabase.admin_headers
                         )
                         if sg_res.status_code == 200 and sg_res.json():
                             for g in sg_res.json():
@@ -239,7 +258,7 @@ async def get_chat_groups(user_id: Optional[str] = None, role: Optional[str] = N
             group_ids = ",".join(list(group_ids_set))
             res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/chat_groups?id=in.({group_ids})&select=*&order=created_at.asc",
-                headers=supabase.headers
+                headers=supabase.admin_headers
             )
             res.raise_for_status()
             return res.json()
