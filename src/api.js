@@ -131,6 +131,11 @@ export async function authFetch(url, options = {}) {
           // Use both module flag AND sessionStorage to prevent race conditions
           const isImpersonatingUser = !!localStorage.getItem('impersonating_user_id');
           const sessionLocked = !!sessionStorage.getItem('_impersonation_401_handled');
+          // Also check if the caller is an admin — admins should NEVER be logged out by a
+          // 401 that comes from an impersonated session or from the impersonate-user API call.
+          const callerRole = localStorage.getItem('role');
+          const isAdmin = callerRole === 'admin' || callerRole === 'super_admin' || callerRole === 'sous_admin';
+          const isImpersonateEndpoint = url && url.toString().includes('/admins/impersonate-user');
 
           if (isImpersonatingUser && !_isHandlingImpersonationError && !sessionLocked) {
             _isHandlingImpersonationError = true;
@@ -141,11 +146,18 @@ export async function authFetch(url, options = {}) {
             // Small delay to let other concurrent 401 handlers see the lock before navigating
             setTimeout(() => {
               sessionStorage.removeItem('_impersonation_401_handled');
+              _isHandlingImpersonationError = false;
               window.location.href = '/admin/players';
             }, 200);
             return res;
           } else if (isImpersonatingUser || _isHandlingImpersonationError || sessionLocked) {
             // Another handler is already dealing with this — just return the response
+            return res;
+          }
+
+          // Protect admins: if the 401 comes from the impersonate-user endpoint or admin is
+          // in the middle of initiating impersonation, don't log them out — just return the response.
+          if (isAdmin || isImpersonateEndpoint) {
             return res;
           }
 
