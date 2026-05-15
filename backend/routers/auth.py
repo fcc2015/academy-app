@@ -26,15 +26,32 @@ _pending_2fa: dict[str, dict] = {}
 _pending_totp_setup: dict[str, str] = {}
 _2FA_SESSION_EXPIRY = 300  # 5 minutes
 
+# ─── In-memory Login Rate Limiting ────────────────────────────
+_login_attempts: dict[str, dict] = {}
+
 @router.post("/login", response_model=LoginResponse)
-async def login(credentials: UserLogin, response: Response):
+async def login(credentials: UserLogin, request: Request, response: Response):
     import httpx
+    
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    
+    # Check rate limit
+    attempt_data = _login_attempts.get(ip, {"count": 0, "lockout_until": 0})
+    if attempt_data["lockout_until"] > now:
+        raise HTTPException(status_code=429, detail="Too many failed attempts. Please try again later.")
+        
     try:
         # Authenticate user with Supabase
         auth_response = await supabase.sign_in_with_password(
             credentials.email.strip(),
             credentials.password.strip()
         )
+        
+        # Reset attempts on success
+        if ip in _login_attempts:
+            del _login_attempts[ip]
+            
         user_id = auth_response["user"]["id"]
         token = auth_response["access_token"]
         refresh_token = auth_response.get("refresh_token", "")
@@ -162,6 +179,12 @@ async def login(credentials: UserLogin, response: Response):
     except HTTPException:
         raise
     except Exception as e:
+        # Record failed attempt
+        attempt_data["count"] += 1
+        if attempt_data["count"] >= 5:
+            attempt_data["lockout_until"] = now + 900  # Lock out for 15 minutes
+        _login_attempts[ip] = attempt_data
+        
         logger.error("Error: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
