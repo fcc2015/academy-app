@@ -55,9 +55,11 @@ ws_router = APIRouter(prefix="/chat", tags=["Chat WS"])
 
 
 async def _verify_ws_token(websocket: WebSocket) -> dict | None:
-    """Read access_token from httpOnly cookie and verify with Supabase."""
+    """Read access_token from httpOnly cookie or query param and verify with Supabase."""
     from core.config import settings
     token = websocket.cookies.get("access_token")
+    if not token:
+        token = websocket.query_params.get("token")
     if not token:
         return None
     try:

@@ -149,6 +149,58 @@ async def create_parent_payment(payment: PaymentCreate):
         logger.error("خطأ في إرسال إثبات الدفع: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
+from fastapi import UploadFile, File, Form
+@router.post("/payments/parent/upload")
+async def create_parent_payment_upload(
+    amount: float = Form(...),
+    payment_method: str = Form(...),
+    notes: str = Form(""),
+    user_id: str = Form(""),
+    file: UploadFile = File(...)
+):
+    """Upload payment receipt and create pending payment."""
+    import uuid
+    from core.context import user_id_ctx
+    try:
+        current_user = user_id_ctx.get()
+        target_user = user_id or current_user
+        
+        # Upload file to Supabase Storage
+        file_ext = file.filename.split(".")[-1]
+        file_name = f"{uuid.uuid4()}.{file_ext}"
+        content = await file.read()
+        
+        try:
+            receipt_url = await supabase.upload_file("receipts", file_name, content, file.content_type)
+        except Exception as e:
+            logger.error(f"Storage upload failed: {e}")
+            receipt_url = f"uploaded_{file_name}"
+            
+        payment_dict = {
+            "user_id": target_user,
+            "amount": amount,
+            "status": "Pending",
+            "payment_method": payment_method,
+            "notes": f"Receipt: {receipt_url}\n{notes}",
+            "payment_date": date.today().isoformat()
+        }
+        
+        response = await supabase.insert_payment(payment_dict)
+        
+        try:
+            await supabase.insert_notification({
+                "title": "📩 إثبات دفع جديد من ولي أمر",
+                "message": f"تم استلام إثبات دفع بقيمة {amount} درهم. يرجى المراجعة والتأكيد.",
+                "type": "admin_alert",
+                "target_role": "Admin"
+            })
+        except Exception as e:
+            logger.warning(f"Notification error: {e}")
+            
+        return response[0] if isinstance(response, list) and response else response
+    except Exception as e:
+        logger.error("Error in payment upload: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Upload failed")
 
 @router.delete("/payments/{payment_id}")
 async def delete_payment(payment_id: str, user: dict = Depends(require_role("admin", "super_admin"))):

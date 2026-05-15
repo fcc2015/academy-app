@@ -64,7 +64,10 @@ export default function useChatWebSocket(groupId, myUserId) {
         fetchMembers();
 
         // Connect WebSocket
-        const ws = new WebSocket(`${WS_URL}/chat/ws/${groupId}`);
+        const token = localStorage.getItem('token') || '';
+        const wsUrl = new URL(`${WS_URL}/chat/ws/${groupId}`);
+        if (token) wsUrl.searchParams.append('token', token);
+        const ws = new WebSocket(wsUrl.toString());
         wsRef.current = ws;
 
         ws.onmessage = (event) => {

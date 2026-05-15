@@ -25,7 +25,7 @@ const ParentPayments = () => {
         notes: ''
     });
 
-    const userId = localStorage.getItem('user_id');
+    const userId = localStorage.getItem('impersonating_user_id') || localStorage.getItem('user_id');
 
     const fetchPayments = React.useCallback(async () => {
         try {
@@ -68,34 +68,39 @@ const ParentPayments = () => {
 
     const handleUploadSubmit = async (e) => {
         e.preventDefault();
+        
+        if (!uploadData.amount || !receiptFile) {
+            toast.error(isRTL ? 'الرجاء إدخال المبلغ وإرفاق إيصال الدفع.' : 'Please enter amount and attach a receipt.');
+            return;
+        }
+        
         setIsUploading(true);
 
         try {
-            // MVP: Simulate file upload, we just send a "Pending" payment to the backend
-            const payload = {
-                user_id: childInfo?.user_id || userId,
-                player_id: childInfo?.id || null,
-                amount: parseFloat(uploadData.amount),
-                status: 'Pending',
-                payment_method: uploadData.payment_method,
-                notes: `${isRTL ? 'تم رفع إيصال' : 'Receipt uploaded'}: ${uploadData.notes}`,
-                billing_type: 'monthly',
-                payment_date: new Date().toISOString()
-            };
+            const formData = new FormData();
+            formData.append('file', receiptFile);
+            formData.append('user_id', childInfo?.user_id || userId);
+            formData.append('amount', uploadData.amount);
+            formData.append('payment_method', uploadData.payment_method);
+            formData.append('notes', uploadData.notes);
 
-            const res = await authFetch(`${API_URL}/finances/payments/parent`, {
+            const res = await fetch(`${API_URL}/finances/payments/parent/upload`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: formData
             });
 
             if (res.ok) {
                 toast.success(isRTL ? 'تم إرسال وصل الدفع للإدارة بنجاح ليتم مراجعته.' : 'Payment receipt sent successfully for review.');
                 setIsUploadModalOpen(false);
                 setUploadData({ amount: '', payment_method: 'Bank Transfer', notes: '' });
+                setReceiptFile(null);
                 fetchPayments(); // Refresh list
             } else {
-                toast.error(isRTL ? 'حدث خطأ أثناء الإرسال' : 'Submission error');
+                const errData = await res.json().catch(() => ({}));
+                toast.error(errData.detail || (isRTL ? 'حدث خطأ أثناء الإرسال' : 'Submission error'));
             }
         } catch (error) {
             console.error('Submit error:', error);
@@ -298,24 +303,28 @@ const ParentPayments = () => {
                                 </select>
                             </div>
 
-                            {/* Simulated Upload Box */}
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">{isRTL ? 'صورة الوصل (اختياري حالياً)' : 'Receipt Image (optional)'}</label>
-                                <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center bg-slate-50 hover:bg-sky-50 hover:border-sky-300 transition-colors cursor-pointer group">
-                                    <Camera className="mx-auto text-slate-400 group-hover:text-sky-500 mb-2 transition-colors" size={28} />
-                                    <span className="text-sm font-bold text-slate-600 group-hover:text-sky-700">{isRTL ? 'اضغط لالتقاط أو اختيار صورة' : 'Click to capture or select image'}</span>
-                                    <p className="text-[10px] text-slate-400 mt-1">{isRTL ? 'يُدعم صور PNG و JPG (ميزة تجريبية)' : 'Supports PNG & JPG (beta feature)'}</p>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{isRTL ? 'صورة الوصل' : 'Receipt Image'}</label>
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => setReceiptFile(e.target.files[0])}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50 focus:bg-white text-sm"
+                                        required
+                                    />
                                 </div>
+                                {receiptFile && <p className="text-xs text-emerald-600 mt-2 font-semibold flex items-center gap-1"><CheckCircle2 size={12}/> {receiptFile.name}</p>}
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1">{isRTL ? 'ملاحظة (رقم الحوالة مثلاً)' : 'Note (e.g. transfer number)'}</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-1">{isRTL ? 'ملاحظة (اختياري)' : 'Note (optional)'}</label>
                                 <input
                                     type="text"
                                     value={uploadData.notes}
                                     onChange={(e) => setUploadData({...uploadData, notes: e.target.value})}
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50 focus:bg-white"
-                                    placeholder={isRTL ? 'اختياري...' : 'Optional...'}
+                                    placeholder={isRTL ? 'رقم الحوالة أو ملاحظات إضافية...' : 'Transfer number or extra notes...'}
                                 />
                             </div>
 
