@@ -204,24 +204,45 @@ async def get_chat_groups(user_id: Optional[str] = None, role: Optional[str] = N
         else:
             if not user_id:
                 return []
-            # Get member groups
+                
+            group_ids_set = set()
+            
+            # 1. Get groups they are already members of
             member_res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?user_id=eq.{user_id}&select=group_id",
                 headers=supabase.headers
             )
             if member_res.status_code == 200 and member_res.json():
-                group_ids = ",".join([m["group_id"] for m in member_res.json()])
-                if not group_ids:
-                    return []
-                res = await client.get(
-                    f"{settings.SUPABASE_URL}/rest/v1/chat_groups?id=in.({group_ids})&select=*&order=created_at.asc",
-                    headers=supabase.headers
+                for m in member_res.json():
+                    group_ids_set.add(m["group_id"])
+                    
+            # 2. Get groups that match their squad (if role is player)
+            if role == "player":
+                p_res = await client.get(
+                    f"{settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=squad_id",
+                    headers=supabase.admin_headers
                 )
-            else:
+                if p_res.status_code == 200 and p_res.json():
+                    squad_id = p_res.json()[0].get("squad_id")
+                    if squad_id:
+                        sg_res = await client.get(
+                            f"{settings.SUPABASE_URL}/rest/v1/chat_groups?squad_id=eq.{squad_id}&select=id",
+                            headers=supabase.headers
+                        )
+                        if sg_res.status_code == 200 and sg_res.json():
+                            for g in sg_res.json():
+                                group_ids_set.add(g["id"])
+
+            if not group_ids_set:
                 return []
                 
-        res.raise_for_status()
-        return res.json()
+            group_ids = ",".join(list(group_ids_set))
+            res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/chat_groups?id=in.({group_ids})&select=*&order=created_at.asc",
+                headers=supabase.headers
+            )
+            res.raise_for_status()
+            return res.json()
 
 @router.post("/groups/{group_id}/add_member")
 async def force_add_member(group_id: str, req: dict):
