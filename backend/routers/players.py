@@ -239,25 +239,43 @@ async def delete_player(user_id: str):
 
 @router.get("/parent/{parent_id}", response_model=List[PlayerResponse])
 async def get_players_by_parent(parent_id: str):
-    """Returns players linked to a specific parent_id"""
-    # Parents can only fetch their own children — admins/coaches can fetch any parent's
+    """Returns players linked to a specific parent_id.
+    Also handles impersonation: an admin impersonating a player (role=player)
+    can fetch the player's own data by passing the player's user_id as parent_id.
+    """
     current_role = role_ctx.get()
     current_user = user_id_ctx.get()
+
+    # Parents can only access their own children
     if current_role == "parent" and current_user != parent_id:
         raise HTTPException(status_code=403, detail="Access denied — you can only view your own children.")
 
     try:
+        import httpx as _httpx
         from core.config import settings
-        res = await supabase.client.get(
-            f"{settings.SUPABASE_URL}/rest/v1/players?parent_id=eq.{parent_id}&select=*,users(full_name)"
-        )
-        res.raise_for_status()
-        data = res.json()
+
+        async with _httpx.AsyncClient(timeout=10.0) as client:
+            # Primary lookup: players where parent_id matches
+            res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/players?parent_id=eq.{parent_id}&select=*",
+                headers=supabase.admin_headers
+            )
+            res.raise_for_status()
+            data = res.json()
+
+            # Fallback: if no children found, check if parent_id is actually a player's user_id
+            # This handles the case where admin impersonates a player directly (no parent account)
+            if not data:
+                res2 = await client.get(
+                    f"{settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{parent_id}&select=*",
+                    headers=supabase.admin_headers
+                )
+                if res2.status_code == 200 and res2.json():
+                    data = res2.json()
+
         for p in data:
-            if 'users' in p and p['users']:
-                p['full_name'] = p['users'].get('full_name', 'Unknown')
-            else:
-                p['full_name'] = 'Unknown'
+            if not p.get('full_name'):
+                p['full_name'] = p.get('parent_name') or p.get('users', {}).get('full_name', 'Unknown') if isinstance(p.get('users'), dict) else 'Unknown'
         return data
     except Exception as e:
         logger.error("Error fetching parent players: %s", e, exc_info=True)
