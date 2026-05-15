@@ -103,6 +103,9 @@ def test_admin_can_view_any_parents_children(authed_as, respx_mock):
     respx_mock.get(url__regex=r".*/rest/v1/players\?parent_id=eq\.parent-X.*").mock(
         return_value=Response(200, json=[])
     )
+    respx_mock.get(url__regex=r".*/rest/v1/players\?user_id=eq\.parent-X.*").mock(
+        return_value=Response(200, json=[])
+    )
 
     with authed_as("admin", user_id="admin-1") as c:
         res = c.get("/api/v1/players/parent/parent-X")
