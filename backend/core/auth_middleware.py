@@ -174,7 +174,11 @@ async def assert_parent_owns_player(parent_user_id: str, player_user_id: str) ->
     """
     Raises 403 if the given parent does not own (is not linked to) the given player.
     Used to prevent parents from accessing other parents' children data server-side.
+    Also allows players to access their own data.
     """
+    if parent_user_id == player_user_id:
+        return  # Allow players to view their own stats
+        
     import httpx
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
