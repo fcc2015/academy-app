@@ -136,11 +136,11 @@ app.add_middleware(AuditLogMiddleware)
 
 # ─── Rate Limiting (in-memory, per-IP) ─────────────────────
 _rate_store: dict[str, list[float]] = defaultdict(list)
-_RATE_LIMIT = 100        # max requests per window
+_RATE_LIMIT = 500        # max requests per window (raised from 100 — admin dashboards make many concurrent calls)
 _RATE_WINDOW = 60.0      # seconds
-_AUTH_RATE_LIMIT = 5      # max login attempts per window
+_AUTH_RATE_LIMIT = 10     # max login attempts per window (raised slightly for impersonation flows)
 _AUTH_RATE_WINDOW = 900.0 # 15 minutes
-_SENSITIVE_RATE_LIMIT = 10  # for registration, password reset, etc.
+_SENSITIVE_RATE_LIMIT = 20  # for registration, password reset, etc.
 _SENSITIVE_RATE_WINDOW = 300.0  # 5 minutes
 _CLEANUP_INTERVAL = 300.0  # clean stale entries every 5 min
 _last_cleanup = time.time()
