@@ -1271,7 +1271,7 @@ const PlayersManagement = () => {
                                                                     timer: 1500,
                                                                     showConfirmButton: false
                                                                 });
-                                                                setTimeout(() => navigate('/parent/dashboard'), 1500);
+                                                                setTimeout(() => { window.location.href = '/parent/dashboard'; }, 1500);
                                                             }
                                                             catch (e) {
                                                                 Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message });
