@@ -1266,8 +1266,8 @@ const PlayersManagement = () => {
                                                                     icon: 'success',
                                                                     title: isRTL ? 'تم تسجيل الدخول' : 'Impersonation active',
                                                                     html: isRTL
-                                                                        ? `<p>أنت الآن تشاهد كـ <b>${data.full_name || 'ولي الأمر'}</b></p><br/><a href="/parent/dashboard" style="display:inline-block;background:#0ea5e9;color:#fff;padding:8px 20px;border-radius:10px;font-weight:900;text-decoration:none;font-size:13px;">فتح لوحة ولي الأمر ←</a>`
-                                                                        : `<p>Viewing as <b>${data.full_name || 'Parent'}</b></p><br/><a href="/parent/dashboard" style="display:inline-block;background:#0ea5e9;color:#fff;padding:8px 20px;border-radius:10px;font-weight:900;text-decoration:none;font-size:13px;">Open Parent Dashboard →</a>`,
+                                                                        ? `<p>أنت الآن تشاهد كـ <b>${data.full_name || 'ولي الأمر'}</b></p><br/><a href="/admin/view-as-parent" style="display:inline-block;background:#0ea5e9;color:#fff;padding:8px 20px;border-radius:10px;font-weight:900;text-decoration:none;font-size:13px;">فتح لوحة ولي الأمر ←</a>`
+                                                                        : `<p>Viewing as <b>${data.full_name || 'Parent'}</b></p><br/><a href="/admin/view-as-parent" style="display:inline-block;background:#0ea5e9;color:#fff;padding:8px 20px;border-radius:10px;font-weight:900;text-decoration:none;font-size:13px;">Open Parent Dashboard →</a>`,
                                                                     showConfirmButton: false,
                                                                     timer: 4000,
                                                                 });

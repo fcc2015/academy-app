@@ -151,6 +151,7 @@ function App() {
             <Route path="tactics" element={<AdminTactics />} />
             <Route path="pending-parents" element={<AdminPendingParents />} />
             <Route path="settings" element={<SettingsManagement />} />
+            <Route path="view-as-parent" element={<ParentDashboard />} />
           </Route>
 
           {/* Coach */}
