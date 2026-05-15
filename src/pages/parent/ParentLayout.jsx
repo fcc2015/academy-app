@@ -23,8 +23,9 @@ function checkParentAuth() {
     const isImpersonating = !!localStorage.getItem('impersonating_user_id');
     // Allow access if:
     // (1) logged in as parent with a token, OR
-    // (2) admin/super_admin impersonating a user (they use their own token)
-    if (isImpersonating && token && (role === 'admin' || role === 'super_admin')) return true;
+    // (2) any admin/super_admin/sous_admin impersonating a user (they use their own token)
+    const isAdminRole = role === 'admin' || role === 'super_admin' || role === 'sous_admin';
+    if (isImpersonating && token && isAdminRole) return true;
     return !!token && role === 'parent';
 }
 
@@ -40,9 +41,12 @@ const ParentLayout = () => {
     if (!isValid) {
         const isImpersonating = !!localStorage.getItem('impersonating_user_id');
         const role = localStorage.getItem('role');
-        // If an admin was trying to impersonate a user, clean up impersonation state
-        // but DO NOT clear the admin's own token/role
-        if (isImpersonating || role === 'admin' || role === 'super_admin') {
+        const token = localStorage.getItem('token');
+        const isAdminRole = role === 'admin' || role === 'super_admin' || role === 'sous_admin';
+
+        // If an admin token exists (even without impersonation active), send them back to admin panel
+        // DO NOT clear the admin's own token/role
+        if (isAdminRole && token) {
             localStorage.removeItem('impersonating_user_id');
             localStorage.removeItem('impersonating_user_name');
             localStorage.removeItem('impersonating_user_role');

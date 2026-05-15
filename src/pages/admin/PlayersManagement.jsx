@@ -1265,13 +1265,14 @@ const PlayersManagement = () => {
                                                                 Swal.fire({
                                                                     icon: 'success',
                                                                     title: isRTL ? 'تم تسجيل الدخول' : 'Impersonation active',
-                                                                    text: isRTL
-                                                                        ? `أنت الآن تشاهد كـ ${data.full_name || 'ولي الأمر'}`
-                                                                        : `Viewing as ${data.full_name || 'Parent'}`,
-                                                                    timer: 1500,
-                                                                    showConfirmButton: false
+                                                                    html: isRTL
+                                                                        ? `<p>أنت الآن تشاهد كـ <b>${data.full_name || 'ولي الأمر'}</b></p><br/><a href="/parent/dashboard" style="display:inline-block;background:#0ea5e9;color:#fff;padding:8px 20px;border-radius:10px;font-weight:900;text-decoration:none;font-size:13px;">فتح لوحة ولي الأمر ←</a>`
+                                                                        : `<p>Viewing as <b>${data.full_name || 'Parent'}</b></p><br/><a href="/parent/dashboard" style="display:inline-block;background:#0ea5e9;color:#fff;padding:8px 20px;border-radius:10px;font-weight:900;text-decoration:none;font-size:13px;">Open Parent Dashboard →</a>`,
+                                                                    showConfirmButton: false,
+                                                                    timer: 4000,
                                                                 });
-                                                                setTimeout(() => { window.location.href = '/parent/dashboard'; }, 1500);
+                                                                // Stay on admin page — banner shows impersonation is active
+                                                                // Admin can click the link in the Swal or navigate via the banner
                                                             }
                                                             catch (e) {
                                                                 Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message });
