@@ -1,5 +1,5 @@
 import { API_URL } from '../../config';
-import { authFetch } from '../../api';
+import { authFetch, logout } from '../../api';
 import { impersonateUser } from '../../utils/impersonate';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -660,6 +660,10 @@ const PlayersManagement = () => {
                 const data = await res.json();
                 setPlayers(Array.isArray(data) ? data : []);
             } else {
+                if (res.status === 401) {
+                    // Unauthorized – likely token expired; force logout
+                    logout();
+                }
                 setFetchError(isRTL ? 'فشل تحميل اللاعبين من الخادم' : 'Failed to load players from server');
             }
         } catch {
@@ -1262,17 +1266,8 @@ const PlayersManagement = () => {
                                                                 if (!storedId) {
                                                                     throw new Error(isRTL ? 'فشل حفظ بيانات الجلسة' : 'Failed to save impersonation session');
                                                                 }
-                                                                Swal.fire({
-                                                                    icon: 'success',
-                                                                    title: isRTL ? 'تم تسجيل الدخول' : 'Impersonation active',
-                                                                    html: isRTL
-                                                                        ? `<p>أنت الآن تشاهد كـ <b>${data.full_name || 'ولي الأمر'}</b></p><br/><a href="/admin/view-as-parent" style="display:inline-block;background:#0ea5e9;color:#fff;padding:8px 20px;border-radius:10px;font-weight:900;text-decoration:none;font-size:13px;">فتح لوحة ولي الأمر ←</a>`
-                                                                        : `<p>Viewing as <b>${data.full_name || 'Parent'}</b></p><br/><a href="/admin/view-as-parent" style="display:inline-block;background:#0ea5e9;color:#fff;padding:8px 20px;border-radius:10px;font-weight:900;text-decoration:none;font-size:13px;">Open Parent Dashboard →</a>`,
-                                                                    showConfirmButton: false,
-                                                                    timer: 4000,
-                                                                });
-                                                                // Stay on admin page — banner shows impersonation is active
-                                                                // Admin can click the link in the Swal or navigate via the banner
+                                                                // Navigate within SPA — avoids full page reload that can reset auth guards
+                                                                navigate('/admin/view-as-parent');
                                                             }
                                                             catch (e) {
                                                                 Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message });

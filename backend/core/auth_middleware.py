@@ -41,7 +41,7 @@ async def verify_token(request: Request):
         validate_csrf(request)
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=20.0, trust_env=False) as client:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/auth/v1/user",
                 headers={
@@ -148,10 +148,17 @@ async def verify_token(request: Request):
             }
     except HTTPException:
         raise
-    except httpx.RequestError:
+    except httpx.RequestError as exc:
+        logger.error(f"[auth] Supabase connection error: {type(exc).__name__}: {exc}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication service unavailable"
+        )
+    except Exception as exc:
+        logger.error(f"[auth] Unexpected error in verify_token: {type(exc).__name__}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal authentication error"
         )
 
 
@@ -181,7 +188,7 @@ async def assert_parent_owns_player(parent_user_id: str, player_user_id: str) ->
         
     import httpx
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/players"
                 f"?parent_id=eq.{parent_user_id}&user_id=eq.{player_user_id}&select=user_id",
