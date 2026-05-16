@@ -1,4 +1,5 @@
 import time
+import sys
 import asyncio
 import uuid
 import logging
@@ -14,7 +15,8 @@ from routers import auth, players, finances, coaches, events, stats, settings as
 class RequestIdFilter(logging.Filter):
     """Injects request_id from context into every log record."""
     def filter(self, record):
-        record.request_id = request_id_ctx.get("-")
+        if not hasattr(record, "request_id"):
+            record.request_id = request_id_ctx.get("-")
         return True
 
 logging.basicConfig(
@@ -267,7 +269,7 @@ async def health_check():
     # Use service_role key if available (bypasses RLS), otherwise fall back to anon
     api_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/",
                 headers={
