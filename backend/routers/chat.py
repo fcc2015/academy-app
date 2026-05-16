@@ -63,7 +63,7 @@ async def _verify_ws_token(websocket: WebSocket) -> dict | None:
     if not token:
         return None
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/auth/v1/user",
                 headers={"apikey": settings.SUPABASE_KEY, "Authorization": f"Bearer {token}"},
@@ -203,7 +203,7 @@ async def get_chat_groups(user_id: Optional[str] = None, role: Optional[str] = N
     if not role:
         role = current_user.get("role")
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         if role in ("admin", "super_admin", "sous_admin") or not role:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/chat_groups?select=*&order=created_at.asc",
@@ -237,6 +237,15 @@ async def get_chat_groups(user_id: Optional[str] = None, role: Optional[str] = N
                 for m in member_res.json():
                     group_ids_set.add(m["group_id"])
                     
+            # 1.5 Get academy-wide general groups (category = 'general' or 'academy')
+            gen_res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/chat_groups?category=in.(general,General,academy,Academy)&select=id",
+                headers=supabase.admin_headers
+            )
+            if gen_res.status_code == 200 and gen_res.json():
+                for g in gen_res.json():
+                    group_ids_set.add(g["id"])
+
             # 2. Get groups that match their squad (player)
             if role == "player":
                 p_res = await client.get(
@@ -271,7 +280,7 @@ async def force_add_member(group_id: str, req: dict):
     import httpx
     from core.config import settings
     
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         check_res = await client.get(
             f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&user_id=eq.{req.get('user_id')}&select=id",
             headers=supabase.headers
@@ -301,7 +310,7 @@ async def get_chat_group(group_id: str):
     """Get a single chat group with members"""
     import httpx
     from core.config import settings
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.get(
             f"{settings.SUPABASE_URL}/rest/v1/chat_groups?id=eq.{group_id}&select=*",
             headers=supabase.headers
@@ -316,7 +325,7 @@ async def get_group_members(group_id: str):
     """Get members of a group"""
     import httpx
     from core.config import settings
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.get(
             f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&select=*&order=joined_at.asc",
             headers=supabase.headers
@@ -331,7 +340,7 @@ async def join_group(group_id: str, req: JoinGroupRequest):
     import httpx
     from core.config import settings
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         # Check if already a member
         check_res = await client.get(
             f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&user_id=eq.{req.user_id}&select=id",
@@ -370,7 +379,7 @@ async def create_group(req: CreateGroupRequest):
         "squad_id": req.squad_id,
         "created_by": req.created_by
     }
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.post(
             f"{settings.SUPABASE_URL}/rest/v1/chat_groups",
             json=data,
@@ -397,7 +406,7 @@ async def sync_category_chat_groups():
     academy_id = academy_id_ctx.get(None)
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             # Fetch this academy's settings (or fallback to first row if no academy_id)
             if academy_id:
                 url = f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?academy_id=eq.{academy_id}&select=age_categories&limit=1"
@@ -514,7 +523,7 @@ async def lock_unlock_group(req: LockGroupRequest):
     """Lock/unlock writing in a group. When locked, only admins can write."""
     import httpx
     from core.config import settings as app_settings
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.patch(
             f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups?id=eq.{req.group_id}",
             json={"is_locked": req.is_locked},
@@ -539,7 +548,7 @@ async def sync_chat_groups():
     created = []
     updated = []
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         # 1. Fetch all squads
         squads_res = await client.get(
             f"{settings.SUPABASE_URL}/rest/v1/squads?select=*",
@@ -649,7 +658,7 @@ async def get_messages(group_id: str, limit: int = 50, offset: int = 0):
     """Get messages for a group"""
     import httpx
     from core.config import settings
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.get(
             f"{settings.SUPABASE_URL}/rest/v1/chat_messages?group_id=eq.{group_id}&is_deleted=eq.false&select=*&order=created_at.desc&limit={limit}&offset={offset}",
             headers=supabase.headers
@@ -666,7 +675,7 @@ async def send_message(req: SendMessageRequest):
     import httpx
     from core.config import settings
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         # Check if group is locked (admin-only writing)
         gres = await client.get(
             f"{settings.SUPABASE_URL}/rest/v1/chat_groups?id=eq.{req.group_id}&select=is_locked",
@@ -747,7 +756,7 @@ async def delete_message(message_id: str):
     """Soft delete a message (admin/moderator)"""
     import httpx
     from core.config import settings
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.patch(
             f"{settings.SUPABASE_URL}/rest/v1/chat_messages?id=eq.{message_id}",
             json={"is_deleted": True, "deleted_at": datetime.utcnow().isoformat()},
@@ -775,7 +784,7 @@ async def update_typing(req: TypingRequest):
         "updated_at": datetime.utcnow().isoformat()
     }
     headers = {**supabase.headers, "Prefer": "resolution=merge-duplicates,return=minimal"}
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.post(
             f"{settings.SUPABASE_URL}/rest/v1/chat_typing",
             json=data,
@@ -796,7 +805,7 @@ async def get_typing(group_id: str, exclude_user: Optional[str] = None):
     if exclude_user:
         url += f"&user_id=neq.{quote(exclude_user)}"
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.get(url, headers=supabase.headers)
         res.raise_for_status()
 
@@ -838,7 +847,7 @@ async def mute_user(req: MuteRequest):
     else:
         raise HTTPException(status_code=400, detail="Invalid mute_type")
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.patch(
             f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{req.group_id}&user_id=eq.{req.target_user_id}",
             json=update_data,
@@ -870,7 +879,7 @@ async def ban_user(req: BanRequest):
     else:
         raise HTTPException(status_code=400, detail="Invalid ban_type")
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.patch(
             f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{req.group_id}&user_id=eq.{req.target_user_id}",
             json=update_data,
@@ -892,7 +901,7 @@ async def _send_system_message_async(group_id: str, content: str):
     import httpx
     from core.config import settings
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(trust_env=False) as client:
             await client.post(
                 f"{settings.SUPABASE_URL}/rest/v1/chat_messages",
                 json={
@@ -939,7 +948,7 @@ async def upload_chat_image(
         "Authorization": f"Bearer {_storage_key}",
         "Content-Type": file.content_type
     }
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.post(
             f"{settings.SUPABASE_URL}/storage/v1/object/chat-images/{filename}",
             content=file_content,
