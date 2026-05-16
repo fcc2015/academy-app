@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { API_URL } from '../../config';
+import { authFetch } from '../../api';
 import SectionErrorBoundary from '../../components/SectionErrorBoundary';
 import { Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -34,6 +36,18 @@ const ParentLayout = () => {
     const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const { t, isRTL, dir } = useLanguage();
+    const [academyName, setAcademyName] = useState(isRTL ? 'أكاديمية كرة القدم' : 'Football Academy');
+
+    useEffect(() => {
+        authFetch(`${API_URL}/settings/`)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data && data.academy_name) {
+                    setAcademyName(data.academy_name);
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     // Re-evaluate on every render so that impersonation state changes are picked up
     const isValid = checkParentAuth();
@@ -163,8 +177,8 @@ const ParentLayout = () => {
                         <NotificationsDropdown />
                         <div className="h-8 w-px bg-slate-200 mx-2 hidden sm:block"></div>
                         <div className="hidden sm:flex flex-col items-end">
-                            <span className="text-sm font-bold text-slate-800">{isRTL ? 'حساب ولي الأمر' : 'Parent Account'}</span>
-                            <span className="text-[11px] font-medium text-sky-600 uppercase tracking-widest">{isRTL ? 'نشط' : 'Active'}</span>
+                            <span className="text-sm font-black text-indigo-700 uppercase tracking-wide truncate max-w-[200px]">{academyName}</span>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{isRTL ? 'حساب ولي الأمر' : 'Parent Account'}</span>
                         </div>
                         <div className="w-11 h-11 bg-slate-100 rounded-full border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
                             <img src="https://ui-avatars.com/api/?name=Parent&background=0ea5e9&color=fff" alt="Parent" className="w-full h-full object-cover" />
