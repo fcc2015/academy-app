@@ -27,7 +27,8 @@ import {
     Heart,
     CreditCard,
     Activity,
-    LogIn
+    LogIn,
+    Key
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import PlayerBadgeModal from '../../components/PlayerBadgeModal';
@@ -1220,6 +1221,42 @@ const PlayersManagement = () => {
                                                     <a href={`https://wa.me/${player.parent_whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-emerald-500 transition-colors">
                                                         <Smartphone size={14} />
                                                     </a>
+                                                )}
+                                                {player.user_id && (
+                                                    <button onClick={async () => {
+                                                        const result = await Swal.fire({
+                                                            title: isRTL ? 'إعادة تعيين كلمة المرور؟' : 'Reset Parent Password?',
+                                                            text: isRTL ? 'هل أنت متأكد من تغيير كلمة مرور ولي الأمر؟' : 'Are you sure you want to reset this parent\'s password?',
+                                                            icon: 'warning',
+                                                            showCancelButton: true,
+                                                            confirmButtonText: isRTL ? 'نعم، تغيير' : 'Yes, reset',
+                                                            cancelButtonText: t('common.cancel')
+                                                        });
+                                                        if (result.isConfirmed) {
+                                                            try {
+                                                                const res = await authFetch(`${API_URL}/players/${player.user_id}/reset-parent-pwd`, { method: 'POST' });
+                                                                if (!res.ok) {
+                                                                    const text = await res.text();
+                                                                    throw new Error(text);
+                                                                }
+                                                                const data = await res.json();
+                                                                Swal.fire({
+                                                                    title: isRTL ? 'تم تغيير كلمة المرور!' : 'Password Reset Successful!',
+                                                                    html: `
+                                                                        <div class="text-left mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200" dir="ltr">
+                                                                            <p class="mb-2"><strong>Login:</strong> ${player.parent_email || 'Unknown (Check Email)'}</p>
+                                                                            <p><strong>Password:</strong> <code class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded select-all font-mono">${data.new_password}</code></p>
+                                                                        </div>
+                                                                    `,
+                                                                    icon: 'success'
+                                                                });
+                                                            } catch (e) {
+                                                                Swal.fire('Error', e.message, 'error');
+                                                            }
+                                                        }
+                                                    }} className="text-indigo-500 hover:text-indigo-700 transition-colors" title={isRTL ? "إعادة تعيين كلمة المرور لولي الأمر" : "Reset Parent Password"}>
+                                                        <Key size={14} />
+                                                    </button>
                                                 )}
                                             </div>
                                             {(player.medical_cert_valid_until || player.transport_zone) && (

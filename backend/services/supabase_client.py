@@ -90,7 +90,7 @@ class SupabaseHttpClient:
             "Content-Type": "application/json",
             "Prefer": "return=representation",
         }
-        self.client = InjectClient(httpx.AsyncClient(timeout=30.0, headers=self.headers), base_url=self.url)
+        self.client = InjectClient(httpx.AsyncClient(trust_env=False, timeout=30.0, headers=self.headers), base_url=self.url)
         # Startup log — confirm which key is in use
         _key_type = "service_role" if self.service_role_key else "anon"
         _key_preview = _effective_key[:15] + "..."
@@ -143,7 +143,7 @@ class SupabaseHttpClient:
 
         
     async def sign_in_with_password(self, email, password):
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.post(
                 f"{self.url}/auth/v1/token?grant_type=password",
                 json={"email": email, "password": password},
@@ -157,7 +157,7 @@ class SupabaseHttpClient:
         if data:
             payload["data"] = data
             
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.post(
                 f"{self.url}/auth/v1/signup",
                 json=payload,
@@ -181,7 +181,7 @@ class SupabaseHttpClient:
             "user_metadata": user_metadata
         }
         # Must use admin (service_role) headers for /auth/v1/admin/* endpoints
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.post(
                 f"{self.url}/auth/v1/admin/users",
                 json=payload,
@@ -194,6 +194,19 @@ class SupabaseHttpClient:
                 except Exception:
                     msg = res.text
                 raise Exception(f"Supabase auth error {res.status_code}: {msg}")
+            return res.json()
+
+    async def admin_update_user_password(self, user_id: str, new_password: str):
+        """Use the Supabase Auth Admin API to update a user's password."""
+        payload = {"password": new_password}
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            res = await client.put(
+                f"{self.url}/auth/v1/admin/users/{user_id}",
+                json=payload,
+                headers=self.admin_headers
+            )
+            if not res.is_success:
+                raise Exception(f"Failed to reset password: {res.text}")
             return res.json()
 
     async def get_players(self):
@@ -213,7 +226,7 @@ class SupabaseHttpClient:
         if academy_id and "academy_id" not in user_data:
             user_data = {**user_data, "academy_id": academy_id}
         url = f"{self.url}/rest/v1/users"
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.post(
                 url,
                 json=user_data,
@@ -426,7 +439,7 @@ class SupabaseHttpClient:
     # Public Requests
     async def insert_public_request(self, data: dict):
         import httpx
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.post(
                 f"{self.url}/rest/v1/public_requests",
                 json=data,
@@ -801,7 +814,7 @@ class SupabaseHttpClient:
             "Content-Type": content_type,
             "x-upsert": "true",
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.post(
                 f"{self.url}/storage/v1/object/{bucket}/{path}",
                 content=content,
@@ -822,7 +835,7 @@ class SupabaseHttpClient:
             "Authorization": f"Bearer {_key}",
             "Content-Type": "application/json",
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.delete(
                 f"{self.url}/storage/v1/object/{bucket}/{path}",
                 headers=headers

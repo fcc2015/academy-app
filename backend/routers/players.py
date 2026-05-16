@@ -50,7 +50,7 @@ async def create_player(player: PlayerCreate):
         try:
             import httpx as _httpx
             from core.config import settings as _s
-            async with _httpx.AsyncClient(timeout=10.0) as _c:
+            async with _httpx.AsyncClient(trust_env=False, timeout=10.0) as _c:
                 _dup_res = await _c.get(
                     f"{_s.SUPABASE_URL}/rest/v1/users?full_name=eq.{quote(player.full_name)}&role=eq.player&select=id",
                     headers=supabase.admin_headers
@@ -77,7 +77,7 @@ async def create_player(player: PlayerCreate):
                 import httpx as _httpx
                 from core.config import settings as _s
                 existing_parent = None
-                async with _httpx.AsyncClient(timeout=10.0) as _c:
+                async with _httpx.AsyncClient(trust_env=False, timeout=10.0) as _c:
                     # We must query auth users since public.users doesn't have an email column
                     auth_users_res = await _c.get(
                         f"{_s.SUPABASE_URL}/auth/v1/admin/users",
@@ -205,6 +205,35 @@ async def get_player_by_id(user_id: str):
         )
 
 
+@router.post("/{player_id}/reset-parent-pwd")
+async def reset_parent_password(player_id: str, current_user: dict = Depends(verify_token)):
+    """Reset the parent's password to a known value for testing purposes."""
+    try:
+        if current_user.get("role") not in ["admin", "super_admin", "sous_admin"]:
+            raise HTTPException(status_code=403, detail="Not authorized")
+            
+        import string, secrets
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+        new_pwd = "".join(secrets.choice(alphabet) for i in range(10))
+        
+        # Get player's parent_id
+        res = await supabase._get(f"/rest/v1/players?user_id=eq.{player_id}&select=parent_id")
+        if not res or not res[0].get("parent_id"):
+            raise HTTPException(status_code=404, detail="Player has no parent associated")
+            
+        parent_id = res[0]["parent_id"]
+        
+        # Reset password
+        await supabase.admin_update_user_password(parent_id, new_pwd)
+        
+        return {"success": True, "new_password": new_pwd}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting parent password: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.put("/{user_id}", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
 async def update_player(user_id: str, player: PlayerCreate):
     try:
@@ -254,7 +283,7 @@ async def get_players_by_parent(parent_id: str):
         import httpx as _httpx
         from core.config import settings
 
-        async with _httpx.AsyncClient(timeout=10.0) as client:
+        async with _httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             # Primary lookup: players where parent_id matches
             res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/players?parent_id=eq.{parent_id}&select=*",
@@ -311,7 +340,7 @@ async def upload_player_photo(file: UploadFile = File(...)):
         "Content-Type": "image/jpeg",
     }
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.post(
                 f"{settings.SUPABASE_URL}/storage/v1/object/player-photos/{filename}",
                 content=content,
