@@ -65,10 +65,14 @@ async def create_player(player: PlayerCreate):
         except Exception as dup_err:
             logger.warning("Duplicate check failed (non-critical): %s", dup_err)
 
-        # --- Auto-create parent auth account if parent_email provided ---
+        # --- Auto-create parent auth account ---
         temp_password = None
         parent_auth_id = None
         parent_email = getattr(player, 'parent_email', None)
+        
+        # If no parent email provided, auto-generate one
+        if not parent_email:
+            parent_email = f"parent_{player.user_id[:8].lower()}@academy.local"
 
         if parent_email:
             temp_password = generate_temp_password()
@@ -226,7 +230,15 @@ async def reset_parent_password(player_id: str, current_user: dict = Depends(ver
         # Reset password
         await supabase.admin_update_user_password(parent_id, new_pwd)
         
-        return {"success": True, "new_password": new_pwd}
+        # Get the actual email of the parent to display it
+        try:
+            parent_auth_user = await supabase.admin_get_user_by_id(parent_id)
+            actual_email = parent_auth_user.get("email", "Unknown")
+        except Exception as e:
+            logger.warning(f"Failed to fetch parent email: {e}")
+            actual_email = "Unknown (Check your records)"
+        
+        return {"success": True, "new_password": new_pwd, "email": actual_email}
     except HTTPException:
         raise
     except Exception as e:
@@ -237,7 +249,45 @@ async def reset_parent_password(player_id: str, current_user: dict = Depends(ver
 @router.put("/{user_id}", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
 async def update_player(user_id: str, player: PlayerCreate):
     try:
+        # Check if the player already has a parent
+        existing_res = await supabase._get(f"/rest/v1/players?user_id=eq.{user_id}&select=parent_id")
+        existing_parent_id = existing_res[0].get("parent_id") if existing_res else None
+
         player_dict = player.model_dump(exclude={"user_id", "full_name", "parent_email"}, mode='json')
+        
+        # If no parent exists, try to create one if email provided (or auto-generate one)
+        if not existing_parent_id:
+            parent_email = getattr(player, 'parent_email', None)
+            if not parent_email:
+                parent_email = f"parent_{user_id[:8].lower()}@academy.local"
+                
+            try:
+                # Check if this email is already a parent
+                import httpx as _httpx
+                from core.config import settings as _s
+                existing_parent = None
+                async with _httpx.AsyncClient(trust_env=False, timeout=10.0) as _c:
+                    auth_users_res = await _c.get(f"{_s.SUPABASE_URL}/auth/v1/admin/users", headers=supabase.admin_headers)
+                    if auth_users_res.status_code == 200:
+                        all_users = auth_users_res.json().get('users', [])
+                        existing = [u for u in all_users if u.get('email') == parent_email]
+                        if existing:
+                            existing_parent = existing[0]
+                
+                if existing_parent:
+                    player_dict["parent_id"] = existing_parent["id"]
+                else:
+                    from core.context import academy_id_ctx
+                    auth_user = await supabase.admin_create_user(
+                        email=parent_email,
+                        password=generate_temp_password(),
+                        role="parent",
+                        full_name=player.parent_name,
+                        academy_id=academy_id_ctx.get(None)
+                    )
+                    player_dict["parent_id"] = auth_user["id"]
+            except Exception as parent_err:
+                logger.error("Failed to auto-create parent on update: %s", parent_err)
         response = await supabase.update_player(user_id, player_dict)
         if not response:
             raise HTTPException(status_code=404, detail="Player not found")
