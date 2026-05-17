@@ -171,6 +171,7 @@ class TestUpdatePlayer:
     """PUT /players/{user_id}"""
 
     def test_update_player_success(self, admin_client, mocker):
+        mocker.patch("routers.players.supabase._get", new_callable=AsyncMock, return_value=[{"parent_id": None}])
         mocker.patch(
             "routers.players.supabase.update_player",
             new_callable=AsyncMock,
@@ -182,12 +183,14 @@ class TestUpdatePlayer:
         assert r.json()["full_name"] == "Youssef Amrani"
 
     def test_update_player_not_found(self, admin_client, mocker):
+        mocker.patch("routers.players.supabase._get", new_callable=AsyncMock, return_value=[{"parent_id": None}])
         mocker.patch("routers.players.supabase.update_player", new_callable=AsyncMock, return_value=[])
 
         r = admin_client.put("/api/v1/players/nonexistent", json=VALID_PLAYER)
         assert r.status_code == 404
 
     def test_update_player_db_error_500(self, admin_client, mocker):
+        mocker.patch("routers.players.supabase._get", new_callable=AsyncMock, return_value=[{"parent_id": None}])
         mocker.patch(
             "routers.players.supabase.update_player",
             new_callable=AsyncMock,
