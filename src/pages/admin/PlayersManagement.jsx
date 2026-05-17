@@ -1222,42 +1222,6 @@ const PlayersManagement = () => {
                                                         <Smartphone size={14} />
                                                     </a>
                                                 )}
-                                                {player.user_id && (
-                                                    <button onClick={async () => {
-                                                        const result = await Swal.fire({
-                                                            title: isRTL ? 'إعادة تعيين كلمة المرور؟' : 'Reset Parent Password?',
-                                                            text: isRTL ? 'هل أنت متأكد من تغيير كلمة مرور ولي الأمر؟' : 'Are you sure you want to reset this parent\'s password?',
-                                                            icon: 'warning',
-                                                            showCancelButton: true,
-                                                            confirmButtonText: isRTL ? 'نعم، تغيير' : 'Yes, reset',
-                                                            cancelButtonText: t('common.cancel')
-                                                        });
-                                                        if (result.isConfirmed) {
-                                                            try {
-                                                                const res = await authFetch(`${API_URL}/players/${player.user_id}/reset-parent-pwd`, { method: 'POST' });
-                                                                if (!res.ok) {
-                                                                    const text = await res.text();
-                                                                    throw new Error(text);
-                                                                }
-                                                                const data = await res.json();
-                                                                Swal.fire({
-                                                                    title: isRTL ? 'تم تغيير كلمة المرور!' : 'Password Reset Successful!',
-                                                                    html: `
-                                                                        <div class="text-left mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200" dir="ltr">
-                                                                            <p class="mb-2"><strong>Login:</strong> ${player.parent_email || 'Unknown (Check Email)'}</p>
-                                                                            <p><strong>Password:</strong> <code class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded select-all font-mono">${data.new_password}</code></p>
-                                                                        </div>
-                                                                    `,
-                                                                    icon: 'success'
-                                                                });
-                                                            } catch (e) {
-                                                                Swal.fire('Error', e.message, 'error');
-                                                            }
-                                                        }
-                                                    }} className="text-indigo-500 hover:text-indigo-700 transition-colors" title={isRTL ? "إعادة تعيين كلمة المرور لولي الأمر" : "Reset Parent Password"}>
-                                                        <Key size={14} />
-                                                    </button>
-                                                )}
                                             </div>
                                             {(player.medical_cert_valid_until || player.transport_zone) && (
                                                 <div className={`flex gap-2 mt-2 ${isRTL ? 'justify-end' : 'justify-start'}`}>
@@ -1292,29 +1256,66 @@ const PlayersManagement = () => {
                                                 <button onClick={() => { setCurrentPlayer(player); setIsBadgeModalOpen(true); }} className="p-3 bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-500 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={t('players.viewCard')}><QrCode size={16} /></button>
                                                 <button onClick={() => openEditModal(player)} className="p-3 bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-600 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={isRTL ? 'تعديل البيانات' : 'Edit'}><Edit2 size={16} /></button>
                                                 {(player.parent_id || player.user_id) && (
-                                                    <button
-                                                        onClick={async () => {
-                                                            try {
-                                                                // Prefer parent_id — that's the actual auth user we want to impersonate
-                                                                const targetId = player.parent_id || player.user_id;
-                                                                const data = await impersonateUser(targetId);
-                                                                // Verify localStorage was actually set (impersonateUser already does this)
-                                                                const storedId = localStorage.getItem('impersonating_user_id');
-                                                                if (!storedId) {
-                                                                    throw new Error(isRTL ? 'فشل حفظ بيانات الجلسة' : 'Failed to save impersonation session');
+                                                    <>
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const targetId = player.parent_id || player.user_id;
+                                                                    const data = await impersonateUser(targetId);
+                                                                    const storedId = localStorage.getItem('impersonating_user_id');
+                                                                    if (!storedId) {
+                                                                        throw new Error(isRTL ? 'فشل حفظ بيانات الجلسة' : 'Failed to save impersonation session');
+                                                                    }
+                                                                    navigate('/admin/view-as-parent');
                                                                 }
-                                                                // Navigate within SPA — avoids full page reload that can reset auth guards
-                                                                navigate('/admin/view-as-parent');
-                                                            }
-                                                            catch (e) {
-                                                                Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message });
-                                                            }
-                                                        }}
-                                                        className="p-3 bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-600 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1"
-                                                        title={isRTL ? 'دخول كولي الأمر' : 'Login as parent'}
-                                                    >
-                                                        <LogIn size={16} />
-                                                    </button>
+                                                                catch (e) {
+                                                                    Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message });
+                                                                }
+                                                            }}
+                                                            className="p-3 bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-600 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1"
+                                                            title={isRTL ? 'دخول كولي الأمر' : 'Login as parent'}
+                                                        >
+                                                            <LogIn size={16} />
+                                                        </button>
+                                                        <button 
+                                                            onClick={async () => {
+                                                                const result = await Swal.fire({
+                                                                    title: isRTL ? 'إعادة تعيين كلمة المرور؟' : 'Reset Parent Password?',
+                                                                    text: isRTL ? 'هل أنت متأكد من تغيير كلمة مرور ولي الأمر؟' : 'Are you sure you want to reset this parent\'s password?',
+                                                                    icon: 'warning',
+                                                                    showCancelButton: true,
+                                                                    confirmButtonText: isRTL ? 'نعم، تغيير' : 'Yes, reset',
+                                                                    cancelButtonText: t('common.cancel')
+                                                                });
+                                                                if (result.isConfirmed) {
+                                                                    try {
+                                                                        const res = await authFetch(`${API_URL}/players/${player.user_id}/reset-parent-pwd`, { method: 'POST' });
+                                                                        if (!res.ok) {
+                                                                            const text = await res.text();
+                                                                            throw new Error(text);
+                                                                        }
+                                                                        const data = await res.json();
+                                                                        Swal.fire({
+                                                                            title: isRTL ? 'تم تغيير كلمة المرور!' : 'Password Reset Successful!',
+                                                                            html: `
+                                                                                <div class="text-left mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200" dir="ltr">
+                                                                                    <p class="mb-2"><strong>Login:</strong> ${player.parent_email || 'Unknown (Check Email)'}</p>
+                                                                                    <p><strong>Password:</strong> <code class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded select-all font-mono">${data.new_password}</code></p>
+                                                                                </div>
+                                                                            `,
+                                                                            icon: 'success'
+                                                                        });
+                                                                    } catch (e) {
+                                                                        Swal.fire('Error', e.message, 'error');
+                                                                    }
+                                                                }
+                                                            }} 
+                                                            className="p-3 bg-sky-50 text-sky-600 border border-sky-200 hover:bg-sky-600 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" 
+                                                            title={isRTL ? "إعادة تعيين كلمة المرور لولي الأمر" : "Reset Parent Password"}
+                                                        >
+                                                            <Key size={16} />
+                                                        </button>
+                                                    </>
                                                 )}
                                                 <button onClick={() => handleDelete(player.user_id)} className="p-3 bg-red-50 text-red-500 border border-red-100 hover:bg-red-500 hover:text-white rounded-xl hover:shadow-lg transition-all hover:-translate-y-1" title={isRTL ? 'حذف من النظام' : 'Delete'}><Trash2 size={16} /></button>
                                             </div>
