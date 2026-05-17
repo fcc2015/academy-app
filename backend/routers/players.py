@@ -13,9 +13,21 @@ from urllib.parse import quote
 
 router = APIRouter(prefix="/players", tags=["Players Engine"], dependencies=[Depends(verify_token)])
 
-def generate_temp_password(length=10):
-    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-    return "".join(secrets.choice(alphabet) for i in range(length))
+def generate_temp_password(length=12):
+    import string, secrets, random
+    lower = string.ascii_lowercase
+    upper = string.ascii_uppercase
+    digits = string.digits
+    special = "!@#$%^&*"
+    pwd = [
+        secrets.choice(lower),
+        secrets.choice(upper),
+        secrets.choice(digits),
+        secrets.choice(special)
+    ]
+    pwd += [secrets.choice(lower + upper + digits + special) for _ in range(length - 4)]
+    random.shuffle(pwd)
+    return "".join(pwd)
 
 @router.get("/", response_model=List[PlayerResponse])
 async def get_all_players(user: dict = Depends(require_role("admin", "coach", "super_admin", "sous_admin"))):
@@ -216,9 +228,7 @@ async def reset_parent_password(player_id: str, current_user: dict = Depends(ver
         if current_user.get("role") not in ["admin", "super_admin", "sous_admin"]:
             raise HTTPException(status_code=403, detail="Not authorized")
             
-        import string, secrets
-        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-        new_pwd = "".join(secrets.choice(alphabet) for i in range(10))
+        new_pwd = generate_temp_password()
         
         # Get player's parent_id
         res = await supabase._get(f"/rest/v1/players?user_id=eq.{player_id}&select=parent_id")
