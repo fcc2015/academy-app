@@ -175,9 +175,9 @@ const ParentLayout = () => {
                     <div className="flex items-center gap-4 ml-auto">
                         <LanguageSwitcher />
                         <NotificationsDropdown />
-                        <div className="h-8 w-px bg-slate-200 mx-2 hidden sm:block"></div>
-                        <div className="hidden sm:flex flex-col items-end">
-                            <span className="text-sm font-black text-indigo-700 uppercase tracking-wide truncate max-w-[200px]">{academyName}</span>
+                        <div className="h-8 w-px bg-slate-200 mx-2 block"></div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-sm md:text-base font-black text-indigo-700 uppercase tracking-wide truncate max-w-[150px] md:max-w-[250px]">{academyName}</span>
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{isRTL ? 'حساب ولي الأمر' : 'Parent Account'}</span>
                         </div>
                         <div className="w-11 h-11 bg-slate-100 rounded-full border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
