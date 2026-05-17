@@ -93,8 +93,8 @@ def test_login_success_sets_cookies(client, mocker, respx_mock):
     assert "csrf_token" in cookies
 
 
-def test_login_blocks_pending_parent(client, mocker, respx_mock):
-    """Parent with account_status=Pending should be blocked with 403."""
+def test_login_allows_pending_parent_and_returns_status(client, mocker, respx_mock):
+    """Parent with account_status=Pending should be allowed but flagged as Pending in the response."""
     async def fake_signin(email, password):
         return {
             "user": {"id": "pending-user", "email": email, "user_metadata": {"role": "parent"}},
@@ -115,7 +115,8 @@ def test_login_blocks_pending_parent(client, mocker, respx_mock):
         "/api/v1/auth/login",
         json={"email": "pending@test.com", "password": "validpass"},
     )
-    assert res.status_code == 403
+    assert res.status_code == 200
+    assert res.json()["account_status"] == "Pending"
 
 
 # ─── /auth/logout ──────────────────────────────────────────────
