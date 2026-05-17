@@ -1,10 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { ThemeProvider } from './components/ThemeContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import ImpersonationBanner from './components/ImpersonationBanner';
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 
 // Pages — Eagerly loaded (public/critical)
 import LandingPage from './pages/LandingPage';
@@ -88,6 +88,21 @@ const PageLoader = () => (
   </div>
 );
 
+// Bridges non-React api.js 401 handler to React Router navigation
+// so that impersonation exits use SPA navigation instead of hard reloads.
+function ImpersonationExitHandler() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const handler = (e) => {
+      const to = e.detail?.to || '/admin/players';
+      navigate(to, { replace: true });
+    };
+    window.addEventListener('impersonation-exit', handler);
+    return () => window.removeEventListener('impersonation-exit', handler);
+  }, [navigate]);
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -95,6 +110,7 @@ function App() {
     <LanguageProvider>
     <ToastProvider>
       <Router>
+        <ImpersonationExitHandler />
         <ImpersonationBanner />
         <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -151,7 +167,6 @@ function App() {
             <Route path="tactics" element={<AdminTactics />} />
             <Route path="pending-parents" element={<AdminPendingParents />} />
             <Route path="settings" element={<SettingsManagement />} />
-            <Route path="view-as-parent" element={<ParentDashboard />} />
           </Route>
 
           {/* Coach */}
