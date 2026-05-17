@@ -209,6 +209,17 @@ class SupabaseHttpClient:
                 raise Exception(f"Failed to reset password: {res.text}")
             return res.json()
 
+    async def admin_get_user_by_id(self, user_id: str):
+        """Use the Supabase Auth Admin API to get a user by ID."""
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            res = await client.get(
+                f"{self.url}/auth/v1/admin/users/{user_id}",
+                headers=self.admin_headers
+            )
+            if not res.is_success:
+                raise Exception(f"Failed to get user: {res.text}")
+            return res.json()
+
     async def get_players(self):
         return await self._get("/rest/v1/players?select=*&order=created_at.desc")
 

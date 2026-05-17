@@ -1305,7 +1305,7 @@ const PlayersManagement = () => {
                                                                                 title: isRTL ? 'تم تغيير كلمة المرور!' : 'Password Reset Successful!',
                                                                                 html: `
                                                                                     <div class="text-left mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200" dir="ltr">
-                                                                                        <p class="mb-2"><strong>Login:</strong> ${player.parent_email || 'Unknown (Check Email)'}</p>
+                                                                                        <p class="mb-2"><strong>Login:</strong> <span class="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-mono">${data.email || 'Unknown'}</span></p>
                                                                                         <p><strong>Password:</strong> <code class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded select-all font-mono">${data.new_password}</code></p>
                                                                                     </div>
                                                                                 `,
