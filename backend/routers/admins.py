@@ -209,11 +209,22 @@ async def get_impersonation_target(user_id: str):
                 f"{_settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=user_id,parent_name,u_category,photo_url,academy_id,parent_id",
                 headers=supabase.admin_headers,
             )
-            if p_res.status_code == 200 and p_res.json():
-                player = p_res.json()[0]
-                # If player has a parent_id, try to impersonate the parent instead
+            players_data = p_res.json() if p_res.status_code == 200 else []
+            
+            # If not found by user_id, check if this user_id is actually a parent_id in players table
+            if not players_data:
+                p2_res = await client.get(
+                    f"{_settings.SUPABASE_URL}/rest/v1/players?parent_id=eq.{user_id}&select=user_id,parent_name,u_category,photo_url,academy_id,parent_id",
+                    headers=supabase.admin_headers,
+                )
+                if p2_res.status_code == 200 and p2_res.json():
+                    players_data = p2_res.json()
+
+            if players_data:
+                player = players_data[0]
+                # If player has a parent_id, try to fetch the parent from users table
                 parent_id = player.get("parent_id")
-                if parent_id:
+                if parent_id and parent_id != user_id: # Avoid loop if user_id WAS the parent_id
                     pu_res = await client.get(
                         f"{_settings.SUPABASE_URL}/rest/v1/users?id=eq.{parent_id}&select=id,email,full_name,role,academy_id",
                         headers=supabase.admin_headers,
@@ -221,12 +232,12 @@ async def get_impersonation_target(user_id: str):
                     if pu_res.status_code == 200 and pu_res.json():
                         target = pu_res.json()[0]
 
-                # If still no target, build a synthetic one from the player record
+                # If still no target (e.g. parent deleted from users, or user_id was parent_id but parent not in users), build a synthetic one
                 if not target:
                     target = {
                         "id": user_id,
                         "email": None,
-                        "full_name": player.get("parent_name", "لاعب"),
+                        "full_name": player.get("parent_name", "ولي أمر") if player.get("parent_name") else "ولي أمر",
                         "role": "parent",
                         "academy_id": player.get("academy_id"),
                     }
