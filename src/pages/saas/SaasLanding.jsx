@@ -5,7 +5,7 @@ import {
     Check, ChevronRight, Star, Users, Phone, Mail, MapPin,
     Shield, Trophy, BarChart3, Zap, Globe, Crown, Clock, X, Menu,
     ArrowRight, CheckCircle2, Loader2, MessageSquare, FileText, RotateCcw,
-    Lock, Headphones, TrendingUp, Layout, Database, Smartphone
+    Lock, Headphones, TrendingUp, Layout, Database, Smartphone, Search, Building2
 } from 'lucide-react';
 
 const PLANS = [
@@ -51,6 +51,7 @@ const FEATURES = [
 
 const NAV_LINKS = [
     { id: 'features', label: 'Fonctionnalités' },
+    { id: 'academies', label: 'Trouver une Académie' },
     { id: 'pricing', label: 'Tarifs' },
     { id: 'about', label: 'À propos' },
     { id: 'contact', label: 'Contact' },
@@ -80,6 +81,36 @@ export default function SaasLanding() {
     const [regForm, setRegForm] = useState({ academy_name: '', admin_name: '', admin_email: '', admin_email_confirm: '', admin_password: '', admin_password_confirm: '' });
     const [regStatus, setRegStatus] = useState(null); // null | 'loading' | 'success' | 'error'
     const [regError, setRegError] = useState('');
+
+    // Directory State
+    const [directoryAcademies, setDirectoryAcademies] = useState([]);
+    const [directoryFilters, setDirectoryFilters] = useState({ country: '', city: '' });
+    const [directoryLoading, setDirectoryLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchDirectory = async () => {
+            setDirectoryLoading(true);
+            try {
+                const query = new URLSearchParams();
+                if (directoryFilters.country) query.append('country', directoryFilters.country);
+                if (directoryFilters.city) query.append('city', directoryFilters.city);
+                
+                const res = await fetch(`${API_URL}/public/academies?${query.toString()}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setDirectoryAcademies(data);
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setDirectoryLoading(false);
+            }
+        };
+        const debounce = setTimeout(() => {
+            fetchDirectory();
+        }, 300);
+        return () => clearTimeout(debounce);
+    }, [directoryFilters]);
 
     // Wake up Render backend on page load (free tier cold start)
     useEffect(() => {
@@ -134,7 +165,7 @@ export default function SaasLanding() {
     useEffect(() => {
         const handleScroll = () => {
             setIsScrolled(window.scrollY > 30);
-            const sections = ['features', 'pricing', 'about', 'contact'];
+            const sections = ['features', 'academies', 'pricing', 'about', 'contact'];
             for (const s of sections.reverse()) {
                 const el = document.getElementById(s);
                 if (el && window.scrollY >= el.offsetTop - 100) {
@@ -830,6 +861,91 @@ export default function SaasLanding() {
                             );
                         })}
                     </div>
+                </div>
+            </section>
+
+            {/* ─── ACADEMY DIRECTORY ─── */}
+            <section id="academies" className="py-24 px-4" style={{ background: 'white' }}>
+                <div className="max-w-6xl mx-auto">
+                    <div className="text-center mb-12">
+                        <span className="inline-block text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full mb-4" style={{ background: 'rgba(16,185,129,0.08)', color: '#10b981' }}>
+                            Découvrir
+                        </span>
+                        <h2 className="text-4xl font-black text-slate-900 tracking-tight mb-4" style={{ letterSpacing: '-0.025em' }}>
+                            Trouvez l'académie de votre enfant
+                        </h2>
+                        <p className="text-slate-500 max-w-xl mx-auto font-medium leading-relaxed">
+                            Recherchez parmi notre réseau d'académies partenaires et inscrivez votre enfant en quelques clics.
+                        </p>
+                    </div>
+
+                    {/* Search Filters */}
+                    <div className="max-w-3xl mx-auto mb-12 flex flex-col sm:flex-row gap-4 p-4 rounded-3xl" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                        <div className="flex-1 relative">
+                            <Globe size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input 
+                                type="text"
+                                placeholder="Pays (ex: Maroc, France...)"
+                                value={directoryFilters.country}
+                                onChange={(e) => setDirectoryFilters({...directoryFilters, country: e.target.value})}
+                                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50 bg-white text-sm font-medium transition-all"
+                            />
+                        </div>
+                        <div className="flex-1 relative">
+                            <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input 
+                                type="text"
+                                placeholder="Ville (ex: Casablanca, Paris...)"
+                                value={directoryFilters.city}
+                                onChange={(e) => setDirectoryFilters({...directoryFilters, city: e.target.value})}
+                                className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200 focus:outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50 bg-white text-sm font-medium transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Results */}
+                    {directoryLoading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 size={32} className="animate-spin text-emerald-500" />
+                        </div>
+                    ) : directoryAcademies.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {directoryAcademies.map(ac => (
+                                <div key={ac.id} className="group rounded-3xl p-6 flex flex-col bg-white transition-all duration-300 hover:-translate-y-1" style={{ border: '1px solid rgba(148,163,184,0.15)', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
+                                    <div className="flex items-center gap-4 mb-5">
+                                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden shrink-0" style={{ background: ac.primary_color ? `${ac.primary_color}15` : '#f1f5f9', border: '1px solid rgba(0,0,0,0.05)' }}>
+                                            {ac.logo_url ? (
+                                                <img src={ac.logo_url} alt={ac.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Building2 size={24} style={{ color: ac.primary_color || '#94a3b8' }} />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h3 className="font-black text-slate-900 text-lg mb-1 group-hover:text-emerald-600 transition-colors">{ac.name}</h3>
+                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                                                <MapPin size={12} />
+                                                {(ac.city || ac.country) ? [ac.city, ac.country].filter(Boolean).join(', ') : 'Emplacement non spécifié'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-auto pt-5 border-t border-slate-100">
+                                        <button 
+                                            onClick={() => window.location.href = `/parent/signup?academy_id=${ac.id}`}
+                                            className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
+                                            style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white' }}>
+                                            Inscrire mon enfant <ChevronRight size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-20 bg-slate-50 rounded-3xl border border-slate-100">
+                            <Search size={48} className="mx-auto text-slate-300 mb-4" />
+                            <h3 className="font-bold text-slate-700 text-lg mb-2">Aucune académie trouvée</h3>
+                            <p className="text-slate-500 text-sm">Essayez de modifier vos critères de recherche.</p>
+                        </div>
+                    )}
                 </div>
             </section>
 

@@ -112,9 +112,15 @@ async def setup_academy_for_google_user(req: SetupAcademyRequest, user: dict = D
 
     async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # 1. Create academy
+        academy_payload = {"name": academy_name, "status": "active", "subscription_status": "free"}
+        if req.country:
+            academy_payload["country"] = req.country
+        if req.city:
+            academy_payload["city"] = req.city
+            
         res = await client.post(
             f"{supabase.url}/rest/v1/academies?select=id",
-            json={"name": academy_name, "status": "active", "subscription_status": "free"},
+            json=academy_payload,
             headers=supabase.admin_headers
         )
         if res.status_code not in [200, 201]:
@@ -145,6 +151,8 @@ async def setup_academy_for_google_user(req: SetupAcademyRequest, user: dict = D
 
 class RegisterAcademyRequest(BaseModel):
     academy_name: str = Field(..., min_length=2, max_length=100)
+    country: Optional[str] = Field(None, max_length=100)
+    city: Optional[str] = Field(None, max_length=100)
     admin_name: str = Field(..., min_length=2, max_length=100)
     admin_email: EmailStr
     admin_password: str = Field(..., min_length=6, max_length=128)
@@ -211,6 +219,8 @@ async def register_academy(req: RegisterAcademyRequest):
         "subdomain": subdomain,
         "status": "active",
         "subscription_status": "free",
+        "country": req.country,
+        "city": req.city
     }
 
     try:
@@ -409,3 +419,27 @@ async def delete_public_request(request_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred. Please try again."
         )
+
+@router.get("/academies")
+async def get_public_academies_directory(country: Optional[str] = None, city: Optional[str] = None):
+    """
+    Public directory of active academies.
+    Parents use this to find and register to academies by country/city.
+    """
+    try:
+        query = f"{supabase.url}/rest/v1/academies?select=id,name,city,country,logo_url,primary_color,plan_id&status=eq.active&order=name.asc"
+        
+        if country:
+            query += f"&country=ilike.*{quote(country)}*"
+        if city:
+            query += f"&city=ilike.*{quote(city)}*"
+            
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            res = await client.get(query, headers=supabase.admin_headers)
+            if res.status_code == 200:
+                return res.json()
+            return []
+    except Exception as e:
+        logger.error(f"Error fetching public academies directory: {e}", exc_info=True)
+        return []
+

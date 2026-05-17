@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { API_URL } from '../../config';
 import { Sparkles, Loader2, Mail, Lock, User, Phone, Users, Shield, Eye, EyeOff, Check, AlertCircle, Building2 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const ParentSignup = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const urlAcademyId = searchParams.get('academy_id');
     const { isRTL, dir } = useLanguage();
 
     const [form, setForm] = useState({
-        full_name: '', email: '', password: '', phone: '', academy_id: '', child_name: ''
+        full_name: '', email: '', password: '', phone: '', academy_id: urlAcademyId || '', child_name: ''
     });
     const [showPassword, setShowPassword] = useState(false);
     const [academies, setAcademies] = useState([]);
@@ -172,7 +174,8 @@ const ParentSignup = () => {
                         <select
                             value={form.academy_id}
                             onChange={onChange('academy_id')}
-                            className="w-full pl-10 pr-3 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-400 appearance-none"
+                            disabled={!!urlAcademyId}
+                            className={`w-full pl-10 pr-3 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-indigo-400 appearance-none ${urlAcademyId ? 'opacity-80 cursor-not-allowed bg-white/10' : ''}`}
                         >
                             <option value="" className="bg-slate-800">
                                 {isRTL ? 'اختر الأكاديمية' : 'Sélectionner une académie'}
@@ -181,6 +184,11 @@ const ParentSignup = () => {
                                 <option key={a.id} value={a.id} className="bg-slate-800">{a.name}</option>
                             ))}
                         </select>
+                        {urlAcademyId && (
+                            <div className="absolute top-1/2 -translate-y-1/2 right-3 text-emerald-400">
+                                <Check size={16} />
+                            </div>
+                        )}
                     </div>
 
                     <button
