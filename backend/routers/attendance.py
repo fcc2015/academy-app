@@ -41,6 +41,8 @@ async def get_player_attendance(player_id: str):
 async def bulk_upsert_attendance(payload: AttendanceBulkCreate):
     try:
         records = []
+        absent_player_ids = []
+
         for item in payload.records:
             records.append({
                 "squad_id": payload.squad_id,
@@ -49,8 +51,42 @@ async def bulk_upsert_attendance(payload: AttendanceBulkCreate):
                 "status": item.status,
                 "notes": item.notes
             })
-            
-        return await supabase.upsert_attendance(records)
+            if item.status and item.status.lower() in ("absent", "غائب", "غياب"):
+                absent_player_ids.append(item.player_id)
+
+        result = await supabase.upsert_attendance(records)
+
+        # Send notification to parent for each absent player
+        for player_id in absent_player_ids:
+            try:
+                import httpx as _httpx
+                from core.config import settings as _settings
+                async with _httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
+                    p_res = await client.get(
+                        f"{_settings.SUPABASE_URL}/rest/v1/players?id=eq.{player_id}&select=parent_name,u_category,parent_id",
+                        headers=supabase.admin_headers,
+                    )
+                    if p_res.status_code == 200 and p_res.json():
+                        player = p_res.json()[0]
+                        parent_id = player.get("parent_id")
+                        player_name = player.get("parent_name") or "اللاعب"
+                        date_str = payload.date.strftime("%d/%m/%Y")
+
+                        notif = {
+                            "title": "🔴 غياب اللاعب",
+                            "message": f"تم تسجيل غياب {player_name} بتاريخ {date_str}. إذا كان هناك عذر، يرجى التواصل مع الأكاديمية.",
+                            "type": "alert",
+                        }
+                        if parent_id:
+                            notif["user_id"] = parent_id
+                        else:
+                            notif["target_role"] = "parent"
+
+                        await supabase.insert_notification(notif)
+            except Exception as notif_err:
+                logger.warning("Failed to send absence notification for player %s: %s", player_id, notif_err)
+
+        return result
     except Exception as e:
         logger.error("Error saving attendance: %s", e, exc_info=True)
         raise HTTPException(
