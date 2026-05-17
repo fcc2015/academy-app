@@ -16,9 +16,8 @@ ADMIN_HEADERS = {
 }
 
 SQL_STATEMENTS = [
+    "ALTER TABLE academies ADD COLUMN IF NOT EXISTS country text;",
     "ALTER TABLE academies ADD COLUMN IF NOT EXISTS city text;",
-    "ALTER TABLE academies ADD COLUMN IF NOT EXISTS notes text;",
-    "ALTER TABLE academies ADD COLUMN IF NOT EXISTS subdomain text;",
 ]
 
 async def run():
