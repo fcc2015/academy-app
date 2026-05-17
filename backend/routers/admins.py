@@ -15,9 +15,21 @@ logger = logging.getLogger("admins")
 
 router = APIRouter(prefix="/admins", tags=["Admins"], dependencies=[Depends(verify_token)])
 
-def generate_temp_password(length=10):
-    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-    return "".join(secrets.choice(alphabet) for i in range(length))
+def generate_temp_password(length=12):
+    import string, secrets, random
+    lower = string.ascii_lowercase
+    upper = string.ascii_uppercase
+    digits = string.digits
+    special = "!@#$%^&*"
+    pwd = [
+        secrets.choice(lower),
+        secrets.choice(upper),
+        secrets.choice(digits),
+        secrets.choice(special)
+    ]
+    pwd += [secrets.choice(lower + upper + digits + special) for _ in range(length - 4)]
+    random.shuffle(pwd)
+    return "".join(pwd)
 
 @router.get("/", response_model=List[AdminResponse])
 async def get_all_admins():
@@ -74,7 +86,7 @@ async def create_admin(admin: AdminCreate):
                 # Email exists in auth — find the user_id and reuse
                 import httpx as _httpx
                 from core.config import settings as _settings
-                async with _httpx.AsyncClient(timeout=10.0) as _c:
+                async with _httpx.AsyncClient(trust_env=False, timeout=10.0) as _c:
                     _r = await _c.get(
                         f"{_settings.SUPABASE_URL}/auth/v1/admin/users?per_page=200",
                         headers=supabase.admin_headers,
@@ -182,7 +194,7 @@ async def get_impersonation_target(user_id: str):
     from core.config import settings as _settings
     caller_academy = academy_id_ctx.get(None)
 
-    async with _httpx.AsyncClient(timeout=10.0) as client:
+    async with _httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
         u_res = await client.get(
             f"{_settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=id,email,full_name,role,academy_id",
             headers=supabase.admin_headers,
@@ -286,7 +298,7 @@ async def invite_match_manager(req: MatchManagerInvite):
     try:
         academy_id = academy_id_ctx.get(None)
         if academy_id:
-            async with _httpx.AsyncClient(timeout=10.0) as client:
+            async with _httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
                 ar = await client.get(
                     f"{_settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=name",
                     headers=supabase.admin_headers,
@@ -331,7 +343,7 @@ async def reset_admin_password(admin_id: str):
 
         new_password = generate_temp_password()
 
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
             res = await client.put(
                 f"{_settings.SUPABASE_URL}/auth/v1/admin/users/{user_id}",
                 json={"password": new_password},

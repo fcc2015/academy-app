@@ -34,9 +34,21 @@ async def get_all_coaches():
             detail="An internal error occurred. Please try again."
         )
 
-def generate_temp_password(length=10):
-    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-    return "".join(secrets.choice(alphabet) for i in range(length))
+def generate_temp_password(length=12):
+    import string, secrets, random
+    lower = string.ascii_lowercase
+    upper = string.ascii_uppercase
+    digits = string.digits
+    special = "!@#$%^&*"
+    pwd = [
+        secrets.choice(lower),
+        secrets.choice(upper),
+        secrets.choice(digits),
+        secrets.choice(special)
+    ]
+    pwd += [secrets.choice(lower + upper + digits + special) for _ in range(length - 4)]
+    random.shuffle(pwd)
+    return "".join(pwd)
 
 @router.post("/", response_model=CoachResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
 async def create_coach(coach: CoachCreate):
