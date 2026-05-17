@@ -456,7 +456,7 @@ const AdminLogin = () => {
 
                             <div className="text-center">
                                 <button type="button"
-                                    onClick={() => navigate('/saas/login?mode=forgot')}
+                                    onClick={() => navigate('/forgot-password')}
                                     className="text-xs font-semibold text-indigo-400/70 hover:text-indigo-300 transition-colors">
                                     {isRTL ? 'نسيت كلمة المرور؟' : 'Mot de passe oublié?'}
                                 </button>
