@@ -259,6 +259,23 @@ const ParentDashboard = () => {
 
     return (
         <div className={`animate-fade-in space-y-8 ${isRTL ? 'text-right' : 'text-left'}`} dir={dir}>
+            {/* BIG ACADEMY WELCOME BANNER */}
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-700 rounded-[2rem] p-8 md:p-10 text-white shadow-xl shadow-indigo-600/20 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+                <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-500/20 rounded-full blur-2xl translate-y-1/3 -translate-x-1/3"></div>
+                <div className="relative z-10">
+                    <h1 className="text-3xl md:text-4xl font-black mb-2 tracking-tight leading-tight">
+                        {isRTL ? 'مرحباً بك في' : 'Welcome to'} <br/>
+                        <span className="text-yellow-300 drop-shadow-md leading-relaxed block mt-1">{academySettings?.academy_name || (isRTL ? 'الأكاديمية' : 'The Academy')}</span>
+                    </h1>
+                    <p className="text-indigo-100 font-bold max-w-lg mt-4 text-sm md:text-base leading-relaxed">
+                        {isRTL 
+                            ? 'نحن سعداء بانضمامك إلينا. يمكنك من خلال هذه المنصة تتبع مسار ابنك، الاطلاع على المباريات، التواصل مع الإدارة، وتسوية وضعيتك المالية بكل سهولة.'
+                            : 'We are thrilled to have you! Use this portal to track your child\'s progress, view upcoming matches, communicate with management, and manage your finances.'}
+                    </p>
+                </div>
+            </div>
+
             {/* 🔴 Suspended Player Banner */}
             {childData?.account_status === 'Suspended' && (
                 <div className={`p-5 rounded-2xl border-2 border-red-300 bg-red-50 ${isRTL ? 'text-right' : 'text-left'}`}>
