@@ -22,7 +22,7 @@ async def _require_enterprise_plan():
             status_code=status.HTTP_403_FORBIDDEN,
             detail="لم يتم تحديد الأكاديمية",
         )
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
         res = await client.get(
             f"{app_settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=plan_id",
             headers=supabase.admin_headers,
@@ -57,7 +57,7 @@ async def list_branches(user: dict = Depends(require_role("admin", "sous_admin",
     if not academy_id:
         raise HTTPException(status_code=400, detail="لم يتم تحديد الأكاديمية")
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
         # If sous_admin, only return their assigned branches
         if user["role"] == "sous_admin":
             # Get assigned branch IDs
@@ -105,7 +105,7 @@ async def create_branch(
         **branch.model_dump(),
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
         res = await client.post(
             f"{supabase.url}/rest/v1/branches",
             json=payload,
@@ -129,7 +129,7 @@ async def update_branch(
     if not update_data:
         raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
         res = await client.patch(
             f"{supabase.url}/rest/v1/branches?id=eq.{branch_id}",
             json=update_data,
@@ -150,7 +150,7 @@ async def delete_branch(
     user: dict = Depends(require_role("admin", "super_admin"))
 ):
     """حذف فرع — Admin فقط"""
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
         res = await client.delete(
             f"{supabase.url}/rest/v1/branches?id=eq.{branch_id}",
             headers=supabase.admin_headers,
@@ -172,7 +172,7 @@ async def assign_sous_admin_to_branch(
     if not academy_id:
         raise HTTPException(status_code=400, detail="لم يتم تحديد الأكاديمية")
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
         res = await client.post(
             f"{supabase.url}/rest/v1/sous_admin_branches",
             json={
@@ -197,7 +197,7 @@ async def unassign_sous_admin(
     user: dict = Depends(require_role("admin", "super_admin"))
 ):
     """إلغاء تعيين Sous-Admin من فرع"""
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
         res = await client.delete(
             f"{supabase.url}/rest/v1/sous_admin_branches"
             f"?user_id=eq.{user_id}&branch_id=eq.{branch_id}",
@@ -214,7 +214,7 @@ async def get_branch_sous_admins(
     user: dict = Depends(require_role("admin", "super_admin"))
 ):
     """قائمة Sous-Admins المعينين لفرع"""
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
         res = await client.get(
             f"{supabase.url}/rest/v1/sous_admin_branches"
             f"?branch_id=eq.{branch_id}&select=user_id,users(id,full_name,email)",

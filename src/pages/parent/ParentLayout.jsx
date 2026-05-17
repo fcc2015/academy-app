@@ -74,6 +74,17 @@ const ParentLayout = () => {
         return <Navigate to="/login" replace />;
     }
 
+    const accountStatus = localStorage.getItem('account_status') || 'Active';
+    
+    // If pending, force them to the checkout page
+    if (accountStatus === 'Pending' && !location.pathname.includes('/parent/checkout')) {
+        return <Navigate to="/parent/checkout" replace />;
+    }
+    
+    // If active, forbid access to checkout page
+    if (accountStatus === 'Active' && location.pathname.includes('/parent/checkout')) {
+        return <Navigate to="/parent/dashboard" replace />;
+    }
 
     const navItems = [
         { path: '/parent/dashboard', name: t('sidebar.dashboard'), icon: LayoutDashboard },

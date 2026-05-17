@@ -99,7 +99,7 @@ PLAN_LIMITS = {
 @router.get("/landing-settings")
 async def get_saas_landing_settings():
     """Read the single saas_landing_settings row."""
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
         res = await client.get(
             f"{supabase.url}/rest/v1/saas_landing_settings?id=eq.1",
             headers=supabase.admin_headers,
@@ -115,7 +115,7 @@ async def update_saas_landing_settings(data: SaasLandingSettings):
     payload = {k: v for k, v in data.model_dump().items() if v is not None}
     if not payload:
         raise HTTPException(status_code=400, detail="No fields to update.")
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
         res = await client.patch(
             f"{supabase.url}/rest/v1/saas_landing_settings?id=eq.1",
             json=payload,
@@ -133,7 +133,7 @@ async def update_saas_landing_settings(data: SaasLandingSettings):
 @router.get("/academies")
 async def get_academies():
     """Get all academies with real-time usage counts."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # Fetch academies, players, admins, coaches in parallel
         import asyncio
         tasks = [
@@ -189,7 +189,7 @@ async def get_academies():
 async def create_academy(req: AcademyProvisionRequest):
     """Provision a new client academy and its root admin.
     Uses service_role (admin_headers) for all DB writes — super_admin bypasses RLS."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # Dedup checks
         r = await client.get(
             f"{supabase.url}/rest/v1/academies?name=eq.{quote(req.name)}&select=id",
@@ -361,7 +361,7 @@ async def reset_academy_admin_password(academy_id: str, req: ResetPasswordReques
     if len(req.new_password) < 6:
         raise HTTPException(status_code=400, detail="كلمة المرور يجب أن تكون 6 أحرف على الأقل")
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # 1. Find admin user(s) for this academy
         admin_res = await client.get(
             f"{supabase.url}/rest/v1/users?academy_id=eq.{academy_id}&role=eq.admin&select=id,full_name",
@@ -388,7 +388,7 @@ async def reset_academy_admin_password(academy_id: str, req: ResetPasswordReques
 
 @router.patch("/academies/{academy_id}")
 async def update_academy(academy_id: str, data: AcademyStatusUpdate):
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.patch(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
             json={"status": data.status},
@@ -405,7 +405,7 @@ async def full_update_academy(academy_id: str, data: AcademyUpdateRequest):
     if not patch:
         raise HTTPException(status_code=400, detail="No fields to update.")
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # Try full patch — if city/notes columns don't exist, fall back to safe fields
         res = await client.patch(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
@@ -445,7 +445,7 @@ async def upload_academy_logo(academy_id: str, file: UploadFile = File(...)):
 
     url = await supabase.upload_file("avatars", file_path, content, file.content_type)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.patch(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
             json={"logo_url": url},
@@ -464,7 +464,7 @@ async def delete_academy(academy_id: str):
     """Permanently delete an academy and all associated data."""
     import asyncio
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # First verify it exists
         check = await client.get(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}&select=id,name",
@@ -517,7 +517,7 @@ async def bulk_update_status(data: BulkStatusUpdate):
         raise HTTPException(status_code=400, detail="No academy IDs provided.")
 
     import asyncio
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         tasks = [
             client.patch(
                 f"{supabase.url}/rest/v1/academies?id=eq.{aid}",
@@ -539,7 +539,7 @@ async def get_academy_details(academy_id: str):
     """Get full details for a single academy: info, admins, coaches, players, payments."""
     import asyncio
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         responses = await asyncio.gather(
             client.get(
                 f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}&select=*",
@@ -642,7 +642,7 @@ async def assign_domain(academy_id: str, data: DomainAssignment):
     existing = await supabase._get(f"/rest/v1/academies?custom_domain=eq.{quote(domain)}&select=id")
     if existing and str(existing[0].get("id", "")) != str(academy_id):
         raise HTTPException(status_code=409, detail="This domain is already assigned to another academy.")
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.patch(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
             json={"custom_domain": domain, "domain_status": "pending"},
@@ -654,7 +654,7 @@ async def assign_domain(academy_id: str, data: DomainAssignment):
 
 @router.delete("/academies/{academy_id}/domain")
 async def remove_domain(academy_id: str):
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.patch(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
             json={"custom_domain": None, "domain_status": None},
@@ -689,7 +689,7 @@ async def verify_domain(academy_id: str):
             domain_status = "verified"
         except socket.gaierror:
             domain_status = "pending"
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         await client.patch(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
             json={"domain_status": domain_status},
@@ -705,7 +705,7 @@ async def assign_plan(academy_id: str, data: PlanAssignment):
     """Assign or upgrade a subscription plan — records billing_cycle_start and pro-rata info."""
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # Try with all new fields first; fall back to plan_id only if columns don't exist yet
         patch_data = {
             "plan_id": data.plan_id,
@@ -753,7 +753,7 @@ async def assign_plan(academy_id: str, data: PlanAssignment):
 async def get_saas_stats():
     import asyncio
     try:
-        async with httpx.AsyncClient(timeout=30.0, headers=supabase.admin_headers) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0, headers=supabase.admin_headers) as client:
             responses = await asyncio.gather(
                 client.get(f"{supabase.url}/rest/v1/academies?select=id,status,custom_domain,domain_status"),
                 client.get(f"{supabase.url}/rest/v1/users?select=id"),
@@ -807,7 +807,7 @@ async def trigger_usage_notifications(req: NotificationTriggerRequest):
     Returns a summary of notifications sent.
     """
     import asyncio
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         responses = await asyncio.gather(
             client.get(f"{supabase.url}/rest/v1/academies?select=id,name,plan_id,status&order=created_at.desc",
                        headers=supabase.admin_headers),
@@ -849,7 +849,7 @@ async def trigger_usage_notifications(req: NotificationTriggerRequest):
     sent = []
     skipped = []
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         for acc in academies:
             if acc.get("status") == "suspended":
                 continue
@@ -908,7 +908,7 @@ async def get_saas_analytics():
     import asyncio
     from collections import defaultdict
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         responses = await asyncio.gather(
             client.get(
                 f"{supabase.url}/rest/v1/academies?select=id,created_at,plan_id,city,status",
@@ -1064,7 +1064,7 @@ async def trigger_renewal_reminders(req: RenewalReminderRequest):
     import asyncio
     today = date.today()
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.get(
             f"{supabase.url}/rest/v1/academies?select=id,name,plan_id,billing_cycle_start,status&status=neq.suspended",
             headers=supabase.admin_headers
@@ -1093,7 +1093,7 @@ async def trigger_renewal_reminders(req: RenewalReminderRequest):
 
     sent = []
     emails_sent = 0
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # Fetch admin user_id + email in parallel (email needed for the reminder)
         admin_responses = await asyncio.gather(*[
             client.get(
@@ -1180,7 +1180,7 @@ DEFAULT_SETTINGS = {
 @router.get("/settings")
 async def get_saas_settings():
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.get(
                 f"{supabase.url}/rest/v1/saas_settings?select=*&limit=1",
                 headers=supabase.admin_headers
@@ -1202,7 +1202,7 @@ async def get_saas_settings():
 @router.put("/settings")
 async def update_saas_settings(request: dict):
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             check = await client.get(
                 f"{supabase.url}/rest/v1/saas_settings?select=id&limit=1",
                 headers=supabase.admin_headers
@@ -1294,7 +1294,7 @@ async def send_email(req: EmailSendRequest):
     import asyncio
 
     # Fetch academy details + admin user IDs
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         responses = await asyncio.gather(*[
             client.get(
                 f"{supabase.url}/rest/v1/academies?id=eq.{aid}&select=id,name,plan_id",
@@ -1314,7 +1314,7 @@ async def send_email(req: EmailSendRequest):
     sent = []
     failed = []
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         for i, aid in enumerate(req.academy_ids):
             try:
                 academy_data = responses[i].json()[0] if not isinstance(responses[i], Exception) and responses[i].status_code == 200 and responses[i].json() else {}
@@ -1381,7 +1381,7 @@ async def generate_invoice(academy_id: str, payment_id: str):
     """Generate a printable HTML invoice for a specific payment."""
     import asyncio
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         academy_req, payment_req = await asyncio.gather(
             client.get(
                 f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}&select=*",
@@ -1508,7 +1508,7 @@ async def impersonate_academy(academy_id: str):
     middleware swaps role → "admin" and academy_id → target for super_admins
     who present that header.
     """
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         acc_res = await client.get(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}&select=id,name,logo_url,primary_color&limit=1",
             headers=supabase.admin_headers,

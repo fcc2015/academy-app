@@ -115,6 +115,7 @@ const AdminLogin = () => {
 
             // Store tokens for cross-domain auth
             localStorage.setItem('user_id', data.user_id);
+            localStorage.setItem('account_status', data.account_status || 'Active');
             if (data.access_token) localStorage.setItem('token', data.access_token);
             if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
 
@@ -171,6 +172,7 @@ const AdminLogin = () => {
 
             localStorage.setItem('user_id', data.user_id);
             localStorage.setItem('role', data.role);
+            localStorage.setItem('account_status', data.account_status || 'Active');
             if (data.access_token) localStorage.setItem('token', data.access_token);
             if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
 
@@ -213,6 +215,7 @@ const AdminLogin = () => {
             }
 
             localStorage.setItem('user_id', data.user_id);
+            localStorage.setItem('account_status', data.account_status || 'Active');
             if (data.access_token) localStorage.setItem('token', data.access_token);
             if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
             const role = data.role;

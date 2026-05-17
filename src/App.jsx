@@ -77,6 +77,7 @@ const ParentAttendance = lazy(() => import('./pages/parent/ParentAttendance'));
 const ParentEvaluations = lazy(() => import('./pages/parent/ParentEvaluations'));
 const ParentPayments = lazy(() => import('./pages/parent/ParentPayments'));
 const ParentChat = lazy(() => import('./pages/parent/ParentChat'));
+const ParentCheckout = lazy(() => import('./pages/parent/ParentCheckout'));
 
 // Loading fallback
 const PageLoader = () => (
@@ -184,6 +185,7 @@ function App() {
           <Route path="/parent" element={<ParentLayout />}>
             <Route index element={<Navigate to="/parent/dashboard" replace />} />
             <Route path="dashboard" element={<ParentDashboard />} />
+            <Route path="checkout" element={<ParentCheckout />} />
             <Route path="child" element={<ParentChildProfile />} />
             <Route path="attendance" element={<ParentAttendance />} />
             <Route path="evaluations" element={<ParentEvaluations />} />

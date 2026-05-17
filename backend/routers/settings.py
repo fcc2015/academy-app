@@ -23,7 +23,7 @@ async def get_settings():
         if not academy_id:
             raise HTTPException(status_code=404, detail="Settings not found")
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             acc = await client.get(
                 f"{app_settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=name",
                 headers=supabase.admin_headers,
@@ -58,7 +58,7 @@ async def get_academy_plan():
     if not academy_id:
         return base
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             ac_res = await client.get(
                 f"{app_settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=plan_id,name",
                 headers=supabase.admin_headers,

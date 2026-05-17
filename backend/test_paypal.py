@@ -9,7 +9,7 @@ BASE      = "https://api-m.sandbox.paypal.com"
 async def main():
     auth = base64.b64encode(f"{CLIENT_ID}:{SECRET}".encode()).decode()
 
-    async with httpx.AsyncClient(timeout=30) as c:
+    async with httpx.AsyncClient(trust_env=False, timeout=30) as c:
         # 1) Get OAuth token
         r = await c.post(
             f"{BASE}/v1/oauth2/token",
