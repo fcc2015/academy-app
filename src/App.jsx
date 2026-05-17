@@ -104,7 +104,24 @@ function ImpersonationExitHandler() {
   return null;
 }
 
+function getAppType() {
+  const hostname = window.location.hostname.replace('www.', '');
+  const mainDomains = [
+    'localhost',
+    'academy-app-mu.vercel.app',
+    'dainty-speculoos-433706.netlify.app',
+    'jolly-kangaroo-3c3d92.netlify.app'
+  ];
+  
+  if (mainDomains.includes(hostname)) {
+    return 'SAAS';
+  }
+  return 'ACADEMY';
+}
+
 function App() {
+  const appType = getAppType();
+
   return (
     <ErrorBoundary>
     <ThemeProvider>
@@ -116,12 +133,12 @@ function App() {
         <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Public */}
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={appType === 'SAAS' ? <SaasLanding /> : <LandingPage />} />
+          <Route path="/saas-platform" element={<Navigate to="/" replace />} />
           <Route path="/download" element={<DownloadPage />} />
           <Route path="/login" element={<AdminLogin />} />
           <Route path="/qr-login" element={<QRLoginPage />} />
           <Route path="/saas/login" element={<SaasLogin />} />
-          <Route path="/saas-platform" element={<SaasLanding />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/parent/signup" element={<ParentSignup />} />
 
