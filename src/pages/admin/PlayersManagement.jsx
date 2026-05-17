@@ -1266,7 +1266,7 @@ const PlayersManagement = () => {
                                                                     if (!storedId) {
                                                                         throw new Error(isRTL ? 'فشل حفظ بيانات الجلسة' : 'Failed to save impersonation session');
                                                                     }
-                                                                    navigate('/admin/view-as-parent');
+                                                                    navigate('/parent');
                                                                 }
                                                                 catch (e) {
                                                                     Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message });
