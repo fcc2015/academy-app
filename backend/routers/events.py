@@ -25,12 +25,32 @@ async def get_all_events():
 async def create_event(event: EventCreate):
     try:
         event_dict = event.model_dump()
-        # Ensure date and time are strings for JSON
         event_dict['event_date'] = event_dict['event_date'].isoformat()
         event_dict['event_time'] = event_dict['event_time'].strftime("%H:%M:%S")
         
         response = await supabase.insert_event(event_dict)
-        return response[0]
+        created = response[0]
+
+        # Notify all roles about new event
+        try:
+            title = event_dict.get("title") or "حدث جديد"
+            date_str = event_dict.get("event_date", "")[:10]
+            await supabase.insert_notification({
+                "title": f"📅 {title}",
+                "message": f"تم جدولة حدث جديد بتاريخ {date_str}. تفقد لوحة التحكم لمزيد من التفاصيل.",
+                "type": "system",
+                "target_role": "parent",
+            })
+            await supabase.insert_notification({
+                "title": f"📅 {title}",
+                "message": f"تم جدولة حدث جديد بتاريخ {date_str}.",
+                "type": "system",
+                "target_role": "coach",
+            })
+        except Exception as notif_err:
+            logger.warning("Failed to send event notification: %s", notif_err)
+
+        return created
     except Exception as e:
         logger.error("Error creating event: %s", e, exc_info=True)
         raise HTTPException(
