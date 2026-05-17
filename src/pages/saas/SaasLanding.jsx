@@ -51,7 +51,7 @@ const FEATURES = [
 
 const NAV_LINKS = [
     { id: 'features', label: 'Fonctionnalités' },
-    { id: 'academies', label: 'Trouver une Académie' },
+    { id: 'academies', label: 'Académies' },
     { id: 'pricing', label: 'Tarifs' },
     { id: 'about', label: 'À propos' },
     { id: 'contact', label: 'Contact' },
