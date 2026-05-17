@@ -15,7 +15,7 @@ async def reset_password():
     user_id = "9128d257-033e-4501-ac8d-6b1a28f2d427"
     
     # Step 2: Update password via Admin API
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.put(
             f"{settings.SUPABASE_URL}/auth/v1/admin/users/{user_id}",
             json={

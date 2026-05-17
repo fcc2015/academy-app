@@ -34,9 +34,9 @@ export default function ImpersonationBanner() {
         const isAcademyImpersonated = !!localStorage.getItem('impersonating_academy_id');
         
         if (realRole === 'super_admin' && !isAcademyImpersonated) {
-            window.location.href = '/saas/dashboard';
+            navigate('/saas/dashboard');
         } else {
-            window.location.href = '/admin/players';
+            navigate('/admin/players');
         }
     };
 

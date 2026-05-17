@@ -11,7 +11,7 @@ async def main():
         "Content-Type": "application/json",
     }
     
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # Step 1: Sign up via GoTrue (password hashed by GoTrue itself)
         print("Step 1: Creating user via signup API...")
         signup_res = await client.post(

@@ -55,7 +55,7 @@ async def get_paypal_access_token() -> str:
     base_url = get_paypal_base_url()
     auth = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.post(
             f"{base_url}/v1/oauth2/token",
             headers={
@@ -89,22 +89,29 @@ async def create_paypal_order(req: CreateOrderRequest):
     if req.source == 'saas_landing':
         return_url = f"{settings.FRONTEND_URL}/saas-platform?payment=success"
         cancel_url = f"{settings.FRONTEND_URL}/saas-platform?payment=cancelled"
+    elif req.source == 'parent_checkout':
+        return_url = f"{settings.FRONTEND_URL}/parent/checkout?payment=success"
+        cancel_url = f"{settings.FRONTEND_URL}/parent/checkout?payment=cancelled"
     else:
         aid = req.academy_id or ""
         pid = req.plan_id or ""
         return_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success&academy_id={aid}&plan_id={pid}"
         cancel_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=cancelled"
 
+    # Set custom_id and reference_id properly
+    custom_id = f"parent|{req.academy_id}" if req.source == 'parent_checkout' else f"{effective_academy_id}|{req.plan_id}"
+    ref_id = f"parent_{req.academy_id}" if req.source == 'parent_checkout' else f"academy_{effective_academy_id}"
+
     order_payload = {
         "intent": "CAPTURE",
         "purchase_units": [{
-            "reference_id": f"academy_{effective_academy_id}",
+            "reference_id": ref_id,
             "description": req.description,
             "amount": {
                 "currency_code": req.currency,
                 "value": f"{req.amount:.2f}"
             },
-            "custom_id": f"{effective_academy_id}|{req.plan_id}"
+            "custom_id": custom_id
         }],
         "application_context": {
             "brand_name": "Academy SaaS Platform",
@@ -115,7 +122,7 @@ async def create_paypal_order(req: CreateOrderRequest):
         }
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.post(
             f"{base_url}/v2/checkout/orders",
             json=order_payload,
@@ -134,7 +141,7 @@ async def create_paypal_order(req: CreateOrderRequest):
         # Save pending payment record in DB — only if we have a real academy_id
         if req.academy_id:
             try:
-                async with httpx.AsyncClient(timeout=30.0) as db_client:
+                async with httpx.AsyncClient(trust_env=False, timeout=30.0) as db_client:
                     save_res = await db_client.post(
                         f"{supabase.url}/rest/v1/payment_transactions",
                         json={
@@ -174,7 +181,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
     token = await get_paypal_access_token()
     base_url = get_paypal_base_url()
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.post(
             f"{base_url}/v2/checkout/orders/{req.order_id}/capture",
             headers={
@@ -200,7 +207,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                 if captures:
                     capture_id = captures[0].get("id", "")
 
-            async with httpx.AsyncClient(timeout=30.0) as db_client:
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as db_client:
                 await db_client.patch(
                     f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{req.order_id}",
                     json={
@@ -224,14 +231,33 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                 if req.plan_id:
                     update_data["plan_id"] = req.plan_id
 
-                async with httpx.AsyncClient(timeout=30.0) as db_client:
-                    await db_client.patch(
-                        f"{supabase.url}/rest/v1/academies?id=eq.{req.academy_id}",
-                        json=update_data,
-                        headers=supabase.admin_headers
-                    )
+                async with httpx.AsyncClient(trust_env=False, timeout=30.0) as db_client:
+                    # check if this is a parent payment by checking if academy_id starts with parent|
+                    is_parent = False
+                    user_id = req.academy_id # defaults to academy_id from capture payload
+                    try:
+                        # try to get custom_id
+                        custom_id = capture_data.get("purchase_units", [])[0].get("custom_id", "")
+                        if custom_id.startswith("parent|"):
+                            is_parent = True
+                            user_id = custom_id.split("|")[1]
+                    except Exception:
+                        pass
+                    
+                    if is_parent:
+                        await db_client.patch(
+                            f"{supabase.url}/rest/v1/users?id=eq.{user_id}",
+                            json={"account_status": "Active"},
+                            headers=supabase.admin_headers
+                        )
+                    else:
+                        await db_client.patch(
+                            f"{supabase.url}/rest/v1/academies?id=eq.{req.academy_id}",
+                            json=update_data,
+                            headers=supabase.admin_headers
+                        )
             except Exception as e:
-                logger.warning(f"Failed to update academy subscription: {e}")
+                logger.warning(f"Failed to update subscription/account status: {e}")
 
             # Receipt email — non-blocking: capture must succeed even if email fails
             try:
@@ -288,7 +314,7 @@ async def verify_paypal_order(paypal_order_id: str):
     token = await get_paypal_access_token()
     base_url = get_paypal_base_url()
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # 1. Get order status from PayPal
         order_res = await client.get(
             f"{base_url}/v2/checkout/orders/{paypal_order_id}",
@@ -302,7 +328,7 @@ async def verify_paypal_order(paypal_order_id: str):
 
         if paypal_status == "COMPLETED":
             # Already captured — just update DB to completed
-            async with httpx.AsyncClient(timeout=30.0) as db:
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as db:
                 await db.patch(
                     f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{paypal_order_id}",
                     json={"status": "completed"},
@@ -340,7 +366,7 @@ async def verify_paypal_order(paypal_order_id: str):
             pass
 
         # 3. Update payment_transactions in DB
-        async with httpx.AsyncClient(timeout=30.0) as db:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as db:
             await db.patch(
                 f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{paypal_order_id}",
                 json={
@@ -378,7 +404,7 @@ async def verify_paypal_order(paypal_order_id: str):
 async def get_payment_transactions(academy_id: str):
     """Get payment transaction history for an academy."""
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.get(
                 f"{supabase.url}/rest/v1/payment_transactions?academy_id=eq.{academy_id}&order=created_at.desc",
                 headers=supabase.admin_headers
@@ -416,7 +442,7 @@ async def verify_paypal_webhook_signature(request: Request, raw_body: bytes) -> 
     try:
         token = await get_paypal_access_token()
         base_url = get_paypal_base_url()
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
             res = await client.post(
                 f"{base_url}/v1/notifications/verify-webhook-signature",
                 json={
@@ -465,10 +491,21 @@ async def paypal_webhook(request: Request):
     if event_type == "PAYMENT.CAPTURE.COMPLETED":
         resource = body.get("resource", {})
         custom_id = resource.get("custom_id", "")
-        if "|" in custom_id:
+        if custom_id.startswith("parent|"):
+            user_id = custom_id.split("|")[1]
+            try:
+                async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+                    await client.patch(
+                        f"{supabase.url}/rest/v1/users?id=eq.{user_id}",
+                        json={"account_status": "Active"},
+                        headers=supabase.admin_headers
+                    )
+            except Exception as e:
+                logger.error(f"Parent Webhook handler error: {e}")
+        elif "|" in custom_id:
             academy_id, plan_id = custom_id.split("|", 1)
             try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
                     await client.patch(
                         f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
                         json={

@@ -50,7 +50,8 @@ const LandingPage = () => {
         // Auto-login redirect for returning users
         if (isAuthenticated()) {
             const role = localStorage.getItem('role');
-            if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+            if (role === 'super_admin') navigate('/saas/dashboard', { replace: true });
+            else if (role === 'admin') navigate('/admin/dashboard', { replace: true });
             else if (role === 'coach') navigate('/coach/dashboard', { replace: true });
             else if (role === 'parent') navigate('/parent/dashboard', { replace: true });
         }

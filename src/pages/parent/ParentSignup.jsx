@@ -55,6 +55,27 @@ const ParentSignup = () => {
                 }),
             });
             if (res.ok) {
+                // Auto-login after signup
+                try {
+                    const loginRes = await fetch(`${API_URL}/auth/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: form.email.trim().toLowerCase(), password: form.password }),
+                        credentials: 'include',
+                    });
+                    if (loginRes.ok) {
+                        const loginData = await loginRes.json();
+                        localStorage.setItem('user_id', loginData.user_id);
+                        localStorage.setItem('role', 'parent');
+                        localStorage.setItem('account_status', 'Pending');
+                        if (loginData.access_token) localStorage.setItem('token', loginData.access_token);
+                        if (loginData.refresh_token) localStorage.setItem('refresh_token', loginData.refresh_token);
+                        navigate('/parent/checkout', { replace: true });
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Auto-login failed:", e);
+                }
                 setSuccess(true);
             } else {
                 const data = await res.json().catch(() => ({}));

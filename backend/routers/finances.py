@@ -533,7 +533,7 @@ async def _update_player_account_status(player_id: str, status: str, settings):
         "Content-Type": "application/json",
         "Prefer": "return=minimal"
     }
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.patch(
             f"{settings.SUPABASE_URL}/rest/v1/players?id=eq.{player_id}",
             json={"account_status": status},
@@ -552,7 +552,7 @@ async def _remove_player_from_chat_groups(player_id: str, settings):
         "Authorization": f"Bearer {_key}",
         "Prefer": "return=minimal"
     }
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.delete(
             f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?user_id=eq.{player_id}",
             headers=headers

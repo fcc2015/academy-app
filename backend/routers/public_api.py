@@ -17,7 +17,7 @@ router = APIRouter(prefix="/public", tags=["Public"])
 async def get_public_saas_landing():
     """Public read of the single saas_landing_settings row — used by /saas-platform."""
     from core.config import settings as _s
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
         res = await client.get(
             f"{_s.SUPABASE_URL}/rest/v1/saas_landing_settings?id=eq.1",
             headers=supabase.admin_headers,
@@ -35,7 +35,7 @@ async def get_public_academy(subdomain: str):
     is on the enterprise plan).
     """
     from core.config import settings as _s
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
         ac = await client.get(
             f"{_s.SUPABASE_URL}/rest/v1/academies"
             f"?subdomain=eq.{quote(subdomain)}"
@@ -110,7 +110,7 @@ async def setup_academy_for_google_user(req: SetupAcademyRequest, user: dict = D
     if req.city:
         academy_name = f"{req.academy_name} — {req.city}"
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # 1. Create academy
         res = await client.post(
             f"{supabase.url}/rest/v1/academies?select=id",
@@ -170,7 +170,7 @@ async def register_academy(req: RegisterAcademyRequest):
 
     # --- Duplicate Check: Academy Name ---
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             check_name = await client.get(
                 f"{supabase.url}/rest/v1/academies?name=eq.{quote(req.academy_name)}&select=id",
                 headers=supabase.admin_headers
@@ -187,7 +187,7 @@ async def register_academy(req: RegisterAcademyRequest):
 
     # --- Duplicate Check: Admin Email ---
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             check_email = await client.get(
                 f"{supabase.url}/rest/v1/admins?email=eq.{quote(str(req.admin_email))}&select=id",
                 headers=supabase.admin_headers
@@ -214,7 +214,7 @@ async def register_academy(req: RegisterAcademyRequest):
     }
 
     try:
-        async with httpx.AsyncClient(timeout=90.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=90.0) as client:
             res = await client.post(
                 f"{supabase.url}/rest/v1/academies?select=id",
                 json=academy_data,
@@ -245,7 +245,7 @@ async def register_academy(req: RegisterAcademyRequest):
     except Exception as e:
         # Rollback: delete the academy if user creation fails
         try:
-            async with httpx.AsyncClient(timeout=90.0) as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=90.0) as client:
                 await client.delete(
                     f"{supabase.url}/rest/v1/academies?id=eq.{new_academy_id}",
                     headers=supabase.admin_headers
@@ -260,7 +260,7 @@ async def register_academy(req: RegisterAcademyRequest):
 
     # 3. Create public.users record
     try:
-        async with httpx.AsyncClient(timeout=90.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=90.0) as client:
             await client.post(
                 f"{supabase.url}/rest/v1/users",
                 json={
@@ -276,7 +276,7 @@ async def register_academy(req: RegisterAcademyRequest):
 
     # 4. Create public.admins record
     try:
-        async with httpx.AsyncClient(timeout=90.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=90.0) as client:
             await client.post(
                 f"{supabase.url}/rest/v1/admins",
                 json={
@@ -293,7 +293,7 @@ async def register_academy(req: RegisterAcademyRequest):
 
     # 5. Create default academy_settings
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             await client.post(
                 f"{supabase.url}/rest/v1/academy_settings",
                 json={

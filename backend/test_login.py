@@ -6,7 +6,7 @@ ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 
 async def test_login():
     headers = {"apikey": ANON_KEY, "Content-Type": "application/json"}
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30) as client:
         r = await client.post(
             f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
             json={"email": "admin@academy.com", "password": "Admin@2024"},

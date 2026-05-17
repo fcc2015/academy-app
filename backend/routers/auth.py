@@ -59,7 +59,7 @@ async def login(credentials: UserLogin, request: Request, response: Response):
         # Read role from DB (reliable) — fallback to user_metadata
         role = auth_response["user"].get("user_metadata", {}).get("role", "parent")
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
                 u_res = await client.get(
                     f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=role",
                     headers=supabase.admin_headers
@@ -87,7 +87,7 @@ async def login(credentials: UserLogin, request: Request, response: Response):
         # ── Block pending / suspended parent accounts ────────────
         if role == "parent":
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
                     s_res = await client.get(
                         f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=account_status",
                         headers=supabase.admin_headers
@@ -95,10 +95,7 @@ async def login(credentials: UserLogin, request: Request, response: Response):
                     if s_res.status_code == 200 and s_res.json():
                         acc_status = s_res.json()[0].get("account_status", "Active")
                         if acc_status == "Pending":
-                            raise HTTPException(
-                                status_code=403,
-                                detail="حسابك قيد المراجعة من طرف الأكاديمية. سيتم تفعيله بعد تأكيد الدفع."
-                            )
+                            pass # We no longer block Pending parents here; we return account_status="Pending" so frontend handles it
                         if acc_status in ("Suspended", "Inactive"):
                             raise HTTPException(
                                 status_code=403,
@@ -112,7 +109,7 @@ async def login(credentials: UserLogin, request: Request, response: Response):
         # ── 2FA check (admin/super_admin only) ────────────────────
         if role in ("admin", "super_admin"):
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
                     t_res = await client.get(
                         f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=totp_enabled,totp_secret",
                         headers=supabase.admin_headers
@@ -174,7 +171,13 @@ async def login(credentials: UserLogin, request: Request, response: Response):
         )
 
         # Return tokens in body (cross-domain) + cookies (same-domain backup)
-        return {"user_id": user_id, "role": role, "access_token": token, "refresh_token": refresh_token}
+        # Check if acc_status is defined from the block above
+        try:
+            status_val = acc_status
+        except NameError:
+            status_val = "Active"
+
+        return {"user_id": user_id, "role": role, "access_token": token, "refresh_token": refresh_token, "account_status": status_val}
 
     except HTTPException:
         raise
@@ -225,7 +228,7 @@ async def refresh_access_token(request: Request, response: Response):
         raise HTTPException(status_code=401, detail="No refresh token. Please login again.")
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             res = await client.post(
                 f"{settings.SUPABASE_URL}/auth/v1/token?grant_type=refresh_token",
                 json={"refresh_token": stored_refresh},
@@ -298,7 +301,7 @@ async def verify_2fa_login(req: TwoFAVerifyLogin, response: Response):
         raise HTTPException(status_code=400, detail="Session expired. Please login again.")
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             t_res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{pending['user_id']}&select=totp_secret",
                 headers=supabase.admin_headers
@@ -372,7 +375,7 @@ async def enable_2fa(req: TwoFACode, token_data: dict = Depends(verify_token)):
         raise HTTPException(status_code=400, detail="Invalid code. Try again.")
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             res = await client.patch(
                 f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}",
                 json={"totp_secret": secret, "totp_enabled": True},
@@ -398,7 +401,7 @@ async def disable_2fa(req: TwoFACode, token_data: dict = Depends(verify_token)):
     user_id = token_data["user_id"]
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             t_res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=totp_secret,totp_enabled",
                 headers=supabase.admin_headers
@@ -434,7 +437,7 @@ async def get_2fa_status(token_data: dict = Depends(verify_token)):
     import httpx
     user_id = token_data["user_id"]
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=totp_enabled",
                 headers=supabase.admin_headers
@@ -452,7 +455,7 @@ async def get_user_role(token_data: dict = Depends(verify_token)):
     import httpx
     user_id = token_data.get("user_id")
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             # Check admins table using service role to bypass RLS
             admin_res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/admins?user_id=eq.{user_id}&select=user_id",
@@ -604,7 +607,7 @@ async def reset_password(req: PasswordReset):
 
     # Find user by email, then update password via Supabase Admin API
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             # Get user ID from Supabase Auth
             list_res = await client.get(
                 f"{settings.SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1",
@@ -683,7 +686,7 @@ async def change_password(
         raise HTTPException(status_code=400, detail="New password must differ from current password.")
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
             # 1. Verify current password by re-authenticating
             verify_res = await client.post(
                 f"{settings.SUPABASE_URL}/auth/v1/token?grant_type=password",
@@ -758,7 +761,7 @@ async def parent_signup(req: ParentSignupRequest):
         if req.academy_id:
             user_row["academy_id"] = req.academy_id
 
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
             await client.post(
                 f"{settings.SUPABASE_URL}/rest/v1/users",
                 json=user_row,
@@ -802,7 +805,7 @@ async def list_pending_parents(user=Depends(verify_token)):
     import httpx
     user_id = user.get("sub") if isinstance(user, dict) else user
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             # Verify caller is admin
             u_res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=role,academy_id",
@@ -838,7 +841,7 @@ async def approve_parent(req: ParentDecision, user=Depends(verify_token)):
     import httpx
     user_id = user.get("sub") if isinstance(user, dict) else user
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
             u_res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=role",
                 headers=supabase.admin_headers,

@@ -123,19 +123,23 @@ export async function authFetch(url, options = {}) {
         credentials: 'include', // Also send cookies as fallback
       });
 
-      // On 401: try refresh first, retry once, then logout
       if (res.status === 401) {
         const currentPath = window.location.pathname;
         if (!currentPath.includes('/login') && currentPath !== '/') {
-          // If we are impersonating a user, exit impersonation instead of logging out the admin
-          // Use both module flag AND sessionStorage to prevent race conditions
-          const isImpersonatingUser = !!localStorage.getItem('impersonating_user_id');
-          const sessionLocked = !!sessionStorage.getItem('_impersonation_401_handled');
-          // Also check if the caller is an admin — admins should NEVER be logged out by a
-          // 401 that comes from an impersonated session or from the impersonate-user API call.
           const callerRole = localStorage.getItem('role');
           const isAdmin = callerRole === 'admin' || callerRole === 'super_admin' || callerRole === 'sous_admin';
           const isImpersonateEndpoint = url && url.toString().includes('/admins/impersonate-user');
+
+          // Protect admins: never log out an admin due to a 401 — they might be
+          // impersonating, or the request might be for a resource the target role can't access.
+          // Just return the response and let the component handle it.
+          if (isAdmin || isImpersonateEndpoint) {
+            return res;
+          }
+
+          // If we are impersonating a user (non-admin caller), exit impersonation gracefully
+          const isImpersonatingUser = !!localStorage.getItem('impersonating_user_id');
+          const sessionLocked = !!sessionStorage.getItem('_impersonation_401_handled');
 
           if (isImpersonatingUser && !_isHandlingImpersonationError && !sessionLocked) {
             _isHandlingImpersonationError = true;
@@ -143,32 +147,23 @@ export async function authFetch(url, options = {}) {
             localStorage.removeItem('impersonating_user_id');
             localStorage.removeItem('impersonating_user_name');
             localStorage.removeItem('impersonating_user_role');
-            // Small delay to let other concurrent 401 handlers see the lock before navigating
             setTimeout(() => {
               sessionStorage.removeItem('_impersonation_401_handled');
               _isHandlingImpersonationError = false;
-              window.location.href = '/admin/players';
+              // Use custom event so React Router handles navigation (no hard reload)
+              window.dispatchEvent(new CustomEvent('impersonation-exit', { detail: { to: '/admin/players' } }));
             }, 200);
             return res;
           } else if (isImpersonatingUser || _isHandlingImpersonationError || sessionLocked) {
-            // Another handler is already dealing with this — just return the response
-            return res;
-          }
-
-          // Protect admins: if the 401 comes from the impersonate-user endpoint or admin is
-          // in the middle of initiating impersonation, don't log them out — just return the response.
-          if (isAdmin || isImpersonateEndpoint) {
             return res;
           }
 
           const refreshed = await tryRefreshToken();
           if (refreshed) {
-            // Update the Authorization header with the new token
             const newToken = localStorage.getItem('token');
             if (newToken) {
               headers['Authorization'] = `Bearer ${newToken}`;
             }
-            // Retry the original request with fresh token
             return fetchWithTimeout(url, { ...options, headers, credentials: 'include' });
           }
           logout();

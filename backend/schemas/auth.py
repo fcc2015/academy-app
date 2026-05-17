@@ -55,3 +55,4 @@ class LoginResponse(BaseModel):
     temp_token: Optional[str] = None
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
+    account_status: Optional[str] = "Active"

@@ -22,7 +22,7 @@ SQL_STATEMENTS = [
 ]
 
 async def run():
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         # Try pg/query endpoint (Supabase internal)
         for sql in SQL_STATEMENTS:
             print(f"\nRunning: {sql}")

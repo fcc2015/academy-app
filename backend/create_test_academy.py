@@ -23,7 +23,7 @@ ADMIN_PASS   = "TestAdmin123!"
 ADMIN_NAME   = "Admin Test"
 
 async def main():
-    async with httpx.AsyncClient(timeout=30) as c:
+    async with httpx.AsyncClient(trust_env=False, timeout=30) as c:
 
         # 1. Create academy record
         print("[1] Creating academy...")
