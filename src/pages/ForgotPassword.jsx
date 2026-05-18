@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { API_URL } from '../../config';
+import { API_URL } from '../config';
 import { Mail, Lock, ArrowRight, CheckCircle, Eye, EyeOff, RefreshCw } from 'lucide-react';
 
 const STEPS = ['email', 'otp', 'password', 'success'];
