@@ -57,6 +57,12 @@ const ParentSignup = () => {
                 }),
             });
             if (res.ok) {
+                const data = await res.json().catch(() => ({}));
+                if (data.requires_verification) {
+                    setRequiresVerification(true);
+                    return;
+                }
+                
                 // Auto-login after signup
                 try {
                     const loginRes = await fetch(`${API_URL}/auth/login`, {
@@ -89,6 +95,99 @@ const ParentSignup = () => {
             setLoading(false);
         }
     };
+
+    const [requiresVerification, setRequiresVerification] = useState(false);
+    const [otp, setOtp] = useState(['', '', '', '', '', '']);
+
+    const handleOtpChange = (val, idx) => {
+        if (!/^\d*$/.test(val)) return;
+        const next = [...otp];
+        next[idx] = val.slice(-1);
+        setOtp(next);
+        if (val && idx < 5) document.getElementById(`otp-${idx + 1}`)?.focus();
+    };
+
+    const handleOtpPaste = (e) => {
+        const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+        if (text.length === 6) setOtp(text.split(''));
+        e.preventDefault();
+    };
+
+    const verifyOtp = async (e) => {
+        e.preventDefault();
+        setError('');
+        const code = otp.join('');
+        if (code.length < 6) { setError(isRTL ? 'أدخل الرمز كاملاً' : 'Entrez le code complet'); return; }
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_URL}/auth/verify-email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: form.email.trim().toLowerCase(), code }),
+            });
+            if (res.ok) {
+                setRequiresVerification(false);
+                setSuccess(true);
+            } else {
+                const data = await res.json().catch(() => ({}));
+                setError(data.detail || (isRTL ? 'رمز غير صحيح' : 'Code invalide'));
+            }
+        } catch {
+            setError(isRTL ? 'فشل الاتصال' : 'Erreur de connexion');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (requiresVerification) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4"
+                style={{ background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)' }}>
+                <div className="max-w-md w-full bg-white/5 backdrop-blur-xl rounded-3xl p-10 border border-white/10 text-center" dir={dir}>
+                    <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-indigo-500/20 border-2 border-indigo-400/30 flex items-center justify-center">
+                        <Mail size={32} className="text-indigo-300" />
+                    </div>
+                    <h2 className="text-2xl font-black text-white mb-3">
+                        {isRTL ? 'تأكيد البريد الإلكتروني' : 'Vérification Email'}
+                    </h2>
+                    <p className="text-slate-300 text-sm leading-relaxed mb-6">
+                        {isRTL
+                            ? `أرسلنا رمزاً إلى ${form.email}. يرجى إدخاله أدناه:`
+                            : `Nous avons envoyé un code à ${form.email}. Veuillez l'entrer ci-dessous:`}
+                    </p>
+                    
+                    {error && (
+                        <div className="mb-6 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300">
+                            {error}
+                        </div>
+                    )}
+
+                    <form onSubmit={verifyOtp}>
+                        <div className="flex gap-2 justify-center mb-8" onPaste={handleOtpPaste}>
+                            {otp.map((digit, i) => (
+                                <input
+                                    key={i} id={`otp-${i}`} type="text" inputMode="numeric"
+                                    value={digit} maxLength={1}
+                                    onChange={e => handleOtpChange(e.target.value, i)}
+                                    className="w-12 h-14 text-center text-xl font-bold rounded-xl text-white outline-none transition-all"
+                                    style={{
+                                        background: digit ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.06)',
+                                        border: digit ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.1)'
+                                    }}
+                                />
+                            ))}
+                        </div>
+                        <button
+                            type="submit" disabled={loading}
+                            className="w-full py-3.5 rounded-xl font-black text-white text-sm transition-all hover:scale-[1.02] disabled:opacity-50"
+                            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
+                            {loading ? <Loader2 size={16} className="animate-spin mx-auto" /> : (isRTL ? 'تأكيد' : 'Vérifier')}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
 
     if (success) {
         return (
