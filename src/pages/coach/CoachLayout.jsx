@@ -10,7 +10,8 @@ import {
     CalendarCheck,
     Star,
     MessageCircle,
-    Trophy
+    Trophy,
+    UserPlus
 } from 'lucide-react';
 import NotificationsDropdown from '../../components/NotificationsDropdown';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
@@ -62,6 +63,7 @@ const CoachLayout = () => {
         { path: '/coach/attendance', name: t('sidebar.attendance'), icon: CalendarCheck },
         { path: '/coach/evaluations', name: t('sidebar.evaluations'), icon: Star },
         { path: '/coach/matches', name: t('sidebar.matches') || (isRTL ? 'المباريات' : 'Matches'), icon: Trophy },
+        { path: '/coach/tryouts', name: t('sidebar.tryouts') || (isRTL ? 'الاختبارات' : 'Tryouts'), icon: UserPlus },
         { path: '/coach/chat', name: t('sidebar.chat') || 'Chat', icon: MessageCircle },
     ];
 
