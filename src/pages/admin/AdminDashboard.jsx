@@ -1,6 +1,7 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import AcademyHealthScore from '../../components/AcademyHealthScore';
+import OnboardingWizard from '../../components/OnboardingWizard';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -220,6 +221,8 @@ const AdminDashboard = () => {
                     </div>
                 </div>
             </div>
+
+            <OnboardingWizard stats={stats} />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Main Content Column */}
