@@ -69,6 +69,7 @@ const CoachAttendance = lazy(() => import('./pages/coach/CoachAttendance'));
 const CoachEvaluations = lazy(() => import('./pages/coach/CoachEvaluations'));
 const CoachMatches = lazy(() => import('./pages/coach/CoachMatches'));
 const CoachChat = lazy(() => import('./pages/coach/CoachChat'));
+const CoachTryouts = lazy(() => import('./pages/coach/CoachTryouts'));
 
 // Parent
 const ParentLayout = lazy(() => import('./pages/parent/ParentLayout'));
@@ -198,6 +199,7 @@ function App() {
             <Route path="evaluations" element={<CoachEvaluations />} />
             <Route path="matches" element={<CoachMatches />} />
             <Route path="chat" element={<CoachChat />} />
+            <Route path="tryouts" element={<CoachTryouts />} />
           </Route>
 
           {/* Parent */}
