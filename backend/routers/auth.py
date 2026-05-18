@@ -736,7 +736,7 @@ class ParentSignupRequest(BaseModel):
 @router.post("/parent-signup")
 async def parent_signup(req: ParentSignupRequest):
     """Create a parent account in Pending state. Admin of the academy must approve after payment confirmation."""
-    import httpx
+    import httpx, random
     if len(req.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
@@ -748,7 +748,7 @@ async def parent_signup(req: ParentSignupRequest):
         )
         user_id = signup_res["user"]["id"]
 
-        # Insert into users table with Pending status
+        # Insert into users table with Pending status (and email_verified=False if column exists)
         user_row = {
             "id": user_id,
             "email": req.email.strip().lower(),
@@ -762,6 +762,7 @@ async def parent_signup(req: ParentSignupRequest):
             user_row["academy_id"] = req.academy_id
 
         async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+            # Note: We assume email_verified column exists and defaults to False.
             await client.post(
                 f"{settings.SUPABASE_URL}/rest/v1/users",
                 json=user_row,
@@ -781,10 +782,24 @@ async def parent_signup(req: ParentSignupRequest):
                     headers=supabase.admin_headers,
                 )
 
+        # Generate and send Verification OTP
+        code = str(random.randint(100000, 999999))
+        _otp_store[req.email.strip().lower()] = {
+            "code": code,
+            "expires": time.time() + _OTP_EXPIRY,
+            "purpose": "verify_email",
+            "user_id": user_id,
+        }
+        try:
+            send_otp_email(req.email.strip().lower(), code, purpose="verify_email")
+        except Exception as email_err:
+            logger.warning(f"Failed to send verification email: {email_err}")
+
         return {
-            "message": "تم إنشاء حسابك بنجاح. سيتم تفعيله بعد تأكيد الدفع من طرف إدارة الأكاديمية.",
+            "message": "تم إنشاء حسابك بنجاح. يرجى التحقق من بريدك الإلكتروني.",
             "user_id": user_id,
             "status": "Pending",
+            "requires_verification": True
         }
     except HTTPException:
         raise
@@ -796,6 +811,41 @@ async def parent_signup(req: ParentSignupRequest):
     except Exception as e:
         logger.error(f"Parent signup failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="فشل التسجيل. يرجى المحاولة لاحقاً.")
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+@router.post("/verify-email")
+async def verify_email(req: VerifyEmailRequest):
+    """Verify email via OTP after signup."""
+    import httpx
+    email = req.email.strip().lower()
+    record = _otp_store.get(email)
+
+    if not record or record.get("purpose") != "verify_email":
+        raise HTTPException(status_code=400, detail="Code invalide ou expiré.")
+    if time.time() > record["expires"]:
+        _otp_store.pop(email, None)
+        raise HTTPException(status_code=400, detail="Le code a expiré. Demandez un nouveau.")
+    if record["code"] != req.code.strip():
+        raise HTTPException(status_code=400, detail="Code incorrect.")
+
+    user_id = record.get("user_id")
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            # Set email_verified = True in users table
+            await client.patch(
+                f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}",
+                json={"email_verified": True},
+                headers=supabase.admin_headers,
+            )
+        _otp_store.pop(email, None)
+        return {"message": "Email vérifié avec succès."}
+    except Exception as e:
+        logger.error(f"Email verification failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Erreur lors de la vérification.")
 
 
 # ─── Admin: list pending parent accounts ─────────────────────
