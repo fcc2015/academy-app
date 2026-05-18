@@ -30,6 +30,7 @@ import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
 import InvoiceModal from '../../components/InvoiceModal';
+import FinancialReportGenerator from '../../components/FinancialReportGenerator';
 
 
 const FinancesManagement = () => {
@@ -58,6 +59,7 @@ const FinancesManagement = () => {
     const [invoicePayment, setInvoicePayment] = useState(null);
     const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
     const [receiptUrl, setReceiptUrl] = useState(null);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
     const showBanner = (message, type = 'success') => {
         if (type === 'error') toast.error(message);
@@ -364,6 +366,14 @@ const FinancesManagement = () => {
                     >
                         <RefreshCw size={18} className={isCheckingAlerts ? 'animate-spin' : ''} />
                         <span>{t('finances.alertCheck')}</span>
+                    </button>
+                    <button
+                        onClick={() => setIsReportModalOpen(true)}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-3 bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl shadow-indigo-600/20 hover:bg-indigo-700 active:scale-95 transition-all"
+                        title="Exporter le Rapport"
+                    >
+                        <FileText size={18} />
+                        <span>{isRTL ? 'تصدير التقرير' : 'Rapport'}</span>
                     </button>
                 </div>
             </div>
@@ -746,6 +756,14 @@ const FinancesManagement = () => {
                     </div>
                 </div>
             )}
+
+            <FinancialReportGenerator
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                payments={payments}
+                expenses={expenses}
+                academyName={academySettings?.academy_name || 'Football Academy'}
+            />
 
             {/* Add Payment Modal */}
             {isAddModalOpen && (
