@@ -64,15 +64,9 @@ async def create_training_session(session: TrainingSessionCreate):
 
             if coach_id:
                 # Fetch coach user_id from coaches table
-                import httpx as _httpx
-                from core.config import settings as _settings
-                async with _httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
-                    c_res = await client.get(
-                        f"{_settings.SUPABASE_URL}/rest/v1/coaches?id=eq.{coach_id}&select=user_id,name",
-                        headers=supabase.admin_headers,
-                    )
-                    if c_res.status_code == 200 and c_res.json():
-                        coach = c_res.json()[0]
+                c_res = await supabase._get(f"/rest/v1/coaches?id=eq.{coach_id}&select=user_id,name")
+                if c_res:
+                    coach = c_res[0]
                         coach_user_id = coach.get("user_id")
                         notif = {
                             "title": f"⚽ تدريب جديد: {title}",

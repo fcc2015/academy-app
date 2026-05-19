@@ -5,6 +5,9 @@ Run once with: python run_migration.py
 import asyncio
 import httpx
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -16,8 +19,19 @@ ADMIN_HEADERS = {
 }
 
 SQL_STATEMENTS = [
-    "ALTER TABLE academies ADD COLUMN IF NOT EXISTS country text;",
-    "ALTER TABLE academies ADD COLUMN IF NOT EXISTS city text;",
+    "ALTER TABLE IF EXISTS public.players ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.coaches ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.squads ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.payments_gateway ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.finances_expenses ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.events ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.notifications ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.attendance ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.evaluations ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.medical_records ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.inventory ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.matches ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE IF EXISTS public.kits ENABLE ROW LEVEL SECURITY;"
 ]
 
 async def run():

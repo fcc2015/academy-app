@@ -65,6 +65,7 @@ const translations = {
         inventory: { ar: 'المخزون', en: 'Inventory', fr: 'Inventaire' },
         training: { ar: 'جدول التداريب', en: 'Training', fr: 'Entraînements' },
         kits: { ar: 'الألبسة والمعدات', en: 'Kits & Equipment', fr: 'Équipements' },
+        equipmentSettings: { ar: 'إعدادات الأمتعة', en: 'Equipment Settings', fr: 'Paramètres d\'équipement' },
         medical: { ar: 'الملفات الطبية', en: 'Medical', fr: 'Médical' },
         expenses: { ar: 'المصاريف', en: 'Expenses', fr: 'Dépenses' },
         chat: { ar: 'التواصل والدردشة', en: 'Chat & Groups', fr: 'Chat & Groupes' },

@@ -36,29 +36,23 @@ async def create_evaluation(evaluation: EvaluationCreate):
 
         # Notify parent about new evaluation
         try:
-            import httpx as _httpx
-            from core.config import settings as _settings
             player_id = eval_dict.get("player_id")
             if player_id:
-                async with _httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
-                    p_res = await client.get(
-                        f"{_settings.SUPABASE_URL}/rest/v1/players?id=eq.{player_id}&select=parent_name,parent_id",
-                        headers=supabase.admin_headers,
-                    )
-                    if p_res.status_code == 200 and p_res.json():
-                        player = p_res.json()[0]
-                        parent_id = player.get("parent_id")
-                        player_name = player.get("parent_name") or "اللاعب"
-                        notif = {
-                            "title": "⭐ تقييم جديد",
-                            "message": f"تم إضافة تقييم جديد للاعب {player_name}. ادخل للمنصة لرؤية التفاصيل.",
-                            "type": "success",
-                        }
-                        if parent_id:
-                            notif["user_id"] = parent_id
-                        else:
-                            notif["target_role"] = "parent"
-                        await supabase.insert_notification(notif)
+                p_res = await supabase._get(f"/rest/v1/players?id=eq.{player_id}&select=parent_name,parent_id")
+                if p_res:
+                    player = p_res[0]
+                    parent_id = player.get("parent_id")
+                    player_name = player.get("parent_name") or "اللاعب"
+                    notif = {
+                        "title": "⭐ تقييم جديد",
+                        "message": f"تم إضافة تقييم جديد للاعب {player_name}. ادخل للمنصة لرؤية التفاصيل.",
+                        "type": "success",
+                    }
+                    if parent_id:
+                        notif["user_id"] = parent_id
+                    else:
+                        notif["target_role"] = "parent"
+                    await supabase.insert_notification(notif)
         except Exception as notif_err:
             logger.warning("Failed to send evaluation notification: %s", notif_err)
 

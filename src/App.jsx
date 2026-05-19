@@ -60,6 +60,7 @@ const AdminTactics = lazy(() => import('./pages/admin/AdminTactics'));
 const AdminPendingParents = lazy(() => import('./pages/admin/AdminPendingParents'));
 const BranchesManagement = lazy(() => import('./pages/admin/BranchesManagement'));
 const SubscriptionPage = lazy(() => import('./pages/admin/SubscriptionPage'));
+const EquipmentSettings = lazy(() => import('./pages/admin/EquipmentSettings'));
 
 // Coach
 const CoachLayout = lazy(() => import('./pages/coach/CoachLayout'));
@@ -178,6 +179,7 @@ function App() {
             <Route path="training" element={<TrainingManagement />} />
             <Route path="medical" element={<MedicalManagement />} />
             <Route path="kits" element={<KitsManagement />} />
+            <Route path="equipment-settings" element={<EquipmentSettings />} />
             <Route path="inventory" element={<InventoryManagement />} />
             <Route path="expenses" element={<ExpensesManagement />} />
             <Route path="admins" element={<AdminsManagement />} />

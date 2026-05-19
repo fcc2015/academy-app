@@ -29,37 +29,31 @@ async def create_injury(injury: InjuryCreate):
 
         # Notify parent about injury
         try:
-            import httpx as _httpx
-            from core.config import settings as _settings
             player_id = data.get("player_id")
             if player_id:
-                async with _httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
-                    p_res = await client.get(
-                        f"{_settings.SUPABASE_URL}/rest/v1/players?id=eq.{player_id}&select=parent_name,parent_id",
-                        headers=supabase.admin_headers,
-                    )
-                    if p_res.status_code == 200 and p_res.json():
-                        player = p_res.json()[0]
-                        parent_id = player.get("parent_id")
-                        player_name = player.get("parent_name") or "اللاعب"
-                        injury_type = data.get("injury_type") or "إصابة"
-                        notif = {
-                            "title": "⚠️ إشعار إصابة",
-                            "message": f"تم تسجيل إصابة ({injury_type}) للاعب {player_name}. يرجى التواصل مع الطاقم الطبي.",
-                            "type": "alert",
-                        }
-                        if parent_id:
-                            notif["user_id"] = parent_id
-                        else:
-                            notif["target_role"] = "parent"
-                        await supabase.insert_notification(notif)
-                        # Also notify admin
-                        await supabase.insert_notification({
-                            "title": "🏥 إصابة لاعب",
-                            "message": f"تم تسجيل إصابة ({injury_type}) للاعب {player_name}.",
-                            "type": "alert",
-                            "target_role": "admin",
-                        })
+                p_res = await supabase._get(f"/rest/v1/players?id=eq.{player_id}&select=parent_name,parent_id")
+                if p_res:
+                    player = p_res[0]
+                    parent_id = player.get("parent_id")
+                    player_name = player.get("parent_name") or "اللاعب"
+                    injury_type = data.get("injury_type") or "إصابة"
+                    notif = {
+                        "title": "⚠️ إشعار إصابة",
+                        "message": f"تم تسجيل إصابة ({injury_type}) للاعب {player_name}. يرجى التواصل مع الطاقم الطبي.",
+                        "type": "alert",
+                    }
+                    if parent_id:
+                        notif["user_id"] = parent_id
+                    else:
+                        notif["target_role"] = "parent"
+                    await supabase.insert_notification(notif)
+                    # Also notify admin
+                    await supabase.insert_notification({
+                        "title": "🏥 إصابة لاعب",
+                        "message": f"تم تسجيل إصابة ({injury_type}) للاعب {player_name}.",
+                        "type": "alert",
+                        "target_role": "admin",
+                    })
         except Exception as notif_err:
             logger.warning("Failed to send injury notification: %s", notif_err)
 
@@ -82,32 +76,23 @@ async def update_injury(injury_id: str, injury: InjuryUpdate):
         new_status = data.get("status", "")
         if new_status.lower() in ("recovered", "متعافي", "عافي", "تعافى"):
             try:
-                import httpx as _httpx
-                from core.config import settings as _settings
-                async with _httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
-                    inj_res = await client.get(
-                        f"{_settings.SUPABASE_URL}/rest/v1/injuries?id=eq.{injury_id}&select=player_id",
-                        headers=supabase.admin_headers,
-                    )
-                    if inj_res.status_code == 200 and inj_res.json():
-                        player_id = inj_res.json()[0].get("player_id")
-                        if player_id:
-                            p_res = await client.get(
-                                f"{_settings.SUPABASE_URL}/rest/v1/players?id=eq.{player_id}&select=parent_name,parent_id",
-                                headers=supabase.admin_headers,
-                            )
-                            if p_res.status_code == 200 and p_res.json():
-                                player = p_res.json()[0]
-                                parent_id = player.get("parent_id")
-                                player_name = player.get("parent_name") or "اللاعب"
-                                notif = {
-                                    "title": "✅ تعافي اللاعب",
-                                    "message": f"يسعدنا إخباركم بأن اللاعب {player_name} قد تعافى وعاد للتدريبات.",
-                                    "type": "success",
-                                }
-                                if parent_id:
-                                    notif["user_id"] = parent_id
-                                await supabase.insert_notification(notif)
+                inj_res = await supabase._get(f"/rest/v1/injuries?id=eq.{injury_id}&select=player_id")
+                if inj_res:
+                    player_id = inj_res[0].get("player_id")
+                    if player_id:
+                        p_res = await supabase._get(f"/rest/v1/players?id=eq.{player_id}&select=parent_name,parent_id")
+                        if p_res:
+                            player = p_res[0]
+                            parent_id = player.get("parent_id")
+                            player_name = player.get("parent_name") or "اللاعب"
+                            notif = {
+                                "title": "✅ تعافي اللاعب",
+                                "message": f"يسعدنا إخباركم بأن اللاعب {player_name} قد تعافى وعاد للتدريبات.",
+                                "type": "success",
+                            }
+                            if parent_id:
+                                notif["user_id"] = parent_id
+                            await supabase.insert_notification(notif)
             except Exception as notif_err:
                 logger.warning("Failed to send recovery notification: %s", notif_err)
 

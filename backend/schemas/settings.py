@@ -11,6 +11,8 @@ class AcademySettingsBase(BaseModel):
     annual_subscription: float = 3000.0
     subscription_model: str = "monthly"
     enable_prorata: bool = False
+    prorata_start_month: int = 1
+    prorata_discount_percentage: int = 30
     currency: str = "MAD"
     logo_url: Optional[str] = None
     address: Optional[str] = None
@@ -39,6 +41,8 @@ class AcademySettingsUpdate(BaseModel):
     annual_subscription: Optional[float] = None
     subscription_model: Optional[str] = None
     enable_prorata: Optional[bool] = None
+    prorata_start_month: Optional[int] = None
+    prorata_discount_percentage: Optional[int] = None
     currency: Optional[str] = None
     logo_url: Optional[str] = None
     address: Optional[str] = None

@@ -1,17 +1,19 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
-import { User, Shield, MapPin, Calendar, Award, Trophy, Star, CalendarCheck, CheckCircle2, XCircle, Clock, AlertTriangle, Heart, TrendingUp, Lightbulb, CreditCard, Wallet, Zap, Target, BadgeCheck, Activity, MessageCircle } from 'lucide-react';
+import { User, Shield, MapPin, Calendar, Award, Trophy, Star, CalendarCheck, CheckCircle2, XCircle, Clock, AlertTriangle, Heart, TrendingUp, Lightbulb, CreditCard, Wallet, Zap, Target, BadgeCheck, Activity, MessageCircle, Shirt } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { SkeletonDashboard } from '../../components/Skeleton';
 import AttendanceHeatmap from '../../components/AttendanceHeatmap';
 import MedicalCard from '../../components/MedicalCard';
 import FUTCard from '../../components/FUTCard';
+import UpgradeModal from '../../components/UpgradeModal';
 
 const ParentChildProfile = () => {
     const { isRTL, dir } = useLanguage();
     const navigate = useNavigate();
+    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [child, setChild] = useState(null);
     const [squad, setSquad] = useState(null);
     const [matches, setMatches] = useState([]);
@@ -19,6 +21,8 @@ const ParentChildProfile = () => {
     const [attendance, setAttendance] = useState([]);
     const [payments, setPayments] = useState([]);
     const [injuries, setInjuries] = useState([]);
+    const [equipment, setEquipment] = useState(null);
+    const [plans, setPlans] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('sessions');
     const userId = localStorage.getItem('impersonating_user_id') || localStorage.getItem('user_id');
@@ -59,12 +63,14 @@ const ParentChildProfile = () => {
                     setChild(currentPlayer);
                     sessionStorage.setItem(`child_data_${userId}`, JSON.stringify(currentPlayer));
 
-                    const [mRes, evalRes, attendRes, payRes, injRes] = await Promise.all([
+                    const [mRes, evalRes, attendRes, payRes, injRes, equipRes, plansRes] = await Promise.all([
                         authFetch(`${API_URL}/matches/player/${currentPlayer.user_id}`).catch(() => null),
                         authFetch(`${API_URL}/evaluations/?player_id=${currentPlayer.user_id}`).catch(() => null),
                         authFetch(`${API_URL}/attendance/player/${currentPlayer.user_id}`).catch(() => null),
                         authFetch(`${API_URL}/finances/payments/user/${currentPlayer.user_id}`).catch(() => null),
-                        authFetch(`${API_URL}/injuries/`).catch(() => null)
+                        authFetch(`${API_URL}/injuries/`).catch(() => null),
+                        authFetch(`${API_URL}/equipment/player-status/${currentPlayer.user_id}`).catch(() => null),
+                        authFetch(`${API_URL}/plans/`).catch(() => null)
                     ]);
 
                     if (mRes?.ok) { const d = await mRes.json().catch(() => []); setMatches(Array.isArray(d) ? d : []); }
@@ -77,6 +83,14 @@ const ParentChildProfile = () => {
                             ? d.filter(i => i.player_id === currentPlayer.user_id || i.user_id === currentPlayer.user_id)
                             : [];
                         setInjuries(filtered);
+                    }
+                    if (equipRes?.ok) {
+                        const d = await equipRes.json().catch(() => null);
+                        setEquipment(d);
+                    }
+                    if (plansRes?.ok) {
+                        const d = await plansRes.json().catch(() => []);
+                        setPlans(d);
                     }
                 }
 
@@ -145,6 +159,7 @@ const ParentChildProfile = () => {
         { id: 'finance', label: isRTL ? 'المالية' : 'Finance', icon: CreditCard, color: 'teal' },
         { id: 'nutrition', label: isRTL ? 'التغذية' : 'Nutrition', icon: AlertTriangle, color: 'orange' },
         { id: 'medical', label: isRTL ? 'الطبي' : 'Medical', icon: Heart, color: 'rose' },
+        { id: 'store', label: isRTL ? 'الأمتعة' : 'Equipment', icon: Shirt, color: 'indigo' },
         { id: 'chat', label: isRTL ? 'المحادثة' : 'Chat', icon: MessageCircle, color: 'blue' },
         { id: 'info', label: isRTL ? 'المعلومات' : 'Info', icon: Shield, color: 'sky' }
     ];
@@ -924,6 +939,110 @@ const ParentChildProfile = () => {
                 {activeTab === 'medical' && (
                     <div className="animate-slide-up">
                         <MedicalCard player={child} isRTL={isRTL} />
+                    </div>
+                )}
+
+                {/* ── STORE / EQUIPMENT ── */}
+                {activeTab === 'store' && (
+                    <div className="animate-slide-up">
+                        <div className={`bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden ${isRTL ? 'text-right' : 'text-left'}`}>
+                            <div className={`px-10 py-8 border-b border-slate-100 flex items-center gap-6 bg-indigo-50/50 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                <div className="p-4 bg-indigo-100 text-indigo-600 rounded-[1.5rem] shadow-sm"><Shirt size={28} /></div>
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">{isRTL ? 'متجر الأمتعة (Store Interne)' : 'Internal Store & Kits'}</h3>
+                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{isRTL ? 'متابعة أمتعة الأكاديمية الخاصة بالباقة' : 'Track academy equipment based on your plan'}</p>
+                                </div>
+                            </div>
+
+                            <div className="p-8 sm:p-10">
+                                {equipment ? (
+                                    <>
+                                        {/* Plan Info */}
+                                        <div className={`flex flex-col md:flex-row items-center justify-between mb-8 p-6 bg-gradient-to-r from-indigo-500 to-violet-600 rounded-[2rem] text-white shadow-xl shadow-indigo-500/20 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
+                                            <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm"><Shield size={24} /></div>
+                                                <div className={isRTL ? 'text-right' : 'text-left'}>
+                                                    <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-100 mb-1">{isRTL ? 'باقتك الحالية' : 'Current Plan'}</p>
+                                                    <h4 className="text-2xl font-black">{equipment.plan_name}</h4>
+                                                </div>
+                                            </div>
+                                            <div className="mt-4 md:mt-0 text-center md:text-right px-6 py-2 bg-white/10 rounded-xl backdrop-blur-sm">
+                                                <span className="text-xs font-bold block text-indigo-100 mb-1">{isRTL ? 'الأمتعة المخصصة' : 'Allocated Items'}</span>
+                                                <span className="text-xl font-black">{equipment.entitlements.length}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Upgrade Button */}
+                                        {(new Date().getMonth() + 1 >= 9 || new Date().getMonth() + 1 <= 1) && (
+                                            <div className={`mb-8 p-6 bg-amber-50 border border-amber-200 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 ${isRTL ? 'sm:flex-row-reverse text-right' : 'text-left'}`}>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="p-3 bg-amber-100 text-amber-600 rounded-xl"><Star size={24} /></div>
+                                                    <div>
+                                                        <h4 className="text-lg font-black text-amber-900">{isRTL ? 'ترقية الباقة' : 'Upgrade Plan'}</h4>
+                                                        <p className="text-sm font-bold text-amber-700">{isRTL ? 'احصل على معدات إضافية وميزات أكثر بترقية باقتك' : 'Get more equipment and features by upgrading your plan'}</p>
+                                                    </div>
+                                                </div>
+                                                {plans.length > 1 && (
+                                                    <button onClick={() => setIsUpgradeModalOpen(true)} className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black rounded-xl hover:scale-105 transition-transform shadow-lg shadow-amber-500/30 whitespace-nowrap">
+                                                        {isRTL ? 'ترقية الآن' : 'Upgrade Now'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <UpgradeModal 
+                                            isOpen={isUpgradeModalOpen} 
+                                            onClose={() => setIsUpgradeModalOpen(false)} 
+                                            currentPlanName={equipment.plan_name} 
+                                            playerId={child.user_id} 
+                                        />
+
+                                        {equipment.status_list.length === 0 ? (
+                                            <div className="text-center py-12 text-slate-400">
+                                                <Shirt className="mx-auto mb-4 opacity-20" size={48} />
+                                                <p className="font-black uppercase tracking-widest text-sm">{isRTL ? 'لا توجد أمتعة مخصصة في هذه الباقة' : 'No items allocated for this plan'}</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                                {equipment.status_list.map((item, idx) => {
+                                                    const delivered = item.status === 'Assigned' || item.status === 'Returned';
+                                                    return (
+                                                        <div key={idx} className={`p-6 rounded-3xl border-2 transition-all ${delivered ? 'border-emerald-100 bg-emerald-50/30 hover:border-emerald-200' : 'border-amber-100 bg-amber-50/30 hover:border-amber-200'}`}>
+                                                            <div className={`flex items-start justify-between mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${delivered ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                                    <Shirt size={20} />
+                                                                </div>
+                                                                <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl ${delivered ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                                    {delivered ? (isRTL ? 'تم التسليم ✓' : 'Delivered ✓') : (isRTL ? 'قيد الانتظار ⏳' : 'Pending ⏳')}
+                                                                </span>
+                                                            </div>
+                                                            <div className={isRTL ? 'text-right' : 'text-left'}>
+                                                                <h4 className="text-lg font-black text-slate-800">{item.item_name}</h4>
+                                                                {delivered ? (
+                                                                    <p className="text-xs font-bold text-slate-500 mt-2 flex items-center gap-1.5 justify-end" dir="ltr">
+                                                                        <CheckCircle2 size={14} className="text-emerald-500"/>
+                                                                        {item.assigned_date}
+                                                                    </p>
+                                                                ) : (
+                                                                    <p className="text-xs font-bold text-slate-500 mt-2 flex items-center gap-1.5 justify-end" dir="ltr">
+                                                                        <Clock size={14} className="text-amber-500"/>
+                                                                        {isRTL ? 'في انتظار التسليم' : 'Awaiting Delivery'}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="flex justify-center py-12">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
 

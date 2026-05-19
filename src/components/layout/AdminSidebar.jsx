@@ -221,6 +221,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
                 { to: '/admin/training',     icon: Calendar,       labelKey: 'sidebar.training' },
                 { to: '/admin/inventory',    icon: Package,        labelKey: 'sidebar.inventory' },
                 { to: '/admin/kits',         icon: Shirt,          labelKey: 'sidebar.kits' },
+                { to: '/admin/equipment-settings', icon: Settings, labelKey: 'sidebar.equipmentSettings' },
             ]
         },
         {
