@@ -175,7 +175,8 @@ const ParentChildProfile = () => {
         rose: 'text-rose-600 bg-rose-50 border-rose-100',
         sky: 'text-sky-600 bg-sky-50 border-sky-100',
         red: 'text-red-600 bg-red-50 border-red-100',
-        blue: 'text-blue-600 bg-blue-50 border-blue-100'
+        blue: 'text-blue-600 bg-blue-50 border-blue-100',
+        indigo: 'text-indigo-600 bg-indigo-50 border-indigo-100'
     };
 
     // Monthly / yearly finance breakdown
@@ -949,8 +950,8 @@ const ParentChildProfile = () => {
                             <div className={`px-10 py-8 border-b border-slate-100 flex items-center gap-6 bg-indigo-50/50 ${isRTL ? 'flex-row-reverse' : ''}`}>
                                 <div className="p-4 bg-indigo-100 text-indigo-600 rounded-[1.5rem] shadow-sm"><Shirt size={28} /></div>
                                 <div>
-                                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">{isRTL ? 'متجر الأمتعة (Store Interne)' : 'Internal Store & Kits'}</h3>
-                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{isRTL ? 'متابعة أمتعة الأكاديمية الخاصة بالباقة' : 'Track academy equipment based on your plan'}</p>
+                                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">{isRTL ? 'تتبع الألبسة (Clothing Tracking)' : 'Clothing Tracking'}</h3>
+                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{isRTL ? 'متابعة حالة تسليم أمتعة الباقة' : 'Track kit delivery status for your plan'}</p>
                                 </div>
                             </div>
 
