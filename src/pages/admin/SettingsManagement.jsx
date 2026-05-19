@@ -797,22 +797,55 @@ const SettingsManagement = () => {
                         </div>
 
                         <div className="space-y-6">
-                            {/* Pro-Rata Toggle */}
-                            <div className="flex items-center justify-between bg-white/10 p-4 rounded-xl border border-white/20">
-                                <div>
-                                    <h4 className="font-bold text-sm">Pro-Rata Billing</h4>
-                                    <p className="text-[10px] text-white/70">Calculates partial initial fees for late joiners</p>
+                            {/* Pro-Rata Toggle and Config */}
+                            <div className="bg-white/10 p-5 rounded-2xl border border-white/20" dir="rtl">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h4 className="font-bold text-lg">نظام التخفيض (Pro-Rata)</h4>
+                                        <p className="text-sm text-indigo-200">تطبيق خصم تلقائي في منتصف الموسم.</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            name="enable_prorata"
+                                            checked={settings.enable_prorata || false}
+                                            onChange={handleInputChange}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-14 h-7 bg-slate-900/40 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-400"></div>
+                                    </label>
                                 </div>
-                                <label className="relative inline-flex items-center cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        name="enable_prorata"
-                                        checked={settings.enable_prorata}
-                                        onChange={handleInputChange}
-                                        className="sr-only peer"
-                                    />
-                                    <div className="w-11 h-6 bg-slate-900/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                                </label>
+                                
+                                {settings.enable_prorata && (
+                                    <div className="mt-4 pt-4 border-t border-white/20 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-indigo-200 mb-2">الشهر الذي يبدأ فيه التخفيض</label>
+                                            <select
+                                                name="prorata_start_month"
+                                                value={settings.prorata_start_month || 1}
+                                                onChange={handleInputChange}
+                                                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+                                            >
+                                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                                                    <option key={m} value={m} className="text-slate-800">شهر {m}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-indigo-200 mb-2">نسبة التخفيض (%)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                name="prorata_discount_percentage"
+                                                value={settings.prorata_discount_percentage || 30}
+                                                onChange={(e) => setSettings(s => ({...s, prorata_discount_percentage: parseInt(e.target.value) || 0}))}
+                                                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+                                                dir="ltr"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Registration Fee */}

@@ -42,6 +42,17 @@ sql_statements = [
         completed_at timestamptz
     );
     """,
+    # parent_signup_requests table
+    """
+    CREATE TABLE IF NOT EXISTS public.parent_signup_requests (
+        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+        parent_user_id uuid,
+        child_name text,
+        academy_id uuid,
+        status text DEFAULT 'pending',
+        created_at timestamptz DEFAULT now()
+    );
+    """,
     # 2. RLS policy for payment_transactions
     """
     ALTER TABLE public.payment_transactions ENABLE ROW LEVEL SECURITY;

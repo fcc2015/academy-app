@@ -429,6 +429,43 @@ const LandingPage = () => {
                             const isFree = plan.billing_cycles?.includes('free');
                             const styles = planColorStyles[plan.color] || planColorStyles.bronze;
 
+                            // Pro-rata Logic
+                            let annualPrice = plan.annual_price;
+                            let hasDiscount = false;
+                            let discountPercent = 0;
+                            const currentMonth = new Date().getMonth() + 1;
+                            const subModel = academyCtx?.subscription_model || 'both';
+                            const enableProrata = academyCtx?.enable_prorata || false;
+                            const prorataStartMonth = academyCtx?.prorata_start_month || 1;
+                            const prorataDiscount = academyCtx?.prorata_discount_percentage || 30;
+
+                            if (enableProrata && annualPrice && (subModel === 'both' || subModel === 'annual')) {
+                                // If current month is >= start month, apply the single discount percentage
+                                // Note: if currentMonth is Dec (12) and start is Jan (1), 12 >= 1.
+                                // If season starts in Sept (9), we might need a wrap-around logic, but for now we'll do simple >= or just check if it's the start month or later in the standard calendar year.
+                                // Actually, if they want it to start from Month X to end of season, a simple >= might not work perfectly if the season spans two calendar years (e.g., Sept to June).
+                                // Let's assume standard behavior: if currentMonth >= prorataStartMonth or currentMonth < 8 (if start month is 1).
+                                // To make it robust: If current month matches or comes after the start month in the season.
+                                // Simplest implementation matching "MATA TABTADI2":
+                                // A typical academy season starts in Sept (9). If prorata_start_month is 1 (Jan), then months 1,2,3,4,5,6,7,8 are "after" 1.
+                                // We can use a simple array of months that get the discount: from prorata_start_month up to 8.
+                                let isDiscountPeriod = false;
+                                if (prorataStartMonth >= 8) { // e.g., starts in Nov (11)
+                                    if (currentMonth >= prorataStartMonth || currentMonth <= 8) isDiscountPeriod = true;
+                                } else {
+                                    if (currentMonth >= prorataStartMonth && currentMonth <= 8) isDiscountPeriod = true;
+                                }
+
+                                if (isDiscountPeriod) {
+                                    discountPercent = prorataDiscount;
+                                }
+                                
+                                if (discountPercent > 0) {
+                                    hasDiscount = true;
+                                    annualPrice = annualPrice - (annualPrice * discountPercent / 100);
+                                }
+                            }
+
                             return (
                                 <div key={plan.id}
                                     className="relative rounded-2xl p-6 flex flex-col transition-all duration-300 hover:-translate-y-1"
@@ -463,9 +500,19 @@ const LandingPage = () => {
                                             </div>
                                         ) : plan.billing_cycles?.includes('annual') && plan.annual_price ? (
                                             <div>
+                                                {hasDiscount && (
+                                                    <div className="text-sm font-bold text-slate-400 line-through mb-1">
+                                                        {plan.annual_price} {t('landing.perYear')}
+                                                    </div>
+                                                )}
                                                 <div className="flex items-baseline gap-1">
-                                                    <span className="text-4xl font-black text-slate-900">{plan.annual_price}</span>
+                                                    <span className="text-4xl font-black text-slate-900">{annualPrice}</span>
                                                     <span className="text-sm font-semibold text-slate-400">{t('landing.perYear')}</span>
+                                                    {hasDiscount && (
+                                                        <span className="ml-2 px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-black rounded-lg">
+                                                            -{discountPercent}%
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 {plan.billing_cycles?.includes('monthly') && plan.monthly_price && (
                                                     <div className="text-sm text-slate-400 font-medium mt-1">
