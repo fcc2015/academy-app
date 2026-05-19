@@ -67,17 +67,17 @@ async def create_training_session(session: TrainingSessionCreate):
                 c_res = await supabase._get(f"/rest/v1/coaches?id=eq.{coach_id}&select=user_id,name")
                 if c_res:
                     coach = c_res[0]
-                        coach_user_id = coach.get("user_id")
-                        notif = {
-                            "title": f"⚽ تدريب جديد: {title}",
-                            "message": f"تم جدولة تدريب بتاريخ {session_date}" + (f" في {location}" if location else "") + ".",
-                            "type": "system",
-                        }
-                        if coach_user_id:
-                            notif["user_id"] = coach_user_id
-                        else:
-                            notif["target_role"] = "coach"
-                        await supabase.insert_notification(notif)
+                    coach_user_id = coach.get("user_id")
+                    notif = {
+                        "title": f"⚽ تدريب جديد: {title}",
+                        "message": f"تم جدولة تدريب بتاريخ {session_date}" + (f" في {location}" if location else "") + ".",
+                        "type": "system",
+                    }
+                    if coach_user_id:
+                        notif["user_id"] = coach_user_id
+                    else:
+                        notif["target_role"] = "coach"
+                    await supabase.insert_notification(notif)
             else:
                 # No specific coach — notify all coaches
                 await supabase.insert_notification({
