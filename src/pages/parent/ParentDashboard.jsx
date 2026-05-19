@@ -14,7 +14,8 @@ import {
     BellRing,
     IdCard,
     Trophy,
-    MapPin
+    MapPin,
+    Shirt
 } from 'lucide-react';
 import PlayerBadgeModal from '../../components/PlayerBadgeModal';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -32,6 +33,7 @@ const ParentDashboard = () => {
     const [performanceScore, setPerformanceScore] = useState('N/A');
     const [upcomingEvent, setUpcomingEvent] = useState(null);
     const [upcomingMatch, setUpcomingMatch] = useState(null);
+    const [equipmentData, setEquipmentData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSendingTest, setIsSendingTest] = useState(false);
     const [isBadgeModalOpen, setIsBadgeModalOpen] = useState(false);
@@ -58,6 +60,7 @@ const ParentDashboard = () => {
                 setUpcomingEvent(data.upcomingEvent);
                 setSubscriptionData(data.subscriptionData);
                 setUpcomingMatch(data.upcomingMatch);
+                setEquipmentData(data.equipmentData);
                 setIsLoading(false);
                 if (cachedChild) return; // Full cache hit
             }
@@ -87,13 +90,14 @@ const ParentDashboard = () => {
             }
 
             if (child) {
-                const [attendRes, evalRes, payRes, eventsRes, subRes, matchRes] = await Promise.all([
+                const [attendRes, evalRes, payRes, eventsRes, subRes, matchRes, equipRes] = await Promise.all([
                     authFetch(`${API_URL}/attendance/player/${child.user_id}`).catch(() => null),
                     authFetch(`${API_URL}/evaluations/?player_id=${child.user_id}`).catch(() => null),
                     authFetch(`${API_URL}/finances/payments/user/${userId}`).catch(() => null),
                     authFetch(`${API_URL}/events/`).catch(() => null),
                     authFetch(`${API_URL}/finances/subscriptions/player/${child.user_id}`).catch(() => null),
-                    authFetch(`${API_URL}/matches/player/${child.user_id}`).catch(() => null)
+                    authFetch(`${API_URL}/matches/player/${child.user_id}`).catch(() => null),
+                    authFetch(`${API_URL}/equipment/player-status/${child.user_id}`).catch(() => null)
                 ]);
 
                 let dashData = {
@@ -102,7 +106,8 @@ const ParentDashboard = () => {
                     payments: [],
                     upcomingEvent: null,
                     subscriptionData: null,
-                    upcomingMatch: null
+                    upcomingMatch: null,
+                    equipmentData: null
                 };
 
                 if (attendRes?.ok) {
@@ -150,12 +155,17 @@ const ParentDashboard = () => {
                     }
                 }
 
+                if (equipRes?.ok) {
+                    dashData.equipmentData = await equipRes.json().catch(() => null);
+                }
+
                 setAttendanceRate(dashData.attendanceRate);
                 setPerformanceScore(dashData.performanceScore);
                 setPayments(dashData.payments);
                 setUpcomingEvent(dashData.upcomingEvent);
                 setSubscriptionData(dashData.subscriptionData);
                 setUpcomingMatch(dashData.upcomingMatch);
+                setEquipmentData(dashData.equipmentData);
 
                 // Cache it
                 sessionStorage.setItem(`parent_dash_data_${userId}`, JSON.stringify(dashData));
@@ -453,6 +463,55 @@ const ParentDashboard = () => {
                         ))}
                     </div>
                 </div>
+
+                {/* Clothing Tracking (Equipment) */}
+                {equipmentData && (
+                    <div className="bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden p-2 lg:col-span-2 animate-fade-in">
+                        <div className={`px-6 py-5 rounded-3xl bg-indigo-50 flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
+                            <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                <Shirt size={20} className="text-indigo-600" />
+                                <h3 className="font-extrabold text-slate-800 text-lg">{isRTL ? 'تتبع الألبسة (Clothing Tracking)' : 'Clothing Tracking'}</h3>
+                            </div>
+                            <div className="text-center px-4 py-1.5 bg-white rounded-xl shadow-sm">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-0.5">{isRTL ? 'الخطة' : 'Plan'}</span>
+                                <span className="text-sm font-black text-indigo-600 leading-none">{equipmentData.plan_name}</span>
+                            </div>
+                        </div>
+                        <div className="p-6">
+                            {!equipmentData.status_list || equipmentData.status_list.length === 0 ? (
+                                <div className="text-center py-8 text-slate-400">
+                                    <Shirt className="mx-auto mb-3 opacity-20" size={32} />
+                                    <p className="font-black uppercase tracking-widest text-xs">{isRTL ? 'لا توجد ألبسة مخصصة لهذه الباقة' : 'No items allocated for this plan'}</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                    {equipmentData.status_list.map((item, idx) => {
+                                        const delivered = item.status === 'Assigned' || item.status === 'Returned';
+                                        return (
+                                            <div key={idx} className={`p-4 rounded-2xl border flex items-center justify-between ${delivered ? 'border-emerald-100 bg-emerald-50/50' : 'border-amber-100 bg-amber-50/50'} ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${delivered ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                        <Shirt size={18} />
+                                                    </div>
+                                                    <div className={isRTL ? 'text-right' : 'text-left'}>
+                                                        <h4 className="text-sm font-black text-slate-800">{item.item_name}</h4>
+                                                        <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${delivered ? 'text-emerald-600' : 'text-amber-600'} ${isRTL ? 'flex-row-reverse justify-end' : ''}`} dir="ltr">
+                                                            {delivered ? <CheckCircle2 size={12}/> : <Clock size={12}/>}
+                                                            {delivered ? item.assigned_date : (isRTL ? 'في الانتظار' : 'Pending')}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${delivered ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                    {delivered ? (isRTL ? 'مُسَلَّم' : 'Delivered') : (isRTL ? 'قيد الانتظار' : 'Pending')}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Next Training */}
