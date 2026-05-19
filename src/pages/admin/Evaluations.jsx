@@ -33,18 +33,31 @@ const Evaluations = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null });
 
+    const [settings, setSettings] = useState(null);
+
     const [formData, setFormData] = useState({
         player_id: '',
         technical_score: 5,
         tactical_score: 5,
         physical_score: 5,
         mental_score: 5,
-        notes: ''
+        notes: '',
+        evaluation_date: new Date().toISOString().split('T')[0]
     });
 
     useEffect(() => {
         fetchPlayers();
+        fetchSettings();
     }, []);
+
+    const fetchSettings = async () => {
+        try {
+            const res = await authFetch(`${API_URL}/settings/`);
+            if (res.ok) setSettings(await res.json());
+        } catch (error) {
+            console.error('Error fetching settings:', error);
+        }
+    };
 
     const fetchPlayers = async () => {
         setIsLoading(true);
@@ -102,7 +115,8 @@ const Evaluations = () => {
                     tactical_score: 5,
                     physical_score: 5,
                     mental_score: 5,
-                    notes: ''
+                    notes: '',
+                    evaluation_date: new Date().toISOString().split('T')[0]
                 });
             }
         } catch (error) {
@@ -396,6 +410,18 @@ const Evaluations = () => {
                         </div>
 
                         <form onSubmit={handleSubmit} className={`p-10 space-y-8 ${isRTL ? 'text-right' : 'text-left'}`}>
+                            <div className="space-y-3">
+                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500">{isRTL ? 'تاريخ التقييم' : 'Evaluation Date'}</label>
+                                <input
+                                    type="date"
+                                    value={formData.evaluation_date}
+                                    min={settings?.season_start || undefined}
+                                    max={settings?.season_end || undefined}
+                                    onChange={(e) => setFormData({ ...formData, evaluation_date: e.target.value })}
+                                    className={`w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold focus:ring-2 focus:ring-indigo-500/20 ${isRTL ? 'text-right' : 'text-left'}`}
+                                />
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
                                 <MetricSlider label={isRTL ? 'المهارات التقنية' : 'Technical Skills'} icon={Zap} value={formData.technical_score} onChange={handleScoreChange} dimension="technical_score" />
                                 <MetricSlider label={isRTL ? 'الوعي التكتيكي' : 'Tactical Awareness'} icon={Brain} value={formData.tactical_score} onChange={handleScoreChange} dimension="tactical_score" />

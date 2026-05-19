@@ -31,6 +31,7 @@ const AttendanceManagement = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [settings, setSettings] = useState(null);
 
     const [isScannerOpen, setIsScannerOpen] = useState(false);
     const [scanFeedback, setScanFeedback] = useState({ show: false, message: '', type: '' });
@@ -44,6 +45,7 @@ const AttendanceManagement = () => {
     useEffect(() => {
         fetchSquads();
         fetchPlayers();
+        fetchSettings();
     }, []);
 
     useEffect(() => {
@@ -59,6 +61,15 @@ const AttendanceManagement = () => {
             if (res.ok) setSquads(await res.json());
         } catch (error) {
             console.error('Error fetching squads:', error);
+        }
+    };
+
+    const fetchSettings = async () => {
+        try {
+            const res = await authFetch(`${API_URL}/settings/`);
+            if (res.ok) setSettings(await res.json());
+        } catch (error) {
+            console.error('Error fetching settings:', error);
         }
     };
 
@@ -245,6 +256,8 @@ const AttendanceManagement = () => {
                                 <input
                                     type="date"
                                     value={selectedDate}
+                                    min={settings?.season_start || undefined}
+                                    max={settings?.season_end || undefined}
                                     onChange={(e) => setSelectedDate(e.target.value)}
                                     className={`w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all cursor-pointer ${isRTL ? 'text-right' : 'text-left'}`}
                                 />
