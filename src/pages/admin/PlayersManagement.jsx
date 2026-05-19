@@ -74,7 +74,7 @@ const PlayerProfileModal = ({ isOpen, onClose, player, isRTL, dir }) => {
         { id: 'attendance', label: isRTL ? 'الحضور'  : 'Attendance', icon: Activity },
         { id: 'medical',    label: isRTL ? 'الطبي'   : 'Medical',    icon: Heart },
         { id: 'payments',   label: isRTL ? 'المدفوعات': 'Payments',   icon: CreditCard },
-        { id: 'equipment',  label: isRTL ? 'الأمتعة'  : 'Equipment',  icon: Shirt },
+        { id: 'equipment',  label: isRTL ? 'تتبع الألبسة'  : 'Equipment',  icon: Shirt },
     ];
 
     const age = player.birth_date
