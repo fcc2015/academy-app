@@ -159,7 +159,7 @@ const ParentChildProfile = () => {
         { id: 'finance', label: isRTL ? 'المالية' : 'Finance', icon: CreditCard, color: 'teal' },
         { id: 'nutrition', label: isRTL ? 'التغذية' : 'Nutrition', icon: AlertTriangle, color: 'orange' },
         { id: 'medical', label: isRTL ? 'الطبي' : 'Medical', icon: Heart, color: 'rose' },
-        { id: 'store', label: isRTL ? 'الأمتعة' : 'Equipment', icon: Shirt, color: 'indigo' },
+        { id: 'store', label: isRTL ? 'تتبع الألبسة' : 'Equipment', icon: Shirt, color: 'indigo' },
         { id: 'chat', label: isRTL ? 'المحادثة' : 'Chat', icon: MessageCircle, color: 'blue' },
         { id: 'info', label: isRTL ? 'المعلومات' : 'Info', icon: Shield, color: 'sky' }
     ];
