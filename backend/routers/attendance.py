@@ -4,6 +4,7 @@ from core.context import user_id_ctx, role_ctx
 from typing import List
 from schemas.attendance import AttendanceResponse, AttendanceBulkCreate
 from services.supabase_client import supabase
+from datetime import datetime
 
 import logging
 logger = logging.getLogger("attendance")
@@ -40,6 +41,17 @@ async def get_player_attendance(player_id: str):
 @router.post("/bulk")
 async def bulk_upsert_attendance(payload: AttendanceBulkCreate):
     try:
+        # Season validation
+        settings = await supabase.get_academy_settings()
+        if settings:
+            s_start = settings.get("season_start")
+            s_end = settings.get("season_end")
+            att_date = payload.date
+            if s_start and att_date < datetime.strptime(s_start, "%Y-%m-%d").date():
+                raise HTTPException(status_code=400, detail="Cannot record attendance before the season start date. | لا يمكن تسجيل الحضور قبل تاريخ بداية الموسم.")
+            if s_end and att_date > datetime.strptime(s_end, "%Y-%m-%d").date():
+                raise HTTPException(status_code=400, detail="Cannot record attendance after the season end date. | لا يمكن تسجيل الحضور بعد تاريخ نهاية الموسم.")
+
         records = []
         absent_player_ids = []
 

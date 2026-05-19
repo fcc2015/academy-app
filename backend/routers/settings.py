@@ -105,19 +105,8 @@ async def update_settings(settings_id: str, settings: AcademySettingsUpdate):
     try:
         settings_dict = settings.model_dump(exclude_unset=True)
         
-        # PROACTIVE: Filter out season fields if columns don't exist yet to avoid crash
-        # This keeps the save button working for everything else
-        try:
-            response = await supabase.update_academy_settings(settings_id, settings_dict)
-            return response[0]
-        except Exception as e:
-            # If it fails, retry without the new fields that may not have columns yet
-            new_fields = ["season_start", "season_end", "terrains", "tournaments_list"]
-            filtered_dict = {k: v for k, v in settings_dict.items() if k not in new_fields}
-            logger.warning(f"Settings update failed once, retrying with filtered fields: {e}")
-            response = await supabase.update_academy_settings(settings_id, filtered_dict)
-            return response[0]
-            
+        response = await supabase.update_academy_settings(settings_id, settings_dict)
+        return response[0]
     except Exception as e:
         logger.error("Error updating settings: %s", e, exc_info=True)
         raise HTTPException(

@@ -4,6 +4,7 @@ from core.context import user_id_ctx, role_ctx
 from typing import List, Optional
 from schemas.evaluations import EvaluationCreate, EvaluationResponse
 from services.supabase_client import supabase
+from datetime import datetime
 
 import logging
 logger = logging.getLogger("evaluations")
@@ -30,6 +31,17 @@ async def get_evaluations(player_id: Optional[str] = Query(None)):
 @router.post("/", response_model=EvaluationResponse)
 async def create_evaluation(evaluation: EvaluationCreate):
     try:
+        # Season validation
+        settings = await supabase.get_academy_settings()
+        eval_date = evaluation.evaluation_date or datetime.utcnow().date()
+        if settings:
+            s_start = settings.get("season_start")
+            s_end = settings.get("season_end")
+            if s_start and eval_date < datetime.strptime(s_start, "%Y-%m-%d").date():
+                raise HTTPException(status_code=400, detail="Cannot create evaluation before the season start date. | لا يمكن التقييم قبل تاريخ بداية الموسم.")
+            if s_end and eval_date > datetime.strptime(s_end, "%Y-%m-%d").date():
+                raise HTTPException(status_code=400, detail="Cannot create evaluation after the season end date. | لا يمكن التقييم بعد تاريخ نهاية الموسم.")
+
         eval_dict = evaluation.model_dump(exclude_none=True, mode='json')
         response = await supabase.insert_evaluation(eval_dict)
         created = response[0] if isinstance(response, list) else response
