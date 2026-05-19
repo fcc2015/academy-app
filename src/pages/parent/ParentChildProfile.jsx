@@ -1038,8 +1038,14 @@ const ParentChildProfile = () => {
                                         )}
                                     </>
                                 ) : (
-                                    <div className="flex justify-center py-12">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                    <div className="flex flex-col items-center py-16 text-slate-400">
+                                        <Shirt className="mx-auto mb-4 opacity-20" size={64} />
+                                        <p className="font-black uppercase tracking-widest text-sm text-center">
+                                            {isRTL ? 'لا توجد أمتعة مرتبطة بهذا اللاعب' : 'No equipment linked to this player'}
+                                        </p>
+                                        <p className="text-xs mt-2 text-slate-400 text-center max-w-xs">
+                                            {isRTL ? 'يرجى التأكد من أن اللاعب مشترك في باقة تحتوي على أمتعة، أو راجع الإدارة.' : 'Please ensure the player is subscribed to a plan with equipment, or contact the admin.'}
+                                        </p>
                                     </div>
                                 )}
                             </div>
