@@ -34,9 +34,21 @@ function checkParentAuth() {
 const ParentLayout = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
     const { t, isRTL, dir } = useLanguage();
     const [academyName, setAcademyName] = useState(isRTL ? 'أكاديمية كرة القدم' : 'Football Academy');
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth >= 1024) {
+                setIsSidebarOpen(true);
+            } else {
+                setIsSidebarOpen(false);
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         authFetch(`${API_URL}/settings/`)
@@ -177,10 +189,9 @@ const ParentLayout = () => {
                 <header className="h-20 bg-white border-b border-slate-200 flex items-center px-4 lg:px-8 justify-between shrink-0 transition-all">
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 shadow-sm bg-white"
+                        className={`p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 shadow-sm bg-white z-[60] relative ${isSidebarOpen ? 'hidden lg:block' : ''}`}
                     >
-                        {isSidebarOpen ? <X size={20} className="lg:hidden" /> : <Menu size={20} />}
-                        {isSidebarOpen && <Menu size={20} className="hidden lg:block" />}
+                        <Menu size={20} />
                     </button>
 
                     <div className="flex items-center gap-4 ml-auto">

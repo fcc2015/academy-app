@@ -28,7 +28,9 @@ import {
     CreditCard,
     Activity,
     LogIn,
-    Key
+    Key,
+    Shirt,
+    CheckCircle2
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import PlayerBadgeModal from '../../components/PlayerBadgeModal';
@@ -43,6 +45,7 @@ const PlayerProfileModal = ({ isOpen, onClose, player, isRTL, dir }) => {
     const [activeTab, setActiveTab] = useState('profile');
     const [attendance, setAttendance] = useState([]);
     const [payments, setPayments] = useState([]);
+    const [equipment, setEquipment] = useState(null);
     const [loadingData, setLoadingData] = useState(false);
 
     useEffect(() => {
@@ -50,13 +53,16 @@ const PlayerProfileModal = ({ isOpen, onClose, player, isRTL, dir }) => {
         setActiveTab('profile');
         setAttendance([]);
         setPayments([]);
+        setEquipment(null);
         setLoadingData(true);
         Promise.all([
             authFetch(`${API_URL}/attendance/player/${player.user_id}`).then(r => r.ok ? r.json() : []).catch(() => []),
             authFetch(`${API_URL}/finances/payments/player/${player.user_id}`).then(r => r.ok ? r.json() : []).catch(() => []),
-        ]).then(([att, pay]) => {
+            authFetch(`${API_URL}/equipment/player-status/${player.user_id}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        ]).then(([att, pay, equip]) => {
             setAttendance(Array.isArray(att) ? att : []);
             setPayments(Array.isArray(pay) ? pay : []);
+            setEquipment(equip);
             setLoadingData(false);
         });
     }, [isOpen, player]);
@@ -68,6 +74,7 @@ const PlayerProfileModal = ({ isOpen, onClose, player, isRTL, dir }) => {
         { id: 'attendance', label: isRTL ? 'الحضور'  : 'Attendance', icon: Activity },
         { id: 'medical',    label: isRTL ? 'الطبي'   : 'Medical',    icon: Heart },
         { id: 'payments',   label: isRTL ? 'المدفوعات': 'Payments',   icon: CreditCard },
+        { id: 'equipment',  label: isRTL ? 'الأمتعة'  : 'Equipment',  icon: Shirt },
     ];
 
     const age = player.birth_date
@@ -164,6 +171,54 @@ const PlayerProfileModal = ({ isOpen, onClose, player, isRTL, dir }) => {
                     {/* Payments tab */}
                     {activeTab === 'payments' && !loadingData && (
                         <PaymentTimeline payments={payments} isRTL={isRTL} currency="MAD" />
+                    )}
+
+                    {/* Equipment tab */}
+                    {activeTab === 'equipment' && !loadingData && equipment && (
+                        <div className="space-y-4 animate-fade-in">
+                            <div className={`p-5 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                <div>
+                                    <h4 className="font-black text-indigo-900">{isRTL ? 'باقة الأمتعة' : 'Equipment Plan'}</h4>
+                                    <p className="text-xs font-bold text-indigo-600">{equipment.plan_name}</p>
+                                </div>
+                                <div className="text-center px-4 py-1.5 bg-white rounded-xl shadow-sm">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-0.5">{isRTL ? 'القطع المخصصة' : 'Allocated'}</span>
+                                    <span className="text-lg font-black text-indigo-600 leading-none">{equipment.entitlements?.length || 0}</span>
+                                </div>
+                            </div>
+                            
+                            {!equipment.status_list || equipment.status_list.length === 0 ? (
+                                <div className="text-center py-10 text-slate-400">
+                                    <Shirt className="mx-auto mb-3 opacity-20" size={32} />
+                                    <p className="font-black uppercase tracking-widest text-xs">{isRTL ? 'لا توجد أمتعة' : 'No items allocated'}</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {equipment.status_list.map((item, idx) => {
+                                        const delivered = item.status === 'Assigned' || item.status === 'Returned';
+                                        return (
+                                            <div key={idx} className={`p-4 rounded-xl border flex items-center justify-between ${delivered ? 'border-emerald-100 bg-emerald-50/30' : 'border-amber-100 bg-amber-50/30'} ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${delivered ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                        <Shirt size={18} />
+                                                    </div>
+                                                    <div className={isRTL ? 'text-right' : 'text-left'}>
+                                                        <h4 className="text-sm font-black text-slate-800">{item.item_name}</h4>
+                                                        <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${delivered ? 'text-emerald-600' : 'text-amber-600'} ${isRTL ? 'flex-row-reverse justify-end' : ''}`} dir="ltr">
+                                                            {delivered ? <CheckCircle2 size={12}/> : <Clock size={12}/>}
+                                                            {delivered ? item.assigned_date : (isRTL ? 'في الانتظار' : 'Pending')}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${delivered ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                    {delivered ? (isRTL ? 'تم التسليم' : 'Delivered') : (isRTL ? 'قيد الانتظار' : 'Pending')}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>
