@@ -23,6 +23,7 @@ const ParentChildProfile = () => {
     const [injuries, setInjuries] = useState([]);
     const [equipment, setEquipment] = useState(null);
     const [plans, setPlans] = useState([]);
+    const [sanctions, setSanctions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('sessions');
     const userId = localStorage.getItem('impersonating_user_id') || localStorage.getItem('user_id');
@@ -63,14 +64,15 @@ const ParentChildProfile = () => {
                     setChild(currentPlayer);
                     sessionStorage.setItem(`child_data_${userId}`, JSON.stringify(currentPlayer));
 
-                    const [mRes, evalRes, attendRes, payRes, injRes, equipRes, plansRes] = await Promise.all([
+                    const [mRes, evalRes, attendRes, payRes, injRes, equipRes, plansRes, sanctionsRes] = await Promise.all([
                         authFetch(`${API_URL}/matches/player/${currentPlayer.user_id}`).catch(() => null),
                         authFetch(`${API_URL}/evaluations/?player_id=${currentPlayer.user_id}`).catch(() => null),
                         authFetch(`${API_URL}/attendance/player/${currentPlayer.user_id}`).catch(() => null),
                         authFetch(`${API_URL}/finances/payments/user/${currentPlayer.user_id}`).catch(() => null),
                         authFetch(`${API_URL}/injuries/`).catch(() => null),
                         authFetch(`${API_URL}/equipment/player-status/${currentPlayer.user_id}`).catch(() => null),
-                        authFetch(`${API_URL}/plans/`).catch(() => null)
+                        authFetch(`${API_URL}/plans/`).catch(() => null),
+                        authFetch(`${API_URL}/sanctions/player/${currentPlayer.user_id}`).catch(() => null)
                     ]);
 
                     if (mRes?.ok) { const d = await mRes.json().catch(() => []); setMatches(Array.isArray(d) ? d : []); }
@@ -91,6 +93,10 @@ const ParentChildProfile = () => {
                     if (plansRes?.ok) {
                         const d = await plansRes.json().catch(() => []);
                         setPlans(d);
+                    }
+                    if (sanctionsRes?.ok) {
+                        const d = await sanctionsRes.json().catch(() => []);
+                        setSanctions(Array.isArray(d) ? d : []);
                     }
                 }
 
@@ -161,6 +167,7 @@ const ParentChildProfile = () => {
         { id: 'medical', label: isRTL ? 'الطبي' : 'Medical', icon: Heart, color: 'rose' },
         { id: 'store', label: isRTL ? 'تتبع الألبسة' : 'Equipment', icon: Shirt, color: 'indigo' },
         { id: 'chat', label: isRTL ? 'المحادثة' : 'Chat', icon: MessageCircle, color: 'blue' },
+        { id: 'sanctions', label: isRTL ? 'العقوبات' : 'Sanctions', icon: AlertTriangle, color: 'rose' },
         { id: 'info', label: isRTL ? 'المعلومات' : 'Info', icon: Shield, color: 'sky' }
     ];
 
@@ -251,9 +258,9 @@ const ParentChildProfile = () => {
                             </span>
                         </div>
                         <div className={`flex flex-wrap items-center justify-center md:justify-start gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                            <span className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-white/20 shadow-sm flex items-center gap-2 ${child.account_status === 'Active' ? 'bg-emerald-400/30 text-emerald-50' : 'bg-white/20'}`}>
-                                <span className={`w-2 h-2 rounded-full ${child.account_status === 'Active' ? 'bg-emerald-300 animate-pulse' : 'bg-white'}`}></span>
-                                {child.account_status || 'Active'}
+                            <span className={`px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-white/20 shadow-sm flex items-center gap-2 ${child.account_status === 'Active' ? 'bg-emerald-400/30 text-emerald-50' : child.account_status === 'Suspended' ? 'bg-rose-500/40 text-rose-50 border-rose-300/30' : 'bg-white/20'}`}>
+                                <span className={`w-2 h-2 rounded-full ${child.account_status === 'Active' ? 'bg-emerald-300 animate-pulse' : child.account_status === 'Suspended' ? 'bg-rose-400 animate-ping' : 'bg-white'}`}></span>
+                                {isRTL && child.account_status === 'Suspended' ? 'موقوف' : child.account_status || 'Active'}
                             </span>
                             <span className="bg-white/10 backdrop-blur-sm px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-white/20 flex items-center gap-2">
                                 <MapPin size={14} /> {childSquad?.name || 'TBD'}
@@ -267,6 +274,46 @@ const ParentChildProfile = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Active Sanctions Alert Block */}
+            {(() => {
+                const activeSanctions = sanctions.filter(s => s.status === 'Approved');
+                if (activeSanctions.length === 0) return null;
+                return (
+                    <div className="bg-gradient-to-br from-rose-50 to-red-100/50 border-2 border-red-200 rounded-[2rem] p-6 shadow-md relative overflow-hidden animate-pulse">
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/5 rounded-full translate-x-1/3 -translate-y-1/3 blur-xl"></div>
+                        <div className={`flex items-start gap-4 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
+                            <div className="p-3 bg-red-100 text-red-600 rounded-2xl shadow-inner mt-1">
+                                <AlertTriangle size={24} className="animate-bounce" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-black text-red-800 tracking-tight">
+                                    {isRTL ? 'تنبيه انضباطي نشط ⚠️' : 'Active Disciplinary Alert ⚠️'}
+                                </h3>
+                                <div className="mt-3 space-y-3">
+                                    {activeSanctions.map((s, idx) => (
+                                        <div key={idx} className="bg-white/70 backdrop-blur-sm rounded-xl p-3 border border-red-100 flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-800">
+                                                    {isRTL ? `العقوبة: ${s.sanction_type === 'Warning' ? 'إنذار' : s.sanction_type === 'Suspension' ? 'توقيف' : s.sanction_type === 'Fine' ? 'غرامة مالية' : 'حرمان من المباريات'}` : `Type: ${s.sanction_type}`}
+                                                </p>
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    {isRTL ? `السبب: ${s.reason}` : `Reason: ${s.reason}`}
+                                                </p>
+                                            </div>
+                                            {s.amount > 0 && (
+                                                <span className="bg-red-100 text-red-700 px-3 py-1 rounded-lg text-xs font-black">
+                                                    {s.amount} MAD
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Tab Navigation */}
             <div className="bg-white p-2 rounded-[2rem] border border-slate-200 premium-shadow flex flex-wrap items-center gap-2 overflow-x-auto no-scrollbar">
@@ -1068,6 +1115,91 @@ const ParentChildProfile = () => {
                                 </div>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* ── SANCTIONS TAB ── */}
+                {activeTab === 'sanctions' && (
+                    <div className={`animate-slide-up bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden ${isRTL ? 'text-right' : 'text-left'}`}>
+                        <div className={`px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-rose-50/50 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                            <div className={`flex items-center gap-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                <div className="p-4 bg-rose-100 text-rose-600 rounded-[1.5rem] shadow-sm"><AlertTriangle size={28} /></div>
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">{isRTL ? 'العقوبات والانضباط' : 'Disciplinary & Sanctions'}</h3>
+                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{isRTL ? `سجل العقوبات والإنذارات` : `Sanctions & Warnings History`}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-8">
+                            {sanctions.length === 0 ? (
+                                <div className="text-center py-20 bg-slate-50 m-8 rounded-[2.5rem] border-2 border-dashed border-slate-100">
+                                    <AlertTriangle className="mx-auto text-slate-200 mb-6 opacity-40" size={48} />
+                                    <p className="text-lg font-black text-slate-400 uppercase tracking-widest">{isRTL ? 'السجل نظيف! لا توجد عقوبات.' : 'Clean record! No sanctions found.'}</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {sanctions.map((s, idx) => {
+                                        const typeLabels = {
+                                            Warning: { ar: 'إنذار', color: 'text-amber-600 bg-amber-50 border-amber-100' },
+                                            Suspension: { ar: 'توقيف عن اللعب', color: 'text-red-600 bg-red-50 border-red-100' },
+                                            Fine: { ar: 'غرامة مالية', color: 'text-rose-600 bg-rose-50 border-rose-100' },
+                                            Match_Ban: { ar: 'حرمان من المباريات', color: 'text-red-700 bg-red-100 border-red-200' }
+                                        };
+                                        const statusLabels = {
+                                            'Pending Approval': { ar: 'قيد الانتظار', color: 'bg-yellow-100 text-yellow-800' },
+                                            'Approved': { ar: 'مقبولة/نشطة', color: 'bg-emerald-100 text-emerald-800' },
+                                            'Rejected': { ar: 'مرفوضة', color: 'bg-slate-100 text-slate-500' },
+                                            'Cancelled': { ar: 'ملغاة/مرفوعة', color: 'bg-sky-100 text-sky-800' }
+                                        };
+                                        const typeInfo = typeLabels[s.sanction_type] || { ar: s.sanction_type, color: 'text-slate-600 bg-slate-50' };
+                                        const statusInfo = statusLabels[s.status] || { ar: s.status, color: 'bg-slate-100 text-slate-800' };
+                                        return (
+                                            <div key={idx} className="border border-slate-100 rounded-[2rem] p-6 hover:shadow-lg transition-all duration-300 bg-white">
+                                                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
+                                                    <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                        <span className={`px-4 py-1.5 rounded-xl text-xs font-black border ${typeInfo.color}`}>
+                                                            {isRTL ? typeInfo.ar : s.sanction_type}
+                                                        </span>
+                                                        <span className={`px-3 py-1 rounded-lg text-xs font-bold ${statusInfo.color}`}>
+                                                            {isRTL ? statusInfo.ar : s.status}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-xs font-bold text-slate-400" dir="ltr">
+                                                        {s.created_at ? new Date(s.created_at).toLocaleDateString() : 'N/A'}
+                                                    </span>
+                                                </div>
+                                                <div className={`space-y-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                                                    <p className="text-base font-bold text-slate-800">
+                                                        {isRTL ? `السبب: ${s.reason}` : `Reason: ${s.reason}`}
+                                                    </p>
+                                                    {s.report_text && (
+                                                        <p className="text-sm text-slate-500 bg-slate-50 p-4 rounded-2xl italic">
+                                                            {s.report_text}
+                                                        </p>
+                                                    )}
+                                                    {s.amount > 0 && (
+                                                        <div className={`flex items-center gap-2 text-sm font-black text-rose-600 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                            <span>{isRTL ? 'مبلغ الغرامة:' : 'Fine Amount:'}</span>
+                                                            <span className="bg-rose-50 px-3 py-1 rounded-lg border border-rose-100">{s.amount} MAD</span>
+                                                        </div>
+                                                    )}
+                                                    {s.end_date && (
+                                                        <p className="text-xs text-slate-400">
+                                                            {isRTL ? `تاريخ الانتهاء: ${new Date(s.end_date).toLocaleDateString()}` : `End Date: ${new Date(s.end_date).toLocaleDateString()}`}
+                                                        </p>
+                                                    )}
+                                                    {s.coach_name && (
+                                                        <p className="text-xs text-slate-400">
+                                                            {isRTL ? `بطلب من المدرب: ${s.coach_name}` : `Requested by Coach: ${s.coach_name}`}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

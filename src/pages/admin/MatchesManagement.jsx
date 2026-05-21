@@ -3,30 +3,19 @@ import { API_URL } from '../../config';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     Trophy,
-    Calendar,
-    MapPin,
-    AlertTriangle,
-    CheckCircle,
-    PlusCircle,
-    Search,
-    Edit2,
-    Trash2,
-    X,
     XCircle,
     Activity,
-    LandPlot,
-    CalendarDays,
-    FileText,
-    FileImage,
-    FileSpreadsheet,
-    Download,
-    Clock,
+    PlusCircle,
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
+import MatchModal from './components/MatchModal';
+import MatchExportTable from './components/MatchExportTable';
+import MatchFilters from './components/MatchFilters';
+import MatchList from './components/MatchList';
 
 const MatchesManagement = () => {
     const { isRTL, dir, t, formatDate } = useLanguage();
@@ -626,586 +615,63 @@ const MatchesManagement = () => {
                 </div>
             </div>
 
-            {/* Matches Table */}
+            {/* Matches Table & Filters */}
             <div className="bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden border-b-8 border-b-fuchsia-600 animate-fade-in">
-                <div className={`px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                    <h3 className={`font-extrabold text-slate-800 text-lg flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
-                        <Trophy size={20} className="text-fuchsia-500" /> {t('matches.archiveSchedule')}
-                    </h3>
+                <MatchFilters
+                    isRTL={isRTL}
+                    t={t}
+                    weekendOnly={weekendOnly}
+                    setWeekendOnly={setWeekendOnly}
+                    exportOpen={exportOpen}
+                    setExportOpen={setExportOpen}
+                    exportPDF={exportPDF}
+                    exportImage={exportImage}
+                    exportExcel={exportExcel}
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                />
 
-                    <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
-                        <button
-                            type="button"
-                            onClick={() => setWeekendOnly(v => !v)}
-                            className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border ${weekendOnly
-                                ? 'bg-fuchsia-600 text-white border-fuchsia-600 shadow-fuchsia-600/20'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-fuchsia-300'
-                                }`}
-                            title="Show only Friday/Saturday/Sunday matches"
-                        >
-                            <CalendarDays size={14} /> Weekend
-                        </button>
-
-                        {/* Export menu */}
-                        <div className="relative">
-                            <button
-                                type="button"
-                                onClick={() => setExportOpen(v => !v)}
-                                className="flex items-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border bg-slate-900 text-white border-slate-900 hover:bg-slate-800"
-                            >
-                                <Download size={14} /> Export
-                            </button>
-                            {exportOpen && (
-                                <>
-                                    <div className="fixed inset-0 z-30" onClick={() => setExportOpen(false)} />
-                                    <div className="absolute top-full mt-2 right-0 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden w-56" dir="ltr">
-                                        <button onClick={exportPDF} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-red-50 text-left transition-colors border-b border-slate-100">
-                                            <div className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center"><FileText size={16} /></div>
-                                            <div>
-                                                <p className="text-xs font-black text-slate-800">Download PDF</p>
-                                                <p className="text-[10px] text-slate-400 font-bold">Landscape A4</p>
-                                            </div>
-                                        </button>
-                                        <button onClick={exportImage} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-blue-50 text-left transition-colors border-b border-slate-100">
-                                            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center"><FileImage size={16} /></div>
-                                            <div>
-                                                <p className="text-xs font-black text-slate-800">Download PNG</p>
-                                                <p className="text-[10px] text-slate-400 font-bold">High-res image</p>
-                                            </div>
-                                        </button>
-                                        <button onClick={exportExcel} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-emerald-50 text-left transition-colors">
-                                            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><FileSpreadsheet size={16} /></div>
-                                            <div>
-                                                <p className="text-xs font-black text-slate-800">Download Excel</p>
-                                                <p className="text-[10px] text-slate-400 font-bold">.xlsx spreadsheet</p>
-                                            </div>
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-
-                        <div className="relative flex-1 sm:w-72">
-                            <Search className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-300`} size={18} />
-                            <input
-                                type="text"
-                                placeholder={t('matches.searchOpponent')}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className={`w-full ${isRTL ? 'pr-12 pl-4 text-right' : 'pl-12 pr-4 text-left'} py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-fuchsia-500/10 outline-none transition-all shadow-sm`}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <div ref={tableRef} className="overflow-x-auto min-h-[400px] bg-white">
-                    {/* Export header (visible in PDF/PNG) */}
-                    <div className="px-6 py-4 border-b-2 border-slate-200 bg-gradient-to-r from-fuchsia-50 to-pink-50 flex items-center justify-between">
-                        <div>
-                            <h2 className="text-xl font-black text-slate-900 tracking-tight">PROGRAMMATION DES MATCHS</h2>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-fuchsia-600 mt-1">
-                                {filteredMatches.length} matches · Generated {new Date().toLocaleDateString('en-GB')}
-                            </p>
-                        </div>
-                        <Trophy className="text-fuchsia-400" size={32} />
-                    </div>
-
-                    {/* Day-color legend */}
-                    <div className="px-6 py-2 border-b border-slate-100 bg-slate-50 flex items-center gap-3 text-[10px] font-black uppercase tracking-widest" data-export-skip>
-                        <span className="text-slate-400">Légende:</span>
-                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-200 border border-amber-400" /> VEN</span>
-                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-cyan-200 border border-cyan-400" /> SAM</span>
-                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-pink-200 border border-pink-400" /> DIM</span>
-                        <span className="ml-auto text-slate-400">💾 Auto-save</span>
-                    </div>
-
-                    <table className="w-full text-left border-collapse" dir="ltr">
-                        <thead>
-                            <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase tracking-[0.15em] font-black border-b-2 border-slate-300">
-                                <th className="px-2 py-3 text-center w-8">#</th>
-                                <th className="px-2 py-3 w-12">Jour</th>
-                                <th className="px-2 py-3">📅 Date</th>
-                                <th className="px-2 py-3">🕐 Heure</th>
-                                <th className="px-2 py-3">⏱️ Durée</th>
-                                <th className="px-2 py-3">U.</th>
-                                <th className="px-2 py-3 text-center">📍 Lieu</th>
-                                <th className="px-2 py-3">🏟️ Terrain / Stade</th>
-                                <th className="px-2 py-3">🆚 Adversaire</th>
-                                <th className="px-2 py-3">🏆 Compétition</th>
-                                <th className="px-2 py-3">👤 Coach</th>
-                                <th className="px-2 py-3 text-center">👕 Kit</th>
-                                <th className="px-2 py-3">État</th>
-                                <th className="px-2 py-3 text-center w-16" data-export-skip>⚙</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200">
-                            {isLoading ? (
-                                <tr>
-                                    <td colSpan="14" className="px-8 py-20 text-center">
-                                        <div className="flex flex-col items-center gap-3">
-                                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-fuchsia-600"></div>
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('matches.loadingMatches')}</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : filteredMatches.length === 0 ? (
-                                <tr>
-                                    <td colSpan="14" className="px-8 py-12 text-center text-slate-300 font-black uppercase tracking-widest text-xs opacity-50">
-                                        {t('matches.noMatches')} — Click "+ Add Row" below to start
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredMatches.map((match, idx) => {
-                                    const dStyle = rowDayStyle(match.match_date);
-                                    const dayLabel = dayName(match.match_date);
-                                    const isSaving = savingRow === match.id;
-                                    const isSaved = savedRow === match.id;
-                                    const meta = parseRowMeta(match.notes);
-                                    const isAway = meta.isAway;
-                                    const matchDur = meta.duration;
-
-                                    return (
-                                        <tr
-                                            key={match.id}
-                                            className={`${dStyle.bg} hover:brightness-95 transition-all text-xs border-l-4 ${dStyle.stripe}`}
-                                        >
-                                            <td className="px-2 py-2 text-center font-black text-slate-400">{idx + 1}</td>
-                                            <td className={`px-2 py-2 text-center font-black tracking-widest ${dStyle.text}`}>{dayLabel}</td>
-
-                                            {/* Date */}
-                                            <td className="px-1 py-1">
-                                                <input
-                                                    type="date"
-                                                    value={isoDate(match.match_date)}
-                                                    onChange={(e) => updateMatchField(match.id, { match_date: composeIso(e.target.value, isoTime(match.match_date)) })}
-                                                    className="w-full px-2 py-1.5 bg-white/80 border border-slate-200 rounded-md text-xs font-black focus:ring-2 focus:ring-fuchsia-400/30 outline-none"
-                                                />
-                                            </td>
-
-                                            {/* Time */}
-                                            <td className="px-1 py-1">
-                                                <input
-                                                    type="time"
-                                                    value={isoTime(match.match_date)}
-                                                    onChange={(e) => updateMatchField(match.id, { match_date: composeIso(isoDate(match.match_date), e.target.value) })}
-                                                    className="w-full px-2 py-1.5 bg-white/80 border border-slate-200 rounded-md text-xs font-black text-fuchsia-700 focus:ring-2 focus:ring-fuchsia-400/30 outline-none"
-                                                />
-                                            </td>
-
-                                            {/* Durée */}
-                                            <td className="px-1 py-1">
-                                                <select
-                                                    value={matchDur || '2x30'}
-                                                    onChange={(e) => updateMatchField(match.id, { notes: buildRowNotes({ ...meta, duration: e.target.value }) })}
-                                                    className="w-full px-2 py-1.5 bg-purple-50 border border-purple-200 rounded-md text-xs font-black uppercase outline-none cursor-pointer"
-                                                >
-                                                    {DURATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                                                </select>
-                                            </td>
-
-                                            {/* Catégorie U — auto-fills coach if a coach is assigned to that U */}
-                                            <td className="px-1 py-1">
-                                                <select
-                                                    value={match.category || ''}
-                                                    onChange={(e) => {
-                                                        const newCat = e.target.value;
-                                                        const patch = { category: newCat };
-                                                        // Auto-fill coach name if not already typed
-                                                        if (newCat && !meta.coachName) {
-                                                            const c = coaches.find(co => (co.u_category || '').toUpperCase() === newCat.toUpperCase());
-                                                            if (c) {
-                                                                patch.notes = buildRowNotes({ ...meta, coachName: c.full_name });
-                                                            }
-                                                        }
-                                                        updateMatchField(match.id, patch);
-                                                    }}
-                                                    className="w-full px-2 py-1.5 bg-indigo-50 border border-indigo-200 rounded-md text-xs font-black uppercase outline-none cursor-pointer"
-                                                >
-                                                    <option value="">—</option>
-                                                    {ageCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                                                </select>
-                                            </td>
-
-                                            {/* DAKHIL / KHARIJ toggle */}
-                                            <td className="px-1 py-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const goingAway = !isAway;
-                                                        const newLocation = goingAway ? '' : (terrains[0] ? `${terrains[0].name} (${terrains[0].size})` : 'Home');
-                                                        updateMatchField(match.id, {
-                                                            location: newLocation,
-                                                            notes: buildRowNotes({ ...meta, isAway: goingAway }),
-                                                        });
-                                                    }}
-                                                    className={`w-full px-2 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider border transition-all ${isAway
-                                                        ? 'bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200'
-                                                        : 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200'
-                                                        }`}
-                                                    title="Click to toggle Home/Away"
-                                                >
-                                                    {isAway ? '✈ خارج' : '🏠 داخل'}
-                                                </button>
-                                            </td>
-
-                                            {/* Terrain (Home) OR Stade name (Away) */}
-                                            <td className="px-1 py-1">
-                                                {isAway ? (
-                                                    <input
-                                                        type="text"
-                                                        value={match.location || ''}
-                                                        onChange={(e) => updateMatchField(match.id, { location: e.target.value })}
-                                                        placeholder="Nom du stade / Mal3ab khariji"
-                                                        className="w-full px-2 py-1.5 bg-orange-50 border border-orange-200 rounded-md text-xs font-black focus:ring-2 focus:ring-orange-400/30 outline-none"
-                                                    />
-                                                ) : (
-                                                    <select
-                                                        value={match.location || ''}
-                                                        onChange={(e) => updateMatchField(match.id, { location: e.target.value })}
-                                                        className="w-full px-2 py-1.5 bg-emerald-50 border border-emerald-200 rounded-md text-xs font-black outline-none cursor-pointer"
-                                                    >
-                                                        <option value="Home">🏠 Home</option>
-                                                        {terrains.map((tr, i) => (
-                                                            <option key={i} value={`${tr.name} (${tr.size})`}>{tr.name} — {tr.size}</option>
-                                                        ))}
-                                                    </select>
-                                                )}
-                                            </td>
-
-                                            {/* Adversaire */}
-                                            <td className="px-1 py-1">
-                                                <input
-                                                    type="text"
-                                                    value={match.opponent_name || ''}
-                                                    onChange={(e) => updateMatchField(match.id, { opponent_name: e.target.value })}
-                                                    placeholder="Ism al-fariq al-monnafis"
-                                                    className="w-full px-2 py-1.5 bg-white/80 border border-slate-200 rounded-md text-xs font-black focus:ring-2 focus:ring-fuchsia-400/30 outline-none"
-                                                />
-                                            </td>
-
-                                            {/* Compétition */}
-                                            <td className="px-1 py-1">
-                                                <select
-                                                    value={match.match_type || ''}
-                                                    onChange={(e) => updateMatchField(match.id, { match_type: e.target.value })}
-                                                    className="w-full px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-md text-xs font-black uppercase outline-none cursor-pointer"
-                                                >
-                                                    <option value="Friendly">FRIENDLY / AMICAL</option>
-                                                    {tournamentsList.map(tn => <option key={tn} value={tn}>{tn}</option>)}
-                                                </select>
-                                            </td>
-
-                                            {/* Coach — dropdown filtered by selected U; falls back to all coaches */}
-                                            <td className="px-1 py-1">
-                                                {(() => {
-                                                    const cat = (match.category || '').toUpperCase();
-                                                    const filtered = coaches.filter(c => (c.u_category || '').toUpperCase() === cat);
-                                                    const list = filtered.length ? filtered : coaches;
-                                                    const namesInList = list.map(c => c.full_name);
-                                                    const isCustom = meta.coachName && !namesInList.includes(meta.coachName);
-                                                    return (
-                                                        <select
-                                                            value={isCustom ? '__custom__' : meta.coachName}
-                                                            onChange={(e) => {
-                                                                let next = e.target.value;
-                                                                if (next === '__custom__') {
-                                                                    const v = window.prompt('Coach name', meta.coachName || '');
-                                                                    if (v == null) return;
-                                                                    next = v;
-                                                                }
-                                                                updateMatchField(match.id, { notes: buildRowNotes({ ...meta, coachName: next }) });
-                                                            }}
-                                                            className="w-full px-2 py-1.5 bg-cyan-50 border border-cyan-200 rounded-md text-xs font-black outline-none cursor-pointer"
-                                                        >
-                                                            <option value="">— Coach —</option>
-                                                            {filtered.length > 0 && (
-                                                                <optgroup label={`Coaches ${match.category}`}>
-                                                                    {filtered.map(c => <option key={c.id} value={c.full_name}>{c.full_name}</option>)}
-                                                                </optgroup>
-                                                            )}
-                                                            {filtered.length === 0 && coaches.length > 0 && (
-                                                                <optgroup label="Tous les coaches">
-                                                                    {coaches.map(c => <option key={c.id} value={c.full_name}>{c.full_name}{c.u_category ? ` (${c.u_category})` : ''}</option>)}
-                                                                </optgroup>
-                                                            )}
-                                                            {isCustom && <option value={meta.coachName}>{meta.coachName}</option>}
-                                                            <option value="__custom__">✏ Autre / Saisir...</option>
-                                                        </select>
-                                                    );
-                                                })()}
-                                            </td>
-
-                                            {/* Kit Color picker */}
-                                            <td className="px-1 py-1">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <input
-                                                        type="color"
-                                                        value={meta.kitColor || '#1e40af'}
-                                                        onChange={(e) => updateMatchField(match.id, { notes: buildRowNotes({ ...meta, kitColor: e.target.value }) })}
-                                                        className="w-7 h-7 rounded border border-slate-200 cursor-pointer"
-                                                        title="Couleur du maillot"
-                                                    />
-                                                    {meta.kitColor && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => updateMatchField(match.id, { notes: buildRowNotes({ ...meta, kitColor: '' }) })}
-                                                            className="text-slate-300 hover:text-red-500 text-xs"
-                                                            title="Effacer"
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-
-                                            {/* État */}
-                                            <td className="px-1 py-1">
-                                                <select
-                                                    value={match.status || 'Scheduled'}
-                                                    onChange={(e) => updateMatchField(match.id, { status: e.target.value })}
-                                                    className="w-full px-2 py-1.5 bg-white/80 border border-slate-200 rounded-md text-xs font-black outline-none cursor-pointer"
-                                                >
-                                                    <option value="Scheduled">⏳ Scheduled</option>
-                                                    <option value="Postponed">⏸ EN ATTENTE</option>
-                                                    <option value="Completed">✅ Completed</option>
-                                                    <option value="Cancelled">❌ REPORTÉ</option>
-                                                </select>
-                                            </td>
-
-                                            {/* Actions */}
-                                            <td className="px-2 py-2 text-center" data-export-skip>
-                                                <div className="flex items-center justify-center gap-1">
-                                                    {isSaving && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="Saving..." />}
-                                                    {isSaved && <span className="w-2 h-2 rounded-full bg-emerald-500" title="Saved" />}
-                                                    <button
-                                                        onClick={() => handleDelete(match.id)}
-                                                        className="p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
-                                                        title="Delete row"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-
-                    {/* Add Row button */}
-                    <div className="px-4 py-3 bg-slate-50/50 border-t-2 border-dashed border-slate-200" data-export-skip>
-                        <button
-                            type="button"
-                            onClick={handleAddRow}
-                            className="w-full flex items-center justify-center gap-2 py-3 bg-white hover:bg-fuchsia-50 border-2 border-dashed border-slate-300 hover:border-fuchsia-400 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:text-fuchsia-600 transition-all"
-                        >
-                            <PlusCircle size={16} />
-                            Add Row (Saturday default)
-                        </button>
-                    </div>
-                </div>
+                <MatchList
+                    tableRef={tableRef}
+                    filteredMatches={filteredMatches}
+                    t={t}
+                    isLoading={isLoading}
+                    savingRow={savingRow}
+                    savedRow={savedRow}
+                    parseRowMeta={parseRowMeta}
+                    rowDayStyle={rowDayStyle}
+                    dayName={dayName}
+                    isoDate={isoDate}
+                    isoTime={isoTime}
+                    composeIso={composeIso}
+                    updateMatchField={updateMatchField}
+                    buildRowNotes={buildRowNotes}
+                    DURATION_OPTIONS={DURATION_OPTIONS}
+                    coaches={coaches}
+                    ageCategories={ageCategories}
+                    terrains={terrains}
+                    tournamentsList={tournamentsList}
+                    handleDelete={handleDelete}
+                    handleAddRow={handleAddRow}
+                />
             </div>
 
-            {/* Add / Edit Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in text-right" dir="rtl">
-                    <div className="bg-white rounded-[2.5rem] w-full max-w-xl premium-shadow overflow-hidden border border-slate-200">
-                        <div className="px-10 py-8 border-b border-slate-100 bg-fuchsia-50 flex justify-between items-center flex-row-reverse">
-                            <h3 className="font-black text-fuchsia-900 text-2xl tracking-tight flex items-center gap-3">
-                                <Trophy size={24} /> {isEditMode ? t('matches.updateMatch') : t('matches.scheduleNew')}
-                            </h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-fuchsia-400 hover:text-fuchsia-600 p-2 hover:bg-white rounded-full transition-all"><X size={20} /></button>
-                        </div>
-
-                        <form onSubmit={handleSubmit} className="p-10 space-y-6 text-right">
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('matches.ourSquad')}</label>
-                                    <select
-                                        name="squad_id"
-                                        value={formData.squad_id}
-                                        onChange={handleInputChange}
-                                        className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none shadow-sm cursor-pointer appearance-none text-right"
-                                    >
-                                        {squads.map(sq => (
-                                            <option key={sq.id} value={sq.id}>{sq.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('matches.opponent')}</label>
-                                    <input
-                                        type="text"
-                                        name="opponent_name"
-                                        value={formData.opponent_name}
-                                        onChange={handleInputChange}
-                                        required
-                                        className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-fuchsia-500/10 text-right shadow-sm"
-                                        placeholder={t('matches.opponentPlaceholder')}
-                                    />
-                                </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="col-span-2">
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('matches.dateTime')}</label>
-                                    <input
-                                        type="datetime-local"
-                                        name="match_date"
-                                        value={formData.match_date}
-                                        onChange={handleInputChange}
-                                        required
-                                        className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-fuchsia-500/10 text-right shadow-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
-                                        <Clock size={11} /> Durée
-                                    </label>
-                                    <select
-                                        name="match_duration"
-                                        value={formData.match_duration}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 py-4 bg-purple-50 border border-purple-200 rounded-2xl text-sm font-black outline-none cursor-pointer appearance-none text-center"
-                                    >
-                                        {DURATION_OPTIONS.map(d => (
-                                            <option key={d} value={d}>{d}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2 text-center">{t('matches.ourGoals')}</label>
-                                    <input
-                                        type="number"
-                                        name="our_score"
-                                        value={formData.our_score}
-                                        onChange={handleInputChange}
-                                        required min="0" step="1"
-                                        className="w-full bg-white text-center text-2xl font-black text-emerald-600 rounded-xl py-2 outline-none border border-emerald-200 focus:ring-4 focus:ring-emerald-500/20"
-                                    />
-                                </div>
-                                <div className="p-4 bg-red-50 rounded-2xl border border-red-100">
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-red-600 mb-2 text-center">{t('matches.theirGoals')}</label>
-                                    <input
-                                        type="number"
-                                        name="their_score"
-                                        value={formData.their_score}
-                                        onChange={handleInputChange}
-                                        required min="0" step="1"
-                                        className="w-full bg-white text-center text-2xl font-black text-red-600 rounded-xl py-2 outline-none border border-red-200 focus:ring-4 focus:ring-red-500/20"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{t('matches.status')}</label>
-                                    <select
-                                        name="status"
-                                        value={formData.status}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none shadow-sm cursor-pointer appearance-none text-right"
-                                    >
-                                        <option value="Scheduled">{t('matches.scheduled')}</option>
-                                        <option value="Completed">{t('matches.completed')}</option>
-                                        <option value="Cancelled">{t('matches.cancelled')}</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
-                                        <Trophy size={11} /> Competition / Tournament
-                                    </label>
-                                    {tournamentsList.length > 0 ? (
-                                        <select
-                                            name="match_type"
-                                            value={formData.match_type}
-                                            onChange={handleInputChange}
-                                            className="w-full px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-black uppercase outline-none shadow-sm cursor-pointer appearance-none text-right tracking-wider"
-                                        >
-                                            <option value="Friendly">FRIENDLY / AMICAL</option>
-                                            {tournamentsList.map(tn => (
-                                                <option key={tn} value={tn}>{tn}</option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <div className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-3 text-center">
-                                            ⚠️ No tournaments defined. Add them in Settings first.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
-                                        <LandPlot size={11} /> Terrain / Pitch
-                                    </label>
-                                    {terrains.length > 0 ? (
-                                        <select
-                                            name="location"
-                                            value={formData.location}
-                                            onChange={handleInputChange}
-                                            className="w-full px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-black outline-none shadow-sm cursor-pointer appearance-none text-right"
-                                        >
-                                            <option value="Home">🏠 Home</option>
-                                            <option value="Away">✈️ Away</option>
-                                            {terrains.map((tr, i) => (
-                                                <option key={i} value={`${tr.name} (${tr.size})`}>
-                                                    {tr.name} — {tr.size}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <input
-                                            type="text"
-                                            name="location"
-                                            value={formData.location}
-                                            onChange={handleInputChange}
-                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none shadow-sm text-right"
-                                            placeholder={t('matches.venuePlaceholder')}
-                                        />
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Category (U)</label>
-                                    {ageCategories.length > 0 ? (
-                                        <select
-                                            name="category"
-                                            value={formData.category}
-                                            onChange={handleInputChange}
-                                            className="w-full px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs font-black outline-none shadow-sm cursor-pointer appearance-none text-right"
-                                        >
-                                            {ageCategories.map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <input
-                                            type="text"
-                                            name="category"
-                                            value={formData.category}
-                                            onChange={handleInputChange}
-                                            placeholder="U13, U15..."
-                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none shadow-sm text-right"
-                                        />
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="pt-6 flex gap-4 justify-end items-center border-t border-slate-100 mt-4 flex-row-reverse">
-                                <button type="submit" className="flex-1 py-5 bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-fuchsia-600/20 hover:shadow-fuchsia-600/40 transition-all transform active:scale-95">
-                                    {isEditMode ? t('ui.saveChanges') : t('matches.scheduleMatch')}
-                                </button>
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-10 py-5 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">{t('common.cancel')}</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            <MatchModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSubmit={handleSubmit}
+                isEditMode={isEditMode}
+                formData={formData}
+                handleInputChange={handleInputChange}
+                squads={squads}
+                t={t}
+                isRTL={isRTL}
+                dir={dir}
+                DURATION_OPTIONS={DURATION_OPTIONS}
+                tournamentsList={tournamentsList}
+                terrains={terrains}
+                ageCategories={ageCategories}
+            />
 
             <ConfirmDialog
                 isOpen={confirmDialog.isOpen}
@@ -1216,138 +682,14 @@ const MatchesManagement = () => {
                 message={t('matches.deleteMessage')}
             />
 
-            {/* ─── Hidden export-only table (Lanoria-style, html2canvas-friendly) ── */}
-            {(() => {
-                const academyName = (academySettings?.academy_name || 'CLUB').toUpperCase();
-                const academyLogo = academySettings?.logo_url;
-                const academyNameUpper = academyName;
-                // Compute weekend range
-                const dates = filteredMatches.map(m => new Date(m.match_date)).filter(d => !isNaN(d));
-                const dateMin = dates.length ? new Date(Math.min(...dates)) : new Date();
-                const dateMax = dates.length ? new Date(Math.max(...dates)) : new Date();
-                const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-                const monthName = months[dateMin.getMonth()];
-                const sameMonth = dateMin.getMonth() === dateMax.getMonth() && dateMin.getFullYear() === dateMax.getFullYear();
-                const weekendLabel = sameMonth
-                    ? `Week-End ${String(dateMin.getDate()).padStart(2, '0')} et ${String(dateMax.getDate()).padStart(2, '0')} ${monthName} ${dateMax.getFullYear()}`
-                    : `${String(dateMin.getDate()).padStart(2, '0')}/${String(dateMin.getMonth()+1).padStart(2, '0')} — ${String(dateMax.getDate()).padStart(2, '0')}/${String(dateMax.getMonth()+1).padStart(2, '0')} ${dateMax.getFullYear()}`;
-
-                // Helpers
-                const dayFr = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-                const fmtDate = (iso) => {
-                    const d = new Date(iso);
-                    return `${dayFr[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${String(d.getFullYear()).slice(2)}`;
-                };
-                const fmtTime = (iso) => {
-                    const d = new Date(iso);
-                    return `${String(d.getHours()).padStart(2, '0')}H${String(d.getMinutes()).padStart(2, '0')}`;
-                };
-                const coachFor = (match) => {
-                    // Prefer the manually-typed coach in the inline editor
-                    const typed = parseRowMeta(match.notes).coachName;
-                    if (typed) return typed;
-                    const sq = squads.find(s => s.id === match.squad_id);
-                    if (!sq) return '';
-                    return sq.coaches?.full_name || sq.coach_name || (coaches.find(c => c.id === sq.coach_id)?.full_name) || '';
-                };
-
-                const HEADER_BLUE = '#1e40af';
-                const ROW_ALT = '#dbeafe';
-                const RED = '#dc2626';
-                const GREEN = '#16a34a';
-
-                return (
-                    <div
-                        ref={exportRef}
-                        style={{
-                            position: 'fixed',
-                            left: '-10000px',
-                            top: 0,
-                            width: '1280px',
-                            backgroundColor: '#ffffff',
-                            fontFamily: 'Arial, Helvetica, sans-serif',
-                            padding: '32px',
-                        }}
-                        aria-hidden="true"
-                    >
-                        {/* Academy logo */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
-                            {academyLogo ? (
-                                <img src={academyLogo} alt="logo" crossOrigin="anonymous" style={{ height: '110px', objectFit: 'contain' }} />
-                            ) : (
-                                <div style={{ width: '110px', height: '110px', borderRadius: '50%', background: '#1e3a8a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '24px', fontWeight: 900 }}>
-                                    {academyNameUpper.charAt(0)}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Title */}
-                        <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                            <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900, letterSpacing: '0.02em', color: '#1e293b' }}>
-                                PROGRAMME DES MATCHES <span style={{ color: '#0284c7' }}>{academyNameUpper}</span> <span style={{ color: GREEN }}>CLUB</span>
-                            </h1>
-                        </div>
-
-                        {/* Subtitle */}
-                        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                            <p style={{ margin: 0, fontSize: '20px', fontStyle: 'italic', color: '#1e293b' }}>{weekendLabel}</p>
-                        </div>
-
-                        {/* Table */}
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', border: '2px solid #1e3a8a' }}>
-                            <thead>
-                                <tr style={{ background: HEADER_BLUE, color: '#ffffff' }}>
-                                    {['Cat', 'Date', 'Domicile', 'Visiteur', 'Heure', 'Terrain', 'Coach', 'Kit'].map(h => (
-                                        <th key={h} style={{ padding: '10px 8px', textAlign: 'center', fontSize: '15px', fontWeight: 900, border: '1px solid #1e3a8a' }}>{h}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredMatches.map((match, idx) => {
-                                    const meta = parseRowMeta(match.notes);
-                                    const isAway = meta.isAway;
-                                    const homeTeam = isAway ? (match.opponent_name || '—') : academyNameUpper;
-                                    const visitorTeam = isAway ? academyNameUpper : (match.opponent_name || '—');
-                                    const isPending = match.status === 'Postponed' || match.status === 'Scheduled' && false;
-                                    const isCancelled = match.status === 'Cancelled';
-                                    const showRed = match.status === 'Postponed' ? 'EN ATTENTE' : (isCancelled ? 'REPORTÉ' : null);
-                                    const rowBg = idx % 2 === 0 ? '#ffffff' : ROW_ALT;
-                                    const cell = { padding: '8px 10px', border: '1px solid #93c5fd', textAlign: 'center', fontWeight: 700, fontSize: '14px', color: '#0f172a' };
-                                    const isOurHome = !isAway;
-                                    const isOurVisit = isAway;
-
-                                    return (
-                                        <tr key={match.id} style={{ background: rowBg }}>
-                                            <td style={{ ...cell, color: HEADER_BLUE, fontWeight: 900 }}>
-                                                {match.category || '—'}
-                                            </td>
-                                            <td style={cell}>
-                                                {showRed ? <span style={{ color: RED, fontWeight: 900 }}>{showRed}</span> : fmtDate(match.match_date)}
-                                            </td>
-                                            <td style={{ ...cell, color: isOurHome ? GREEN : '#0f172a', fontWeight: 900 }}>{homeTeam}</td>
-                                            <td style={{ ...cell, color: isOurVisit ? GREEN : '#0f172a', fontWeight: 900 }}>{visitorTeam}</td>
-                                            <td style={cell}>
-                                                {showRed ? '' : fmtTime(match.match_date)}
-                                            </td>
-                                            <td style={cell}>
-                                                {showRed ? <span style={{ color: RED, fontWeight: 900 }}>{showRed}</span> : (match.location || '—')}
-                                            </td>
-                                            <td style={cell}>
-                                                {showRed ? <span style={{ color: RED, fontWeight: 900 }}>{showRed}</span> : (coachFor(match) || '—')}
-                                            </td>
-                                            <td style={cell}>
-                                                {meta.kitColor ? (
-                                                    <span style={{ display: 'inline-block', width: 28, height: 28, borderRadius: 6, background: meta.kitColor, border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.15)' }} title={meta.kitColor} />
-                                                ) : '—'}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                );
-            })()}
+            <MatchExportTable
+                exportRef={exportRef}
+                academySettings={academySettings}
+                filteredMatches={filteredMatches}
+                squads={squads}
+                coaches={coaches}
+                parseRowMeta={parseRowMeta}
+            />
         </div>
     );
 };

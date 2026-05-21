@@ -33,6 +33,13 @@ import {
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
 
+import GeneralBrandingSection from './components/GeneralBrandingSection';
+import FinancialPolicySection from './components/FinancialPolicySection';
+import LandingPageEditorSection from './components/LandingPageEditorSection';
+import MembershipPlansSection from './components/MembershipPlansSection';
+import CouponsSection from './components/CouponsSection';
+import SecuritySection from './components/SecuritySection';
+
 const SettingsManagement = () => {
     const [settings, setSettings] = useState(null);
     const [coupons, setCoupons] = useState([]);
@@ -463,456 +470,33 @@ const SettingsManagement = () => {
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* General Information */}
-                <div className="lg:col-span-2 space-y-8">
-                    <div className="bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
-                        <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                            <Building className="text-indigo-600" size={20} />
-                            <h3 className="font-extrabold text-slate-800">الهوية والعلامة التجارية</h3>
-                        </div>
-                        <div className="p-8 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">اسم الأكاديمية</label>
-                                    <div className="relative">
-                                        <Building className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                        <input
-                                            name="academy_name"
-                                            value={settings.academy_name}
-                                            onChange={handleInputChange}
-                                            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20"
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">رابط الشعار (Logo URL)</label>
-                                    <div className="relative">
-                                        <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                        <input
-                                            name="logo_url"
-                                            value={settings.logo_url || ''}
-                                            onChange={handleInputChange}
-                                            placeholder="https://example.com/logo.png"
-                                            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Physical Address</label>
-                                <div className="relative">
-                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                    <input
-                                        name="address"
-                                        value={settings.address || ''}
-                                        onChange={handleInputChange}
-                                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20"
-                                    />
-                                </div>
-                            </div>
+                <GeneralBrandingSection
+                    settings={settings}
+                    handleInputChange={handleInputChange}
+                    newCategoryInput={newCategoryInput}
+                    setNewCategoryInput={setNewCategoryInput}
+                    addAgeCategory={addAgeCategory}
+                    removeAgeCategory={removeAgeCategory}
+                    newTerrain={newTerrain}
+                    setNewTerrain={setNewTerrain}
+                    TERRAIN_SIZES={TERRAIN_SIZES}
+                    addTerrain={addTerrain}
+                    removeTerrain={removeTerrain}
+                    newTournamentInput={newTournamentInput}
+                    setNewTournamentInput={setNewTournamentInput}
+                    DEFAULT_TOURNAMENTS={DEFAULT_TOURNAMENTS}
+                    addTournament={addTournament}
+                    addTournamentPreset={addTournamentPreset}
+                    removeTournament={removeTournament}
+                />
 
-                            {/* Age Categories Management */}
-                            <div className="pt-4 border-t border-slate-100">
-                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Dynamic Age Categories</label>
-                                <p className="text-xs text-slate-500 mb-3 font-medium">Define the categories (e.g., U7, U9, Senior) available when registering new players.</p>
-                                
-                                <div className="flex gap-2 mb-3">
-                                    <input 
-                                        type="text"
-                                        value={newCategoryInput}
-                                        onChange={(e) => setNewCategoryInput(e.target.value)}
-                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAgeCategory(e); } }}
-                                        placeholder="e.g. U5, Pro Team..."
-                                        className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20 text-sm"
-                                    />
-                                    <button 
-                                        type="button" 
-                                        onClick={addAgeCategory}
-                                        className="px-5 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold rounded-xl flex items-center gap-2 transition-colors border border-indigo-100"
-                                    >
-                                        <Plus size={18} /> Add
-                                    </button>
-                                </div>
-
-                                <div className="flex flex-wrap gap-2 p-4 bg-slate-50 border border-slate-100 rounded-2xl min-h-[80px]">
-                                    {settings.age_categories && settings.age_categories.length > 0 ? (
-                                        settings.age_categories.map((cat, idx) => (
-                                            <span 
-                                                key={idx} 
-                                                className="group flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold px-3 py-1.5 rounded-xl shadow-sm hover:border-indigo-300 transition-all"
-                                            >
-                                                {cat}
-                                                <button 
-                                                    type="button" 
-                                                    onClick={() => removeAgeCategory(cat)} 
-                                                    className="ml-1 text-slate-400 opacity-50 group-hover:opacity-100 hover:text-red-500 transition-all bg-slate-100 group-hover:bg-red-50 rounded-md p-0.5"
-                                                    title={`Remove ${cat}`}
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                            </span>
-                                        ))
-                                    ) : (
-                                        <div className="w-full text-center text-sm font-medium text-slate-400 py-2">
-                                            No age categories defined. Please add some above.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ─── Terrains (Pitches) ────────────────────── */}
-                    <div className="bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
-                        <div className="px-8 py-6 border-b border-slate-100 bg-emerald-50/50 flex items-center gap-3">
-                            <LandPlot className="text-emerald-600" size={20} />
-                            <h3 className="font-extrabold text-slate-800">Terrains / Pitches</h3>
-                        </div>
-                        <div className="p-8 space-y-4" dir="ltr">
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                                Add the pitches available at your academy. These will appear as options when scheduling matches.
-                            </p>
-
-                            <div className="grid grid-cols-12 gap-2">
-                                <input
-                                    type="text"
-                                    value={newTerrain.name}
-                                    onChange={(e) => setNewTerrain(t => ({ ...t, name: e.target.value }))}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTerrain(e); } }}
-                                    placeholder="e.g. Terrain 1, Stade Principal"
-                                    className="col-span-7 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-emerald-500/20"
-                                />
-                                <select
-                                    value={newTerrain.size}
-                                    onChange={(e) => setNewTerrain(t => ({ ...t, size: e.target.value }))}
-                                    className="col-span-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-emerald-500/20"
-                                >
-                                    {TERRAIN_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                                <button
-                                    type="button"
-                                    onClick={addTerrain}
-                                    className="col-span-2 px-3 py-3 bg-emerald-600 text-white hover:bg-emerald-700 font-black rounded-xl flex items-center justify-center gap-1 transition-colors text-sm"
-                                >
-                                    <Plus size={16} /> Add
-                                </button>
-                            </div>
-
-                            <div className="space-y-2 p-4 bg-slate-50 border border-slate-100 rounded-2xl min-h-[80px]">
-                                {settings.terrains && settings.terrains.length > 0 ? (
-                                    settings.terrains.map((tr, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="group flex items-center justify-between gap-3 bg-white border border-slate-200 px-4 py-2.5 rounded-xl shadow-sm hover:border-emerald-300 transition-all"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <LandPlot className="text-emerald-500" size={16} />
-                                                <span className="font-bold text-slate-800 text-sm">{tr.name}</span>
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">
-                                                    {tr.size}
-                                                </span>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeTerrain(idx)}
-                                                className="text-slate-300 opacity-50 group-hover:opacity-100 hover:text-red-500 transition-all p-1 rounded-md hover:bg-red-50"
-                                                title={`Remove ${tr.name}`}
-                                            >
-                                                <X size={16} />
-                                            </button>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="w-full text-center text-sm font-medium text-slate-400 py-2">
-                                        No terrains yet. Add your first pitch above.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ─── Tournaments List ──────────────────────── */}
-                    <div className="bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
-                        <div className="px-8 py-6 border-b border-slate-100 bg-amber-50/50 flex items-center gap-3">
-                            <Trophy className="text-amber-600" size={20} />
-                            <h3 className="font-extrabold text-slate-800">Tournaments / Competitions</h3>
-                        </div>
-                        <div className="p-8 space-y-4" dir="ltr">
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                                Pre-define the tournaments your academy participates in. The match scheduler will use this list.
-                            </p>
-
-                            {/* Quick presets */}
-                            <div className="flex flex-wrap gap-2">
-                                {DEFAULT_TOURNAMENTS.map(preset => {
-                                    const exists = (settings.tournaments_list || []).includes(preset);
-                                    return (
-                                        <button
-                                            key={preset}
-                                            type="button"
-                                            disabled={exists}
-                                            onClick={() => addTournamentPreset(preset)}
-                                            className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border transition-all ${exists
-                                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                                                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 active:scale-95'
-                                                }`}
-                                        >
-                                            {exists ? <Check size={11} className="inline mr-1" /> : <Plus size={11} className="inline mr-1" />}
-                                            {preset}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={newTournamentInput}
-                                    onChange={(e) => setNewTournamentInput(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTournament(e); } }}
-                                    placeholder="Custom tournament name..."
-                                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-amber-500/20 uppercase"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={addTournament}
-                                    className="px-5 py-3 bg-amber-600 text-white hover:bg-amber-700 font-black rounded-xl flex items-center gap-2 transition-colors text-sm"
-                                >
-                                    <Plus size={16} /> Add
-                                </button>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2 p-4 bg-slate-50 border border-slate-100 rounded-2xl min-h-[80px]">
-                                {settings.tournaments_list && settings.tournaments_list.length > 0 ? (
-                                    settings.tournaments_list.map((tr, idx) => (
-                                        <span
-                                            key={idx}
-                                            className="group flex items-center gap-1.5 bg-white border border-amber-200 text-amber-800 text-xs font-black px-3 py-1.5 rounded-xl shadow-sm hover:border-amber-400 transition-all uppercase tracking-wider"
-                                        >
-                                            <Trophy size={12} />
-                                            {tr}
-                                            <button
-                                                type="button"
-                                                onClick={() => removeTournament(tr)}
-                                                className="ml-1 text-amber-300 opacity-50 group-hover:opacity-100 hover:text-red-500 transition-all bg-amber-50 group-hover:bg-red-50 rounded-md p-0.5"
-                                                title={`Remove ${tr}`}
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </span>
-                                    ))
-                                ) : (
-                                    <div className="w-full text-center text-sm font-medium text-slate-400 py-2">
-                                        No tournaments defined. Tap a preset above or add your own.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
-                        <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                            <Calendar className="text-indigo-600" size={20} />
-                            <h3 className="font-extrabold text-slate-800">برمجة الموسم الرياضي (Saison)</h3>
-                        </div>
-                        <div className="p-8 space-y-6" dir="rtl">
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed mb-2">
-                                حدد تواريخ بداية ونهاية الموسم لضبط الإحصائيات وجدولة الدفعات بشكل تلقائي.
-                            </p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2 text-right">بداية الموسم</label>
-                                    <div className="relative">
-                                        <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                        <input
-                                            type="date"
-                                            name="season_start"
-                                            value={settings.season_start || ''}
-                                            onChange={handleInputChange}
-                                            className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20"
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2 text-right">نهاية الموسم</label>
-                                    <div className="relative">
-                                        <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                        <input
-                                            type="date"
-                                            name="season_end"
-                                            value={settings.season_end || ''}
-                                            onChange={handleInputChange}
-                                            className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
-                        <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
-                            <Mail className="text-indigo-600" size={20} />
-                            <h3 className="font-extrabold text-slate-800">معلومات التواصل</h3>
-                        </div>
-                        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">البريد الإلكتروني</label>
-                                <div className="relative">
-                                    <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                    <input
-                                        type="email"
-                                        name="contact_email"
-                                        value={settings.contact_email || ''}
-                                        onChange={handleInputChange}
-                                        className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20"
-                                        dir="ltr"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">رقم الهاتف</label>
-                                <div className="relative">
-                                    <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                    <input
-                                        name="contact_phone"
-                                        value={settings.contact_phone || ''}
-                                        onChange={handleInputChange}
-                                        className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20"
-                                        dir="ltr"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Pricing & Subscription */}
+                {/* Right Column: Pricing, Landing Page Editor, Save */}
                 <div className="space-y-8">
-                    <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-8 text-white premium-shadow">
-                        <div className="flex items-center justify-between mb-6 flex-row-reverse">
-                            <div className="flex items-center gap-3 flex-row-reverse">
-                                <CreditCard size={24} />
-                                <h3 className="font-black text-xl text-right">السياسة المالية</h3>
-                            </div>
-                        </div>
-
-                        <div className="space-y-6">
-                            {/* Pro-Rata Toggle and Config */}
-                            <div className="bg-white/10 p-5 rounded-2xl border border-white/20" dir="rtl">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div>
-                                        <h4 className="font-bold text-lg">نظام التخفيض (Pro-Rata)</h4>
-                                        <p className="text-sm text-indigo-200">تطبيق خصم تلقائي في منتصف الموسم.</p>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            name="enable_prorata"
-                                            checked={settings.enable_prorata || false}
-                                            onChange={handleInputChange}
-                                            className="sr-only peer"
-                                        />
-                                        <div className="w-14 h-7 bg-slate-900/40 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-400"></div>
-                                    </label>
-                                </div>
-                                
-                                {settings.enable_prorata && (
-                                    <div className="mt-4 pt-4 border-t border-white/20 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-indigo-200 mb-2">الشهر الذي يبدأ فيه التخفيض</label>
-                                            <select
-                                                name="prorata_start_month"
-                                                value={settings.prorata_start_month || 1}
-                                                onChange={handleInputChange}
-                                                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-white/50"
-                                            >
-                                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
-                                                    <option key={m} value={m} className="text-slate-800">شهر {m}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-indigo-200 mb-2">نسبة التخفيض (%)</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                name="prorata_discount_percentage"
-                                                value={settings.prorata_discount_percentage || 30}
-                                                onChange={(e) => setSettings(s => ({...s, prorata_discount_percentage: parseInt(e.target.value) || 0}))}
-                                                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-white/50"
-                                                dir="ltr"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Registration Fee */}
-                            <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">Registration Fee</label>
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="number"
-                                        name="registration_fee"
-                                        value={settings.registration_fee}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-black text-xl focus:ring-2 focus:ring-white/30 outline-none"
-                                    />
-                                    <span className="font-black text-xl">{settings.currency}</span>
-                                </div>
-                            </div>
-
-                            {/* Subscription Model Dropdown */}
-                            <div>
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">Supported Billing Models</label>
-                                <select
-                                    name="subscription_model"
-                                    value={settings.subscription_model}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-bold text-sm focus:ring-2 focus:ring-white/30 outline-none appearance-none"
-                                >
-                                    <option value="monthly" className="text-slate-900">Monthly Only</option>
-                                    <option value="annual" className="text-slate-900">Annual Only</option>
-                                    <option value="both" className="text-slate-900">Both Monthly & Annual</option>
-                                </select>
-                            </div>
-
-                            {/* Monthly Fee */}
-                            {(settings.subscription_model === 'monthly' || settings.subscription_model === 'both') && (
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">Monthly Fee</label>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="number"
-                                            name="monthly_subscription"
-                                            value={settings.monthly_subscription}
-                                            onChange={handleInputChange}
-                                            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-black text-xl focus:ring-2 focus:ring-white/30 outline-none"
-                                        />
-                                        <span className="font-black text-xl">{settings.currency}</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Annual Fee */}
-                            {(settings.subscription_model === 'annual' || settings.subscription_model === 'both') && (
-                                <div>
-                                    <label className="block text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">Annual Fee</label>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="number"
-                                            name="annual_subscription"
-                                            value={settings.annual_subscription}
-                                            onChange={handleInputChange}
-                                            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-black text-xl focus:ring-2 focus:ring-white/30 outline-none"
-                                        />
-                                        <span className="font-black text-xl">{settings.currency}</span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    <FinancialPolicySection
+                        settings={settings}
+                        handleInputChange={handleInputChange}
+                        setSettings={setSettings}
+                    />
 
                     <div className="bg-white rounded-3xl p-6 border border-slate-200 premium-shadow">
                         <button
@@ -931,630 +515,63 @@ const SettingsManagement = () => {
                         <p className="text-[12px] text-slate-500 font-medium leading-relaxed">أي تغييرات تقوم بها هنا ستنعكس فوراً على واجهة الأكاديمية.</p>
                     </div>
 
-                    {/* ─── Public Landing Page Editor ─── */}
-                    <div className="bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
-                        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-purple-50">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white">
-                                    <Globe size={20} />
-                                </div>
-                                <div className="text-right">
-                                    <h3 className="font-black text-slate-900">الصفحة العامة (Landing Page)</h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">عدّل النصوص والروابط اللي كيشوفها الزوار فالصفحة الرئيسية ديال أكاديميتك.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-8 space-y-5">
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">عنوان الترحيب (Hero Title)</label>
-                                <input
-                                    name="hero_title"
-                                    value={settings.hero_title || ''}
-                                    onChange={handleInputChange}
-                                    placeholder="مرحبا بكم في أكاديمية..."
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">العنوان الفرعي (Hero Subtitle)</label>
-                                <input
-                                    name="hero_subtitle"
-                                    value={settings.hero_subtitle || ''}
-                                    onChange={handleInputChange}
-                                    placeholder="نصنع الأبطال — تدريب احترافي لكل الأعمار"
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">من نحن (About Text)</label>
-                                <textarea
-                                    name="about_text"
-                                    value={settings.about_text || ''}
-                                    onChange={handleInputChange}
-                                    rows={5}
-                                    placeholder="اكتب قصة الأكاديمية، رسالتك، قيمك..."
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-indigo-500/20 resize-none"
-                                />
-                            </div>
-
-                            <div className="pt-2 border-t border-slate-100">
-                                <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">الشبكات الاجتماعية</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Facebook URL</label>
-                                        <input
-                                            name="facebook_url"
-                                            value={settings.facebook_url || ''}
-                                            onChange={handleInputChange}
-                                            placeholder="https://facebook.com/..."
-                                            dir="ltr"
-                                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-indigo-500/20"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Instagram URL</label>
-                                        <input
-                                            name="instagram_url"
-                                            value={settings.instagram_url || ''}
-                                            onChange={handleInputChange}
-                                            placeholder="https://instagram.com/..."
-                                            dir="ltr"
-                                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-indigo-500/20"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">YouTube URL</label>
-                                        <input
-                                            name="youtube_url"
-                                            value={settings.youtube_url || ''}
-                                            onChange={handleInputChange}
-                                            placeholder="https://youtube.com/@..."
-                                            dir="ltr"
-                                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-indigo-500/20"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">WhatsApp Number</label>
-                                        <input
-                                            name="whatsapp_number"
-                                            value={settings.whatsapp_number || ''}
-                                            onChange={handleInputChange}
-                                            placeholder="+212600000000"
-                                            dir="ltr"
-                                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:ring-2 focus:ring-indigo-500/20"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <LandingPageEditorSection
+                        settings={settings}
+                        handleInputChange={handleInputChange}
+                    />
                 </div>
             </form>
 
-            {/* Subscription Plans Section */}
-            <div className="mt-8 bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
-                <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Star className="text-amber-500" size={20} fill="currentColor" />
-                        <h3 className="font-extrabold text-slate-800">Membership Tiers (Plans)</h3>
-                        <span className="text-xs bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full">Live on Landing Page</span>
-                    </div>
-                    <button onClick={() => setIsCreatePlanOpen(!isCreatePlanOpen)} className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl hover:bg-indigo-700 transition-colors">
-                        <Plus size={16} /> New Plan
-                    </button>
-                </div>
+            <MembershipPlansSection
+                plans={plans}
+                editingPlan={editingPlan}
+                setEditingPlan={setEditingPlan}
+                isCreatePlanOpen={isCreatePlanOpen}
+                setIsCreatePlanOpen={setIsCreatePlanOpen}
+                newPlanData={newPlanData}
+                setNewPlanData={setNewPlanData}
+                newFeatureInput={newFeatureInput}
+                setNewFeatureInput={setNewFeatureInput}
+                editFeatureInput={editFeatureInput}
+                setEditFeatureInput={setEditFeatureInput}
+                confirmDeletePlanId={confirmDeletePlanId}
+                setConfirmDeletePlanId={setConfirmDeletePlanId}
+                handleCreatePlan={handleCreatePlan}
+                handleSaveEditPlan={handleSaveEditPlan}
+                handleDeletePlan={handleDeletePlan}
+                handleTogglePlan={handleTogglePlan}
+                addFeatureTo={addFeatureTo}
+                removeFeatureFrom={removeFeatureFrom}
+                planColorMap={planColorMap}
+            />
 
-                <div className="p-8 space-y-4">
-                    {/* Create Plan Form */}
-                    {isCreatePlanOpen && (
-                        <form onSubmit={handleCreatePlan} className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 mb-6 space-y-4">
-                            <h4 className="font-black text-slate-800">Create New Plan</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Plan Name</label>
-                                    <input required className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold bg-white" placeholder="e.g. Diamond" value={newPlanData.name} onChange={e => setNewPlanData({ ...newPlanData, name: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Color Theme</label>
-                                    <select className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold bg-white" value={newPlanData.color} onChange={e => setNewPlanData({ ...newPlanData, color: e.target.value })}>
-                                        <option value="gold">Gold</option>
-                                        <option value="silver">Silver</option>
-                                        <option value="bronze">Bronze</option>
-                                        <option value="blue">Blue</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Supported Billing Cycles</label>
-                                <div className="flex gap-3 flex-wrap">
-                                    {['monthly', 'annual', 'free'].map(c => (
-                                        <button key={c} type="button" onClick={() => {
-                                            if (c === 'free') {
-                                                setNewPlanData(prev => ({ ...prev, billing_cycles: prev.billing_cycles?.includes('free') ? prev.billing_cycles.filter(x => x !== 'free') : ['free'] }));
-                                            } else {
-                                                // if free is selected, deselect it first
-                                                setNewPlanData(prev => ({
-                                                    ...prev,
-                                                    billing_cycles: prev.billing_cycles?.includes('free')
-                                                        ? [c]
-                                                        : prev.billing_cycles?.includes(c)
-                                                            ? prev.billing_cycles.filter(x => x !== c)
-                                                            : [...(prev.billing_cycles || []), c]
-                                                }));
-                                            }
-                                        }} className={`px-4 py-2 text-xs font-bold rounded-lg capitalize transition-all ${newPlanData.billing_cycles?.includes(c)
-                                            ? c === 'free' ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'
-                                            : 'bg-white text-slate-600 border border-slate-200'
-                                            }`}>{c === 'free' ? '🎁 Free (Majani)' : c.charAt(0).toUpperCase() + c.slice(1)}</button>
-                                    ))}
-                                </div>
-                            </div>
-                            {!newPlanData.billing_cycles?.includes('free') && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {newPlanData.billing_cycles?.includes('monthly') && (
-                                        <div>
-                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Monthly Price (MAD)</label>
-                                            <input type="number" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold bg-white" placeholder="0" value={newPlanData.monthly_price} onChange={e => setNewPlanData({ ...newPlanData, monthly_price: e.target.value })} />
-                                        </div>
-                                    )}
-                                    {newPlanData.billing_cycles?.includes('annual') && (
-                                        <div>
-                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Annual Price (MAD)</label>
-                                            <input type="number" className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold bg-white" placeholder="0" value={newPlanData.annual_price} onChange={e => setNewPlanData({ ...newPlanData, annual_price: e.target.value })} />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            {newPlanData.billing_cycles?.includes('free') && (
-                                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-                                    <span className="text-emerald-700 text-sm font-bold">🎁 Free plan — no payment required</span>
-                                </div>
-                            )}
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Description</label>
-                                <input className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white" placeholder="Short plan description..." value={newPlanData.description} onChange={e => setNewPlanData({ ...newPlanData, description: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Features / Advantages</label>
-                                <div className="flex gap-2 mb-2">
-                                    <input className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm bg-white" placeholder="Add a feature..." value={newFeatureInput} onChange={e => setNewFeatureInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addFeatureTo(newFeatureInput, setNewPlanData, setNewFeatureInput))} />
-                                    <button type="button" onClick={() => addFeatureTo(newFeatureInput, setNewPlanData, setNewFeatureInput)} className="px-4 py-2 bg-indigo-100 text-indigo-700 font-bold rounded-xl text-sm"><Plus size={16} /></button>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {newPlanData.features?.map((f, i) => (
-                                        <span key={i} className="flex items-center gap-1 bg-white border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full">{f}<button type="button" onClick={() => removeFeatureFrom(i, setNewPlanData)} className="ml-1 text-red-400 hover:text-red-600"><X size={12} /></button></span>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-3">
-                                <button type="button" onClick={() => setIsCreatePlanOpen(false)} className="px-5 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl">Cancel</button>
-                                <button type="submit" className="px-5 py-2 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700">Create Plan</button>
-                            </div>
-                        </form>
-                    )}
+            <CouponsSection
+                settings={settings}
+                newCoupon={newCoupon}
+                setNewCoupon={setNewCoupon}
+                handleCreateCoupon={handleCreateCoupon}
+                coupons={coupons}
+                handleToggleCoupon={handleToggleCoupon}
+                handleDeleteCoupon={handleDeleteCoupon}
+            />
 
-
-                    {/* Plans List */}
-                    {plans.map(plan => {
-                        const colors = planColorMap[plan.color] || planColorMap.gold;
-                        const isEditing = editingPlan?.id === plan.id;
-
-                        return (
-                            <div key={plan.id} className={`bg-gradient-to-br ${colors.bg} border-2 ${colors.border} rounded-2xl overflow-hidden transition-all ${!plan.is_active ? 'opacity-60' : ''}`}>
-                                {/* Plan Header */}
-                                <div className="flex items-center justify-between p-5">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-3 h-3 rounded-full ${colors.dot}`}></div>
-                                        <div>
-                                            {isEditing ? (
-                                                <input className="font-black text-slate-800 text-base border-b-2 border-slate-400 bg-transparent outline-none" value={editingPlan.name} onChange={e => setEditingPlan({ ...editingPlan, name: e.target.value })} />
-                                            ) : (
-                                                <h4 className="font-black text-slate-800">{plan.name}</h4>
-                                            )}
-                                            <div className="flex gap-2 mt-1 flex-wrap">
-                                                {plan.billing_cycles?.includes('monthly') && plan.monthly_price && (
-                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.badge}`}>{plan.monthly_price} MAD/mo</span>
-                                                )}
-                                                {plan.billing_cycles?.includes('annual') && plan.annual_price && (
-                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.badge}`}>{plan.annual_price} MAD/yr</span>
-                                                )}
-                                                {!plan.is_active && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Hidden</span>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {isEditing ? (
-                                            <>
-                                                <button onClick={handleSaveEditPlan} className="p-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg transition-colors"><Check size={16} /></button>
-                                                <button onClick={() => setEditingPlan(null)} className="p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"><X size={16} /></button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <button onClick={() => setEditingPlan({ ...plan })} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition-colors" title="Edit Plan"><Edit2 size={16} /></button>
-                                                <button onClick={() => handleTogglePlan(plan)} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${plan.is_active ? 'bg-white text-slate-600 hover:bg-slate-100' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>{plan.is_active ? 'Hide' : 'Show'}</button>
-                                                {confirmDeletePlanId === plan.id ? (
-                                                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 px-3 py-1.5 rounded-xl">
-                                                        <span className="text-xs font-bold text-red-700">Delete?</span>
-                                                        <button type="button" onClick={() => handleDeletePlan(plan.id)} className="px-2.5 py-1 bg-red-600 text-white text-xs font-black rounded-lg hover:bg-red-700 transition-colors">Yes</button>
-                                                        <button type="button" onClick={() => setConfirmDeletePlanId(null)} className="px-2.5 py-1 bg-white text-slate-600 border border-slate-200 text-xs font-black rounded-lg hover:bg-slate-100 transition-colors">No</button>
-                                                    </div>
-                                                ) : (
-                                                    <button type="button" onClick={() => setConfirmDeletePlanId(plan.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Plan Edit Fields */}
-                                {isEditing && (
-                                    <div className="px-5 pb-5 space-y-4 border-t border-black/10 pt-4">
-                                        {!editingPlan.billing_cycles?.includes('free') && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {editingPlan.billing_cycles?.includes('monthly') && (
-                                                    <div>
-                                                        <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Monthly Price (MAD)</label>
-                                                        <input type="number" className="w-full px-4 py-2 border bg-white border-slate-200 rounded-xl text-sm font-bold" value={editingPlan.monthly_price || ''} onChange={e => setEditingPlan({ ...editingPlan, monthly_price: e.target.value })} />
-                                                    </div>
-                                                )}
-                                                {editingPlan.billing_cycles?.includes('annual') && (
-                                                    <div>
-                                                        <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Annual Price (MAD)</label>
-                                                        <input type="number" className="w-full px-4 py-2 border bg-white border-slate-200 rounded-xl text-sm font-bold" value={editingPlan.annual_price || ''} onChange={e => setEditingPlan({ ...editingPlan, annual_price: e.target.value })} />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                        {editingPlan.billing_cycles?.includes('free') && (
-                                            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-                                                <span className="text-emerald-700 text-sm font-bold">🎁 Free plan — no payment required</span>
-                                            </div>
-                                        )}
-                                        <div>
-                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Billing Cycles</label>
-                                            <div className="flex gap-3 flex-wrap">
-                                                {['monthly', 'annual', 'free'].map(c => (
-                                                    <button key={c} type="button" onClick={() => {
-                                                        if (c === 'free') {
-                                                            setEditingPlan(prev => ({ ...prev, billing_cycles: prev.billing_cycles?.includes('free') ? prev.billing_cycles.filter(x => x !== 'free') : ['free'] }));
-                                                        } else {
-                                                            setEditingPlan(prev => ({
-                                                                ...prev,
-                                                                billing_cycles: prev.billing_cycles?.includes('free')
-                                                                    ? [c]
-                                                                    : prev.billing_cycles?.includes(c)
-                                                                        ? prev.billing_cycles.filter(x => x !== c)
-                                                                        : [...(prev.billing_cycles || []), c]
-                                                            }));
-                                                        }
-                                                    }} className={`px-4 py-2 text-xs font-bold rounded-lg capitalize ${editingPlan.billing_cycles?.includes(c)
-                                                        ? c === 'free' ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'
-                                                        : 'bg-white text-slate-600 border border-slate-200'
-                                                        }`}>{c === 'free' ? '🎁 Free' : c.charAt(0).toUpperCase() + c.slice(1)}</button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Description</label>
-                                            <input className="w-full px-4 py-2 border bg-white border-slate-200 rounded-xl text-sm" value={editingPlan.description || ''} onChange={e => setEditingPlan({ ...editingPlan, description: e.target.value })} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Features</label>
-                                            <div className="flex gap-2 mb-2">
-                                                <input className="flex-1 px-4 py-2 border bg-white border-slate-200 rounded-xl text-sm" placeholder="Add feature..." value={editFeatureInput} onChange={e => setEditFeatureInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addFeatureTo(editFeatureInput, setEditingPlan, setEditFeatureInput))} />
-                                                <button type="button" onClick={() => addFeatureTo(editFeatureInput, setEditingPlan, setEditFeatureInput)} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-sm"><Plus size={16} /></button>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                {editingPlan.features?.map((f, i) => (
-                                                    <span key={i} className="flex items-center gap-1 bg-white border border-slate-200 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full">
-                                                        {f}
-                                                        <button type="button" onClick={() => removeFeatureFrom(i, setEditingPlan)} className="ml-1 text-red-400 hover:text-red-600"><X size={12} /></button>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">Color Theme</label>
-                                            <select className="w-full px-4 py-2 border bg-white border-slate-200 rounded-xl text-sm font-bold" value={editingPlan.color || 'gold'} onChange={e => setEditingPlan({ ...editingPlan, color: e.target.value })}>
-                                                <option value="gold">Gold</option>
-                                                <option value="silver">Silver</option>
-                                                <option value="bronze">Bronze</option>
-                                                <option value="blue">Blue</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Features display (non-edit) */}
-                                {!isEditing && plan.features?.length > 0 && (
-                                    <div className="px-5 pb-4 flex flex-wrap gap-2">
-                                        {plan.features.map((f, i) => (
-                                            <span key={i} className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-white/80 px-3 py-1 rounded-full border border-black/10">
-                                                <Check size={11} className="text-emerald-500" strokeWidth={3} /> {f}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-
-                    {plans.length === 0 && (
-                        <div className="text-center py-12 text-slate-400 font-medium">No plans created yet. Click "New Plan" to get started.</div>
-                    )}
-                </div>
-            </div >
-
-
-            {/* Coupons Section - Outside main form */}
-            < div className="mt-8 bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden" >
-                <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Tag className="text-indigo-600" size={20} />
-                        <h3 className="font-extrabold text-slate-800">Promo & Coupons</h3>
-                    </div>
-                </div>
-                <div className="p-8">
-                    {/* Create New Coupon */}
-                    <form onSubmit={handleCreateCoupon} className="flex flex-wrap gap-4 items-end mb-8 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                        <div className="flex-1 min-w-[200px]">
-                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Code</label>
-                            <input
-                                required
-                                value={newCoupon.code}
-                                onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value.toUpperCase() })}
-                                placeholder="e.g. SUMMER20"
-                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold uppercase"
-                            />
-                        </div>
-                        <div className="w-[150px]">
-                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Type</label>
-                            <select
-                                value={newCoupon.discount_type}
-                                onChange={(e) => setNewCoupon({ ...newCoupon, discount_type: e.target.value })}
-                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold"
-                            >
-                                <option value="percentage">Percentage %</option>
-                                <option value="fixed">Fixed {settings?.currency}</option>
-                            </select>
-                        </div>
-                        <div className="w-[150px]">
-                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Value</label>
-                            <input
-                                required
-                                type="number"
-                                min="1"
-                                value={newCoupon.discount_value}
-                                onChange={(e) => setNewCoupon({ ...newCoupon, discount_value: e.target.value })}
-                                placeholder={newCoupon.discount_type === 'percentage' ? '20' : '500'}
-                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold"
-                            />
-                        </div>
-                        <button
-                            type="submit"
-                            className="h-[50px] px-6 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 flex items-center gap-2"
-                        >
-                            <Plus size={18} /> Add Coupon
-                        </button>
-                    </form>
-
-                    {/* Coupons List */}
-                    <div className="space-y-3">
-                        {coupons.length === 0 ? (
-                            <div className="text-center p-8 text-slate-400 font-medium">No coupons created yet</div>
-                        ) : (
-                            coupons.map(coupon => (
-                                <div key={coupon.id} className={`flex items-center justify-between p-5 rounded-2xl border transition-all ${coupon.is_active ? 'bg-white border-slate-200' : 'bg-slate-50 opacity-60 border-slate-200'}`}>
-                                    <div className="flex items-center gap-4">
-                                        <div className="bg-indigo-50 border border-indigo-100 text-indigo-700 font-black px-4 py-2 rounded-lg tracking-widest uppercase">
-                                            {coupon.code}
-                                        </div>
-                                        <div>
-                                            <p className="font-extrabold text-slate-800">
-                                                {coupon.discount_type === 'percentage' ? `${coupon.discount_value}% OFF` : `${coupon.discount_value} ${settings?.currency} OFF`}
-                                            </p>
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-0.5">
-                                                {coupon.is_active ? 'Active' : 'Disabled'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <button
-                                            onClick={() => handleToggleCoupon(coupon.id, coupon.is_active)}
-                                            className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${coupon.is_active ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
-                                        >
-                                            {coupon.is_active ? 'Disable' : 'Enable'}
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteCoupon(coupon.id)}
-                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* ── 2FA / Security Section ── */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-8 border-b border-slate-100">
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center">
-                            <KeyRound size={20} className="text-indigo-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-black text-slate-800">Two-Factor Authentication</h2>
-                            <p className="text-sm text-slate-400 font-medium">Add an extra layer of security to your account</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-8 space-y-6">
-                    {/* Status row */}
-                    <div className="flex items-center justify-between p-5 rounded-2xl border border-slate-100 bg-slate-50">
-                        <div className="flex items-center gap-4">
-                            {twoFA.enabled
-                                ? <ShieldCheck size={24} className="text-emerald-500" />
-                                : <ShieldOff size={24} className="text-slate-400" />
-                            }
-                            <div>
-                                <p className="font-extrabold text-slate-800">
-                                    {twoFA.enabled ? '2FA is enabled' : '2FA is disabled'}
-                                </p>
-                                <p className="text-xs text-slate-400 font-medium mt-0.5">
-                                    {twoFA.enabled
-                                        ? 'Your account is protected with Google Authenticator'
-                                        : 'Enable to require a code from your authenticator app at login'}
-                                </p>
-                            </div>
-                        </div>
-                        {!twoFA.loading && !twoFAAction && (
-                            twoFA.enabled ? (
-                                <button
-                                    onClick={() => { setTwoFAAction('disable'); setTwoFACode(''); }}
-                                    className="px-4 py-2 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
-                                >
-                                    Disable
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={handle2FASetup}
-                                    disabled={twoFASaving}
-                                    className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors flex items-center gap-2"
-                                >
-                                    {twoFASaving ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-                                    Enable 2FA
-                                </button>
-                            )
-                        )}
-                    </div>
-
-                    {/* Setup flow — QR code */}
-                    {twoFAAction === 'enable' && twoFASetup && (
-                        <div className="space-y-5 p-5 rounded-2xl border border-indigo-100 bg-indigo-50/50">
-                            <p className="font-bold text-slate-700 text-sm">
-                                1. Scan this QR code with <strong>Google Authenticator</strong> or <strong>Authy</strong>
-                            </p>
-                            <div className="flex justify-center">
-                                <img src={twoFASetup.qr_code} alt="2FA QR Code" className="w-48 h-48 rounded-2xl border-4 border-white shadow-lg" />
-                            </div>
-                            <details className="text-xs text-slate-500">
-                                <summary className="cursor-pointer font-semibold">Can't scan? Enter manually</summary>
-                                <code className="block mt-2 p-3 bg-white rounded-xl font-mono text-slate-700 break-all select-all border border-slate-200">
-                                    {twoFASetup.secret}
-                                </code>
-                            </details>
-                            <p className="font-bold text-slate-700 text-sm">2. Enter the 6-digit code from the app to confirm</p>
-                            <div className="flex gap-3">
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    maxLength={6}
-                                    placeholder="000000"
-                                    value={twoFACode}
-                                    onChange={e => setTwoFACode(e.target.value.replace(/\D/g, ''))}
-                                    className="flex-1 px-4 py-3 border border-slate-200 rounded-xl font-mono text-xl text-center tracking-widest font-black outline-none focus:border-indigo-400 transition-colors"
-                                />
-                                <button
-                                    onClick={handle2FAEnable}
-                                    disabled={twoFACode.length !== 6 || twoFASaving}
-                                    className="px-5 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                                >
-                                    {twoFASaving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                                    Verify
-                                </button>
-                                <button
-                                    onClick={() => { setTwoFAAction(null); setTwoFASetup(null); setTwoFACode(''); }}
-                                    className="px-4 py-3 text-slate-500 hover:text-slate-700 font-bold rounded-xl hover:bg-slate-100 transition-colors"
-                                >
-                                    <X size={16} />
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Disable flow */}
-                    {twoFAAction === 'disable' && (
-                        <div className="space-y-4 p-5 rounded-2xl border border-red-100 bg-red-50/50">
-                            <p className="font-bold text-slate-700 text-sm">
-                                Enter your current authenticator code to disable 2FA
-                            </p>
-                            <div className="flex gap-3">
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    maxLength={6}
-                                    placeholder="000000"
-                                    value={twoFACode}
-                                    onChange={e => setTwoFACode(e.target.value.replace(/\D/g, ''))}
-                                    className="flex-1 px-4 py-3 border border-slate-200 rounded-xl font-mono text-xl text-center tracking-widest font-black outline-none focus:border-red-400 transition-colors"
-                                />
-                                <button
-                                    onClick={handle2FADisable}
-                                    disabled={twoFACode.length !== 6 || twoFASaving}
-                                    className="px-5 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                                >
-                                    {twoFASaving ? <Loader2 size={16} className="animate-spin" /> : <ShieldOff size={16} />}
-                                    Disable
-                                </button>
-                                <button
-                                    onClick={() => { setTwoFAAction(null); setTwoFACode(''); }}
-                                    className="px-4 py-3 text-slate-500 hover:text-slate-700 font-bold rounded-xl hover:bg-slate-100 transition-colors"
-                                >
-                                    <X size={16} />
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* ── Change Password Section ── */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-8 border-b border-slate-100">
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center">
-                            <KeyRound size={20} className="text-amber-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-black text-slate-800">Change Password</h2>
-                            <p className="text-sm text-slate-400 font-medium">All active sessions will be signed out after the change</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-8 space-y-4 max-w-lg">
-                    {[
-                        { label: 'Current password', key: 'current', placeholder: '••••••••' },
-                        { label: 'New password',     key: 'next',    placeholder: 'Min. 8 characters' },
-                        { label: 'Confirm new',      key: 'confirm', placeholder: 'Repeat new password' },
-                    ].map(({ label, key, placeholder }) => (
-                        <div key={key}>
-                            <label className="block text-sm font-bold text-slate-600 mb-1">{label}</label>
-                            <input
-                                type="password"
-                                placeholder={placeholder}
-                                value={pwForm[key]}
-                                onChange={e => setPwForm(f => ({ ...f, [key]: e.target.value }))}
-                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-amber-400 transition-colors"
-                            />
-                        </div>
-                    ))}
-
-                    <button
-                        onClick={handleChangePassword}
-                        disabled={pwSaving || !pwForm.current || !pwForm.next || !pwForm.confirm}
-                        className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                        {pwSaving ? <Loader2 size={16} className="animate-spin" /> : <KeyRound size={16} />}
-                        Update Password
-                    </button>
-                </div>
-            </div>
+            <SecuritySection
+                twoFA={twoFA}
+                twoFAAction={twoFAAction}
+                setTwoFAAction={setTwoFAAction}
+                twoFASetup={twoFASetup}
+                setTwoFASetup={setTwoFASetup}
+                twoFACode={twoFACode}
+                setTwoFACode={setTwoFACode}
+                twoFASaving={twoFASaving}
+                handle2FASetup={handle2FASetup}
+                handle2FAEnable={handle2FAEnable}
+                handle2FADisable={handle2FADisable}
+                pwForm={pwForm}
+                setPwForm={setPwForm}
+                pwSaving={pwSaving}
+                handleChangePassword={handleChangePassword}
+            />
 
             <ConfirmDialog
                 isOpen={confirmDialog.isOpen}
@@ -1564,7 +581,7 @@ const SettingsManagement = () => {
                 title="Delete Coupon"
                 message="Are you sure you want to delete this coupon? This cannot be undone."
             />
-        </div >
+        </div>
     );
 };
 
