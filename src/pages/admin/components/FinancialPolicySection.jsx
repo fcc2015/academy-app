@@ -67,6 +67,76 @@ const FinancialPolicySection = ({
                     )}
                 </div>
 
+                {/* Family Discount */}
+                <div className="bg-white/10 p-5 rounded-2xl border border-white/20" dir="rtl">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="text-right">
+                            <h4 className="font-bold text-lg">تخفيض الإخوة (Family Discount)</h4>
+                            <p className="text-sm text-indigo-200">نسبة التخفيض المطبقة تلقائياً على الطفل الثاني فما فوق.</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <label className="block text-xs font-bold text-indigo-200 mb-2">نسبة التخفيض (%)</label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            name="family_discount_percentage"
+                            value={settings.family_discount_percentage !== undefined ? settings.family_discount_percentage : 10}
+                            onChange={(e) => setSettings(s => ({...s, family_discount_percentage: parseInt(e.target.value) || 0}))}
+                            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-white/50 text-right"
+                            dir="ltr"
+                        />
+                    </div>
+                </div>
+
+                {/* Local Payment Methods Info */}
+                <div className="bg-white/10 p-5 rounded-2xl border border-white/20" dir="rtl">
+                    <div className="mb-4">
+                        <h4 className="font-bold text-lg text-right">معلومات الدفع المحلي (Local Payment Methods)</h4>
+                        <p className="text-sm text-indigo-200 text-right">ستظهر هذه المعلومات للآباء عند اختيار طريقة الدفع.</p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                        <div className="text-right">
+                            <label className="block text-xs font-bold text-indigo-200 mb-2">الحساب البنكي (RIB - Virement)</label>
+                            <input
+                                type="text"
+                                name="bank_rib"
+                                value={settings.bank_rib || ''}
+                                onChange={handleInputChange}
+                                placeholder="مثال: 011 780 0000000000000000 12 (بنك افريقيا)"
+                                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-white/50 text-right"
+                                dir="ltr"
+                            />
+                        </div>
+                        <div className="text-right">
+                            <label className="block text-xs font-bold text-indigo-200 mb-2">حساب كاش بلوس (CashPlus)</label>
+                            <input
+                                type="text"
+                                name="cashplus_details"
+                                value={settings.cashplus_details || ''}
+                                onChange={handleInputChange}
+                                placeholder="رقم الحساب أو الهاتف المرتبط بـ CashPlus"
+                                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-white/50 text-right"
+                                dir="ltr"
+                            />
+                        </div>
+                        <div className="text-right">
+                            <label className="block text-xs font-bold text-indigo-200 mb-2">حساب وفا كاش (Wafacash)</label>
+                            <input
+                                type="text"
+                                name="wafacash_details"
+                                value={settings.wafacash_details || ''}
+                                onChange={handleInputChange}
+                                placeholder="رقم الحساب المرتبط بـ Wafacash"
+                                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-white/50 text-right"
+                                dir="ltr"
+                            />
+                        </div>
+                    </div>
+                </div>
+
                 {/* Registration Fee */}
                 <div className="text-right">
                     <label className="block text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">رسوم التسجيل (Registration Fee)</label>

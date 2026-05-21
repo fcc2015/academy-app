@@ -78,6 +78,44 @@ async def get_payments_by_user(user_id: str):
         raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
+@router.get("/payments/{payment_id}")
+async def get_payment_by_id(payment_id: str):
+    """جلب دفعة واحدة مع التحقق من الصلاحيات"""
+    try:
+        current_role = role_ctx.get()
+        current_user = user_id_ctx.get()
+        
+        from core.config import settings
+        res = await supabase.client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/payments?id=eq.{payment_id}&select=*"
+        )
+        if res.status_code != 200 or not res.json():
+            raise HTTPException(status_code=404, detail="Payment not found")
+            
+        payment = res.json()[0]
+        
+        # Role gate
+        if current_role == "parent":
+            payment_user_id = payment.get("user_id")
+            if payment_user_id != current_user:
+                # Check if it belongs to one of parent's children
+                players_res = await supabase.client.get(
+                    f"{settings.SUPABASE_URL}/rest/v1/players?parent_id=eq.{current_user}&user_id=eq.{payment_user_id}&select=id"
+                )
+                if not (players_res.status_code == 200 and players_res.json()):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Non-authorized — You can only access your own or your child's payment details"
+                    )
+                    
+        return payment
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error fetching payment details: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+
+
 @router.post("/payments")
 async def create_payment(payment: PaymentCreate, user: dict = Depends(require_role("admin", "coach", "super_admin"))):
     """إنشاء دفعة — فقط الأدمين"""
@@ -293,6 +331,34 @@ async def create_subscription(sub: SubscriptionCreate):
         # Calculate prorata for first partial month
         prorata_amount, prorata_days = calculate_prorata(start, sub.monthly_amount)
 
+        # Handle Family Discount if user_id is provided
+        monthly_amount = sub.monthly_amount
+        annual_amount = sub.annual_amount or (sub.monthly_amount * 12)
+        
+        if sub.user_id:
+            try:
+                # Fetch academy settings to get the discount percentage
+                academy_settings = await supabase.get_academy_settings() or {}
+                discount_pct = academy_settings.get("family_discount_percentage", 10)
+                
+                # Check how many active subscriptions this parent has
+                parent_subs = await supabase.client.get(
+                    f"{supabase.url}/rest/v1/subscriptions?user_id=eq.{sub.user_id}&status=eq.active&select=id"
+                )
+                if parent_subs.status_code == 200 and len(parent_subs.json()) > 0 and discount_pct > 0:
+                    # Apply discount
+                    discount_factor = (100 - discount_pct) / 100.0
+                    monthly_amount = round(monthly_amount * discount_factor, 2)
+                    annual_amount = round(annual_amount * discount_factor, 2)
+                    prorata_amount = round(prorata_amount * discount_factor, 2)
+                    
+                    if sub.notes:
+                        sub.notes += f"\n(Family Discount Applied: {discount_pct}%)"
+                    else:
+                        sub.notes = f"(Family Discount Applied: {discount_pct}%)"
+            except Exception as e:
+                logger.warning(f"Failed to apply family discount: {e}")
+
         # Determine next due date
         first_of_next_month = get_next_due_date("monthly", start.replace(day=1))
         next_due = first_of_next_month if prorata_days < 28 else get_next_due_date(sub.billing_type, start)
@@ -307,8 +373,8 @@ async def create_subscription(sub: SubscriptionCreate):
             "billing_type": sub.billing_type,
             "start_date": start.isoformat(),
             "next_due_date": next_due.isoformat(),
-            "monthly_amount": sub.monthly_amount,
-            "annual_amount": sub.annual_amount or (sub.monthly_amount * 12),
+            "monthly_amount": monthly_amount,
+            "annual_amount": annual_amount,
             "prorata_days": prorata_days,
             "prorata_amount": prorata_amount,
             "status": "active",

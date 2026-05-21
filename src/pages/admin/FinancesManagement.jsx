@@ -1,7 +1,7 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
     DollarSign,
     CreditCard,
@@ -35,6 +35,7 @@ import FinancialReportGenerator from '../../components/FinancialReportGenerator'
 
 const FinancesManagement = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const { t, isRTL, dir } = useLanguage();
     const toast = useToast();
     const [payments, setPayments] = useState([]);
@@ -566,7 +567,13 @@ const FinancesManagement = () => {
                                         </td>
                                         <td className="px-8 py-6">
                                             <span className="text-[10px] font-black text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 uppercase tracking-tighter">
-                                                {payment.payment_method === 'Cash' ? 'نقداً' : payment.payment_method === 'Card' ? 'بطاقة' : 'تحويل'}
+                                                {payment.payment_method === 'Cash' ? 'نقداً' :
+                                                 payment.payment_method === 'Card' ? 'بطاقة' :
+                                                 payment.payment_method === 'Bank Transfer' || payment.payment_method === 'Virement' ? 'تحويل بنكي' :
+                                                 payment.payment_method === 'CashPlus' ? 'كاش بلوس' :
+                                                 payment.payment_method === 'Wafacash' ? 'وفاكاش' :
+                                                 payment.payment_method === 'PayPal' ? 'باي بال' :
+                                                 payment.payment_method}
                                             </span>
                                         </td>
                                         <td className="px-8 py-6">
@@ -605,6 +612,13 @@ const FinancesManagement = () => {
                                         </td>
                                         <td className="px-8 py-6 text-left">
                                             <div className="flex justify-start gap-1">
+                                                <button
+                                                    onClick={() => navigate(`/invoice/${payment.id}`)}
+                                                    className="p-3 text-slate-300 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all"
+                                                    title="فاتورة مطبوعة"
+                                                >
+                                                    <FileText size={18} />
+                                                </button>
                                                 <button onClick={() => setInvoicePayment(payment)} className="p-3 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all" title="وصل / Facture"><Receipt size={18} /></button>
                                                 <button onClick={() => handleEditClick(payment)} className="p-3 text-slate-300 hover:text-indigo-600 hover:bg-slate-100/50 rounded-xl transition-all"><Edit2 size={18} /></button>
                                                 <button onClick={() => handleDeletePayment(payment.id)} className="p-3 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>
@@ -814,7 +828,10 @@ const FinancesManagement = () => {
                                     >
                                         <option value="Cash">نقداً / كاش</option>
                                         <option value="Card">بطاقة بنكية</option>
-                                        <option value="Bank Transfer">تحويل / إيداع</option>
+                                        <option value="Bank Transfer">تحويل بنكي (Virement)</option>
+                                        <option value="CashPlus">كاش بلوس (CashPlus)</option>
+                                        <option value="Wafacash">وفاكاش (Wafacash)</option>
+                                        <option value="PayPal">باي بال (PayPal)</option>
                                     </select>
                                 </div>
                             </div>
