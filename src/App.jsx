@@ -62,6 +62,7 @@ const BranchesManagement = lazy(() => import('./pages/admin/BranchesManagement')
 const SubscriptionPage = lazy(() => import('./pages/admin/SubscriptionPage'));
 const EquipmentSettings = lazy(() => import('./pages/admin/EquipmentSettings'));
 const SanctionsManagement = lazy(() => import('./pages/admin/SanctionsManagement'));
+const Invoice = lazy(() => import('./pages/Invoice'));
 
 // Coach
 const CoachLayout = lazy(() => import('./pages/coach/CoachLayout'));
@@ -217,6 +218,9 @@ function App() {
             <Route path="payments" element={<ParentPayments />} />
             <Route path="chat" element={<ParentChat />} />
           </Route>
+
+          {/* Invoice (standalone printable page) */}
+          <Route path="/invoice/:paymentId" element={<Invoice />} />
 
           {/* Fallback */}
           <Route path="*" element={<NotFound />} />

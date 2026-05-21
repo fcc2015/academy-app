@@ -3,7 +3,7 @@ from typing import Optional, Literal
 from datetime import datetime, date
 
 PaymentStatus = Literal['Completed', 'Pending', 'Cancelled', 'Refunded']
-PaymentMethod = Literal['Cash', 'Card', 'Transfer', 'Online', 'Other']
+PaymentMethod = Literal['Cash', 'Card', 'Transfer', 'Online', 'Other', 'CashPlus', 'Wafacash', 'PayPal', 'Virement']
 BillingType = Literal['monthly', 'annual', 'hybrid', 'prorata']
 AlertStatus = Literal['none', 'due_soon', 'overdue', 'paid']
 

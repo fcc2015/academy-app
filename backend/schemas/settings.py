@@ -31,6 +31,10 @@ class AcademySettingsBase(BaseModel):
     instagram_url: Optional[str] = None
     youtube_url: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    bank_rib: Optional[str] = None
+    wafacash_details: Optional[str] = None
+    cashplus_details: Optional[str] = None
+    family_discount_percentage: int = 10
 
 class AcademySettingsUpdate(BaseModel):
     academy_name: Optional[str] = None
@@ -58,6 +62,10 @@ class AcademySettingsUpdate(BaseModel):
     instagram_url: Optional[str] = None
     youtube_url: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    bank_rib: Optional[str] = None
+    wafacash_details: Optional[str] = None
+    cashplus_details: Optional[str] = None
+    family_discount_percentage: Optional[int] = None
 
 class AcademySettingsResponse(AcademySettingsBase):
     id: str

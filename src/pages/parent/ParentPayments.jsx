@@ -1,7 +1,8 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import React, { useState, useEffect } from 'react';
-import { CreditCard, CheckCircle2, Clock, AlertTriangle, TrendingUp, Upload, X, Camera, Send } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CreditCard, CheckCircle2, Clock, AlertTriangle, TrendingUp, Upload, X, Camera, Send, FileText } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 import { SkeletonDashboard } from '../../components/Skeleton';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -9,6 +10,7 @@ import PaymentTimeline from '../../components/PaymentTimeline';
 
 const ParentPayments = () => {
     const toast = useToast();
+    const navigate = useNavigate();
     const { isRTL, dir } = useLanguage();
     const [payments, setPayments] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -17,6 +19,7 @@ const ParentPayments = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [receiptFile, setReceiptFile] = useState(null);
     const [submittingPayment, setSubmittingPayment] = useState(false);
+    const [academySettings, setAcademySettings] = useState(null);
     
     // Upload form state
     const [uploadData, setUploadData] = useState({
@@ -64,6 +67,17 @@ const ParentPayments = () => {
 
     useEffect(() => {
         fetchPayments();
+        
+        const fetchSettings = async () => {
+            try {
+                const res = await authFetch(`${API_URL}/settings`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setAcademySettings(data);
+                }
+            } catch (e) { console.error(e); }
+        };
+        fetchSettings();
     }, [fetchPayments]);
 
     const handleUploadSubmit = async (e) => {
@@ -210,6 +224,7 @@ const ParentPayments = () => {
                                     <th className="px-6 py-4">{isRTL ? 'المبلغ' : 'Amount'}</th>
                                     <th className="px-6 py-4">{isRTL ? 'طريقة الدفع' : 'Method'}</th>
                                     <th className="px-6 py-4 text-center">{isRTL ? 'الحالة' : 'Status'}</th>
+                                    <th className="px-6 py-4 text-center">{isRTL ? 'الفاتورة' : 'Invoice'}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50/80">
@@ -248,6 +263,15 @@ const ParentPayments = () => {
                                                 {payment.status === 'Completed' || payment.status === 'paid' ? (isRTL ? 'تم الدفع' : 'Paid') : 
                                                  payment.status === 'Overdue' ? (isRTL ? 'متأخر' : 'Overdue') : (isRTL ? 'قيد المراجعة' : 'Pending')}
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <button
+                                                onClick={() => navigate(`/invoice/${payment.id}`)}
+                                                className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all"
+                                                title={isRTL ? 'فاتورة مطبوعة' : 'Printable Invoice'}
+                                            >
+                                                <FileText size={18} />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -299,9 +323,30 @@ const ParentPayments = () => {
                                 >
                                     <option value="Bank Transfer">{isRTL ? 'تحويل بنكي (Virement)' : 'Bank Transfer'}</option>
                                     <option value="Wafacash">{isRTL ? 'وكالة Wafacash' : 'Wafacash'}</option>
+                                    <option value="CashPlus">{isRTL ? 'كاش بلوس (CashPlus)' : 'CashPlus'}</option>
                                     <option value="Cash">{isRTL ? 'نقداً في الأكاديمية' : 'Cash at Academy'}</option>
                                 </select>
                             </div>
+
+                            {/* Payment Instructions */}
+                            {uploadData.payment_method === 'Bank Transfer' && academySettings?.bank_rib && (
+                                <div className="p-3 bg-sky-50 rounded-xl border border-sky-100 text-sky-800 text-sm">
+                                    <p className="font-bold mb-1">{isRTL ? 'يرجى تحويل المبلغ إلى الحساب التالي:' : 'Please transfer to the following account:'}</p>
+                                    <p className="font-mono text-center bg-white p-2 rounded-lg border border-sky-200 mt-2" dir="ltr">{academySettings.bank_rib}</p>
+                                </div>
+                            )}
+                            {uploadData.payment_method === 'Wafacash' && academySettings?.wafacash_details && (
+                                <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 text-amber-800 text-sm">
+                                    <p className="font-bold mb-1">{isRTL ? 'يرجى إرسال المبلغ عبر وفاكاش إلى:' : 'Please send via Wafacash to:'}</p>
+                                    <p className="font-mono text-center bg-white p-2 rounded-lg border border-amber-200 mt-2" dir="ltr">{academySettings.wafacash_details}</p>
+                                </div>
+                            )}
+                            {uploadData.payment_method === 'CashPlus' && academySettings?.cashplus_details && (
+                                <div className="p-3 bg-purple-50 rounded-xl border border-purple-100 text-purple-800 text-sm">
+                                    <p className="font-bold mb-1">{isRTL ? 'يرجى إرسال المبلغ عبر كاش بلوس إلى:' : 'Please send via CashPlus to:'}</p>
+                                    <p className="font-mono text-center bg-white p-2 rounded-lg border border-purple-200 mt-2" dir="ltr">{academySettings.cashplus_details}</p>
+                                </div>
+                            )}
 
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">{isRTL ? 'صورة الوصل' : 'Receipt Image'}</label>

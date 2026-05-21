@@ -54,6 +54,107 @@ class TestPaymentsRoleGates:
         assert r.json()["message"] == "Payment deleted successfully"
 
 
+class TestGetPaymentById:
+    """GET /payments/{payment_id} auth & role checks."""
+
+    def test_unauthenticated_cannot_get_payment(self, client):
+        r = client.get("/api/v1/finances/payments/pay-1")
+        assert r.status_code == 401
+
+    def test_admin_can_get_any_payment(self, admin_client, mocker):
+        class MockResponse:
+            def __init__(self, status_code, json_data):
+                self.status_code = status_code
+                self.json_data = json_data
+            def json(self):
+                return self.json_data
+
+        mocker.patch(
+            "routers.finances.supabase.client.get",
+            new_callable=AsyncMock,
+            return_value=MockResponse(200, [{"id": "pay-1", "user_id": "other-user", "amount": 500}])
+        )
+        r = admin_client.get("/api/v1/finances/payments/pay-1")
+        assert r.status_code == 200
+        assert r.json()["id"] == "pay-1"
+
+    def test_parent_can_get_own_payment(self, parent_client, mocker):
+        class MockResponse:
+            def __init__(self, status_code, json_data):
+                self.status_code = status_code
+                self.json_data = json_data
+            def json(self):
+                return self.json_data
+
+        mocker.patch(
+            "routers.finances.supabase.client.get",
+            new_callable=AsyncMock,
+            return_value=MockResponse(200, [{"id": "pay-1", "user_id": "parent-1", "amount": 500}])
+        )
+        r = parent_client.get("/api/v1/finances/payments/pay-1")
+        assert r.status_code == 200
+        assert r.json()["id"] == "pay-1"
+
+    def test_parent_can_get_child_payment(self, parent_client, mocker):
+        class MockResponse:
+            def __init__(self, status_code, json_data):
+                self.status_code = status_code
+                self.json_data = json_data
+            def json(self):
+                return self.json_data
+
+        # Mocking supabase.client.get for payment lookup AND player ownership lookup
+        mock_get = mocker.patch(
+            "routers.finances.supabase.client.get",
+            new_callable=AsyncMock,
+        )
+        # First call gets payment, second gets child relationship
+        mock_get.side_effect = [
+            MockResponse(200, [{"id": "pay-1", "user_id": "child-1", "amount": 500}]),
+            MockResponse(200, [{"id": "player-1"}]) # parent_id lookup match
+        ]
+
+        r = parent_client.get("/api/v1/finances/payments/pay-1")
+        assert r.status_code == 200
+        assert r.json()["id"] == "pay-1"
+
+    def test_parent_cannot_get_others_payment(self, parent_client, mocker):
+        class MockResponse:
+            def __init__(self, status_code, json_data):
+                self.status_code = status_code
+                self.json_data = json_data
+            def json(self):
+                return self.json_data
+
+        mock_get = mocker.patch(
+            "routers.finances.supabase.client.get",
+            new_callable=AsyncMock,
+        )
+        mock_get.side_effect = [
+            MockResponse(200, [{"id": "pay-1", "user_id": "stranger-1", "amount": 500}]),
+            MockResponse(200, []) # child lookup returns empty
+        ]
+
+        r = parent_client.get("/api/v1/finances/payments/pay-1")
+        assert r.status_code == 403
+
+    def test_get_payment_not_found(self, admin_client, mocker):
+        class MockResponse:
+            def __init__(self, status_code, json_data):
+                self.status_code = status_code
+                self.json_data = json_data
+            def json(self):
+                return self.json_data
+
+        mocker.patch(
+            "routers.finances.supabase.client.get",
+            new_callable=AsyncMock,
+            return_value=MockResponse(200, [])
+        )
+        r = admin_client.get("/api/v1/finances/payments/pay-nonexistent")
+        assert r.status_code == 404
+
+
 # =========================================================
 # PARENT PAYMENT — Always forced Pending
 # =========================================================
@@ -254,6 +355,53 @@ class TestSubscriptions:
             "annual_amount": 3000,
         })
         assert r.status_code == 200
+
+    def test_create_subscription_applies_family_discount(self, admin_client, mocker):
+        start = date.today().replace(day=1)
+        mock_insert_sub = mocker.patch(
+            "routers.finances.supabase.insert_subscription",
+            new_callable=AsyncMock,
+            return_value={"id": "sub-discounted"},
+        )
+        mocker.patch("routers.finances.supabase.insert_payment", new_callable=AsyncMock, return_value=[{}])
+        mocker.patch("routers.finances.supabase.insert_notification", new_callable=AsyncMock)
+        mocker.patch("routers.finances.supabase.get_next_invoice_sequence", return_value=1003)
+        
+        # Mock academy settings to return 15% family discount
+        mocker.patch(
+            "routers.finances.supabase.get_academy_settings",
+            new_callable=AsyncMock,
+            return_value={"family_discount_percentage": 15}
+        )
+        
+        # Mock parent_subs to show they already have an active subscription
+        class MockResponse:
+            def __init__(self, status_code, json_data):
+                self.status_code = status_code
+                self.json_data = json_data
+            def json(self):
+                return self.json_data
+
+        mocker.patch(
+            "routers.finances.supabase.client.get",
+            new_callable=AsyncMock,
+            return_value=MockResponse(200, [{"id": "existing-sub-id"}])
+        )
+
+        r = admin_client.post("/api/v1/finances/subscriptions", json={
+            "player_id": "p3",
+            "user_id": "parent-1",
+            "billing_type": "monthly",
+            "start_date": start.isoformat(),
+            "monthly_amount": 300,
+        })
+        assert r.status_code == 200
+        
+        # Verify the subscription insertion data has 15% discount applied (300 * 0.85 = 255.0)
+        sub_data = mock_insert_sub.call_args[0][0]
+        assert sub_data["monthly_amount"] == 255.0
+        assert sub_data["annual_amount"] == 3060.0 # 255.0 * 12
+        assert "Family Discount Applied" in sub_data["notes"]
 
     def test_delete_subscription(self, authed_as, mocker):
         with authed_as("admin", user_id="admin-1") as c:
