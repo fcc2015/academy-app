@@ -28,7 +28,8 @@ import {
     TrendingDown,
     UserCheck,
     Building2,
-    Sparkles as SubscriptionIcon
+    Sparkles as SubscriptionIcon,
+    BarChart3
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { usePlan } from '../../hooks/usePlan';
@@ -245,7 +246,8 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
                 { to: '/admin/programmateur',   icon: CalendarClock, labelKey: 'sidebar.programmateur' },
                 ...(hasFeature('branches') ? [{ to: '/admin/branches', icon: Building2, labelKey: 'sidebar.branches' }] : []),
                 { to: '/admin/subscription', icon: SubscriptionIcon, labelKey: 'sidebar.subscription' },
-                { to: '/admin/settings',        icon: Settings,      labelKey: 'sidebar.settings' },
+                { to: '/admin/analytics',   icon: BarChart3,         labelKey: 'sidebar.analytics' },
+                { to: '/admin/settings',    icon: Settings,          labelKey: 'sidebar.settings' },
             ]
         }
     ];

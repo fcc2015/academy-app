@@ -71,6 +71,7 @@ const translations = {
         chat: { ar: 'التواصل والدردشة', en: 'Chat & Groups', fr: 'Chat & Groupes' },
         pendingParents: { ar: 'حسابات معلقة', en: 'Pending Parents', fr: 'Parents en attente' },
         sanctions: { ar: 'العقوبات الانضباطية', en: 'Disciplinary & Sanctions', fr: 'Discipline & Sanctions' },
+        analytics: { ar: 'التحليلات والإحصائيات', en: 'Analytics & Reports', fr: 'Analyses & Rapports' },
     },
 
     // ========== NOTIFICATIONS ==========

@@ -62,6 +62,7 @@ const BranchesManagement = lazy(() => import('./pages/admin/BranchesManagement')
 const SubscriptionPage = lazy(() => import('./pages/admin/SubscriptionPage'));
 const EquipmentSettings = lazy(() => import('./pages/admin/EquipmentSettings'));
 const SanctionsManagement = lazy(() => import('./pages/admin/SanctionsManagement'));
+const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'));
 const Invoice = lazy(() => import('./pages/Invoice'));
 
 // Coach
@@ -193,6 +194,7 @@ function App() {
             <Route path="pending-parents" element={<AdminPendingParents />} />
             <Route path="sanctions" element={<SanctionsManagement />} />
             <Route path="settings" element={<SettingsManagement />} />
+            <Route path="analytics" element={<AdminAnalytics />} />
           </Route>
 
           {/* Coach */}
