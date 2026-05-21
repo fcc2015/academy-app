@@ -1,7 +1,9 @@
 import { API_URL } from '../../config';
 
 // WebSocket URL derived from API_URL (http→ws, https→wss)
-export const WS_URL = API_URL.replace(/^http/, 'ws');
+export const WS_URL = API_URL.startsWith('http') 
+    ? API_URL.replace(/^http/, 'ws') 
+    : (typeof window !== 'undefined' ? window.location.origin.replace(/^http/, 'ws') + API_URL : API_URL);
 
 // ─────────────────────────
 // Category Colors
