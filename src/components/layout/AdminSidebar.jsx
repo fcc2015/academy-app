@@ -4,6 +4,7 @@ import {
     LayoutDashboard,
     Users,
     ShieldAlert,
+    AlertTriangle,
     DollarSign,
     Calendar,
     CalendarClock,
@@ -37,6 +38,7 @@ import { authFetch } from '../../api';
 // Map notification content → sidebar route
 const mapNotifToRoute = (notif) => {
     const text = `${notif.title || ''} ${notif.message || ''} ${notif.type || ''}`.toLowerCase();
+    if (['sanction', 'disciplinary', 'عقوبة', 'انضباط', 'warning', 'توقيف', 'غرامة'].some(k => text.includes(k))) return '/admin/sanctions';
     if (['player', 'joueur', 'لاعب', 'inscription'].some(k => text.includes(k))) return '/admin/players';
     if (['payment', 'paiement', 'دفع', 'أداء', 'mad', 'finance'].some(k => text.includes(k))) return '/admin/finances';
     if (['coach', 'مدرب', 'entraîneur'].some(k => text.includes(k))) return '/admin/coaches';
@@ -222,6 +224,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
                 { to: '/admin/inventory',    icon: Package,        labelKey: 'sidebar.inventory' },
                 { to: '/admin/kits',         icon: Shirt,          labelKey: 'sidebar.kits' },
                 { to: '/admin/equipment-settings', icon: Settings, labelKey: 'sidebar.equipmentSettings' },
+                { to: '/admin/sanctions',    icon: AlertTriangle,  labelKey: 'sidebar.sanctions' },
             ]
         },
         {
