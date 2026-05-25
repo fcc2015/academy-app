@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Monitoring
     SENTRY_DSN: Optional[str] = None  # Set in production via env var
 
+    # Security & Third-party APIs
+    ENCRYPTION_KEY: Optional[str] = None
+    RESEND_API_KEY: Optional[str] = None
+    RESEND_FROM: Optional[str] = None
+
     # DEV_MODE=true في .env يفعّل الـ bypass للتطوير المحلي فقط
     # في الإنتاج يجب أن يكون DEV_MODE=false أو غير موجود
     DEV_MODE: bool = False

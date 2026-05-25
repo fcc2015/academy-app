@@ -12,6 +12,89 @@ _MAX_RETRIES = 3
 _RETRY_BACKOFF = 0.5  # seconds, doubles each retry
 _RETRYABLE_STATUS = {502, 503, 504}
 
+from core.encryption import encrypt_val, decrypt_val
+
+def _encrypt_data(url_or_endpoint: str, data):
+    """Encrypt sensitive fields in request payload (dict or list of dicts)."""
+    if not data:
+        return data
+        
+    url_str = str(url_or_endpoint)
+    
+    # Identify target fields based on URL
+    fields_to_encrypt = []
+    if "/rest/v1/players" in url_str:
+        fields_to_encrypt = ["blood_type", "allergies", "emergency_contact", "coach_notes"]
+    elif "/rest/v1/medical_records" in url_str:
+        fields_to_encrypt = [
+            "blood_type", "allergies", "chronic_conditions", "notes", 
+            "insurance_provider", "insurance_number", "emergency_contact_name", "emergency_contact_phone"
+        ]
+    elif "/rest/v1/injuries" in url_str:
+        fields_to_encrypt = ["description"]
+        
+    if not fields_to_encrypt:
+        return data
+        
+    import copy
+    if isinstance(data, dict):
+        copied = copy.deepcopy(data)
+        for field in fields_to_encrypt:
+            if field in copied and copied[field] is not None:
+                copied[field] = encrypt_val(copied[field])
+        return copied
+    elif isinstance(data, list):
+        copied_list = []
+        for item in data:
+            if isinstance(item, dict):
+                copied_item = copy.deepcopy(item)
+                for field in fields_to_encrypt:
+                    if field in copied_item and copied_item[field] is not None:
+                        copied_item[field] = encrypt_val(copied_item[field])
+                copied_list.append(copied_item)
+            else:
+                copied_list.append(item)
+        return copied_list
+        
+    return data
+
+def _decrypt_data(url_or_endpoint: str, data):
+    """Decrypt sensitive fields in response payload (dict or list of dicts)."""
+    if not data:
+        return data
+        
+    url_str = str(url_or_endpoint)
+    
+    # Identify target fields based on URL
+    fields_to_decrypt = []
+    if "/rest/v1/players" in url_str:
+        fields_to_decrypt = ["blood_type", "allergies", "emergency_contact", "coach_notes"]
+    elif "/rest/v1/medical_records" in url_str:
+        fields_to_decrypt = [
+            "blood_type", "allergies", "chronic_conditions", "notes", 
+            "insurance_provider", "insurance_number", "emergency_contact_name", "emergency_contact_phone"
+        ]
+    elif "/rest/v1/injuries" in url_str:
+        fields_to_decrypt = ["description"]
+        
+    if not fields_to_decrypt:
+        return data
+        
+    if isinstance(data, dict):
+        for field in fields_to_decrypt:
+            if field in data and data[field] is not None:
+                data[field] = decrypt_val(data[field])
+        return data
+    elif isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                for field in fields_to_decrypt:
+                    if field in item and item[field] is not None:
+                        item[field] = decrypt_val(item[field])
+        return data
+        
+    return data
+
 class InjectClient:
     def __init__(self, client, base_url=""):
         self.client = client
@@ -34,7 +117,13 @@ class InjectClient:
         return f"{url_str}{separator}academy_id=eq.{academy_id}"
 
     async def get(self, url, **kwargs):
-        return await self.client.get(self._inject(url), **kwargs)
+        res = await self.client.get(self._inject(url), **kwargs)
+        _original_json = res.json
+        def wrapped_json(*args, **kwargs_inner):
+            data = _original_json(*args, **kwargs_inner)
+            return _decrypt_data(url, data)
+        res.json = wrapped_json
+        return res
 
     async def delete(self, url, **kwargs):
         return await self.client.delete(self._inject(url), **kwargs)
@@ -47,7 +136,17 @@ class InjectClient:
         if academy_id and json_data and isinstance(json_data, dict) and "academy_id" not in json_data:
             kwargs["json"] = copy.deepcopy(json_data)
             kwargs["json"]["academy_id"] = academy_id
-        return await self.client.patch(self._inject(url), **kwargs)
+            
+        if "json" in kwargs:
+            kwargs["json"] = _encrypt_data(url, kwargs["json"])
+            
+        res = await self.client.patch(self._inject(url), **kwargs)
+        _original_json = res.json
+        def wrapped_json(*args, **kwargs_inner):
+            data = _original_json(*args, **kwargs_inner)
+            return _decrypt_data(url, data)
+        res.json = wrapped_json
+        return res
 
     async def post(self, url, **kwargs):
         from core.context import academy_id_ctx
@@ -65,8 +164,17 @@ class InjectClient:
                     if isinstance(item, dict) and "academy_id" not in item:
                         item["academy_id"] = academy_id
                 kwargs["json"] = new_data
-        # Note: we do NOT inject academy_id in the URL query string for POST
-        return await self.client.post(url_str, **kwargs)
+                
+        if "json" in kwargs:
+            kwargs["json"] = _encrypt_data(url_str, kwargs["json"])
+            
+        res = await self.client.post(url_str, **kwargs)
+        _original_json = res.json
+        def wrapped_json(*args, **kwargs_inner):
+            data = _original_json(*args, **kwargs_inner)
+            return _decrypt_data(url_str, data)
+        res.json = wrapped_json
+        return res
 
 class SupabaseHttpClient:
     """Async HTTP client for Supabase"""
@@ -903,9 +1011,85 @@ class SupabaseHttpClient:
         res.raise_for_status()
         return res.json()
 
+    # =========================================================
+    # Stories Management
+    # =========================================================
+    async def get_stories(self):
+        """Return active (non-expired) stories for the current academy."""
+        return await self._get(
+            "/rest/v1/stories"
+            "?select=*,users(full_name,photo_url)"
+            "&expires_at=gt.now()"
+            "&order=created_at.desc"
+        )
+
+    async def get_story_by_id(self, story_id: str):
+        data = await self._get(f"/rest/v1/stories?id=eq.{story_id}&select=*")
+        return data[0] if data else None
+
+    async def insert_story(self, data: dict):
+        result = await self._post("/rest/v1/stories", data)
+        return result[0] if isinstance(result, list) and result else result
+
+    async def delete_story(self, story_id: str):
+        res = await self.client.delete(f"/rest/v1/stories?id=eq.{story_id}")
+        if res.status_code not in [200, 201, 204]:
+            res.raise_for_status()
+        return {"success": True}
+
+    # =========================================================
+    # Advertisements Management
+    # =========================================================
+    async def get_advertisements(self, role: str = None):
+        """Return active advertisements, optionally filtered by role."""
+        url = "/rest/v1/advertisements?is_active=eq.true&order=created_at.desc"
+        if role:
+            # Postgres @> operator: target_roles contains role, or target_roles is empty
+            # We filter at app level for simplicity since PostgREST array ops are verbose
+            data = await self._get(url)
+            filtered = []
+            for ad in data:
+                target_roles = ad.get("target_roles") or []
+                if not target_roles or role in target_roles:
+                    filtered.append(ad)
+            return filtered
+        return await self._get(url)
+
+    async def insert_advertisement(self, data: dict):
+        result = await self._post("/rest/v1/advertisements", data)
+        return result[0] if isinstance(result, list) and result else result
+
+    async def update_advertisement(self, ad_id: str, data: dict):
+        res = await self.client.patch(f"/rest/v1/advertisements?id=eq.{ad_id}", json=data)
+        res.raise_for_status()
+        result = res.json()
+        return result[0] if isinstance(result, list) and result else result
+
+    async def delete_advertisement(self, ad_id: str):
+        res = await self.client.delete(f"/rest/v1/advertisements?id=eq.{ad_id}")
+        if res.status_code not in [200, 201, 204]:
+            res.raise_for_status()
+        return {"success": True}
+
+    async def increment_ad_stat(self, ad_id: str, field: str):
+        """Increment views_count or clicks_count via RPC."""
+        # Fetch current value first, then increment
+        data = await self._get(f"/rest/v1/advertisements?id=eq.{ad_id}&select={field}")
+        if not data:
+            return {"success": False}
+        current = data[0].get(field, 0) or 0
+        res = await self.client.patch(
+            f"/rest/v1/advertisements?id=eq.{ad_id}",
+            json={field: current + 1}
+        )
+        if res.status_code not in [200, 201, 204]:
+            res.raise_for_status()
+        return {"success": True}
+
 
 supabase = SupabaseHttpClient(
     settings.SUPABASE_URL,
     settings.SUPABASE_KEY,
     service_role_key=settings.SUPABASE_SERVICE_ROLE_KEY
 )
+

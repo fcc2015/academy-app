@@ -32,6 +32,7 @@ class PlayerCreate(BaseModel):
     allergies: Optional[str] = Field(None, max_length=500)
     emergency_contact: Optional[str] = Field(None, max_length=200)
     branch_id: Optional[str] = None
+    coach_notes: Optional[str] = Field(None, max_length=5000, description="Private notes visible to coaches and admins only")
 
     @field_validator("full_name", "parent_name", "address", "allergies", "emergency_contact")
     @classmethod

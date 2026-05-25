@@ -210,6 +210,12 @@ async def get_player_by_id(user_id: str):
             p['full_name'] = p['users'].get('full_name', 'Unknown')
         else:
             p['full_name'] = 'Unknown'
+
+        # Strip coach_notes for roles that shouldn't see it
+        role = role_ctx.get(None)
+        if role not in ("admin", "super_admin", "sous_admin", "coach"):
+            p.pop("coach_notes", None)
+
         return p
     except HTTPException:
         raise
@@ -348,9 +354,13 @@ async def get_players_by_parent(parent_id: str):
         if not data:
             data = await supabase._get(f"/rest/v1/players?user_id=eq.{parent_id}&select=*")
 
+        role = role_ctx.get(None)
         for p in data:
             if not p.get('full_name'):
                 p['full_name'] = p.get('parent_name') or p.get('users', {}).get('full_name', 'Unknown') if isinstance(p.get('users'), dict) else 'Unknown'
+            # Strip coach_notes for unauthorized roles
+            if role not in ("admin", "super_admin", "sous_admin", "coach"):
+                p.pop("coach_notes", None)
         return data
     except Exception as e:
         logger.error("Error fetching parent players: %s", e, exc_info=True)

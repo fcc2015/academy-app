@@ -24,9 +24,38 @@ def _frontend_url() -> str:
 
 
 def _send_email(to: str, subject: str, html_body: str):
-    """Send an email via SMTP. Silently fails if SMTP is not configured."""
+    """Send an email via Resend API or SMTP fallback. Silently fails if neither is configured."""
+    import httpx
+    
+    # 1. Try Resend HTTP API if configured
+    if settings.RESEND_API_KEY:
+        try:
+            resend_from = settings.RESEND_FROM or f"{ACADEMY_NAME} <onboarding@resend.dev>"
+            headers = {
+                "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "from": resend_from,
+                "to": [to],
+                "subject": subject,
+                "html": html_body,
+            }
+            with httpx.Client(trust_env=False, timeout=15.0) as client:
+                res = client.post("https://api.resend.com/emails", json=payload, headers=headers)
+                if res.status_code in (200, 201):
+                    logger.info(f"Sent email to {to} via Resend: {subject}")
+                    return True
+                else:
+                    logger.error(f"Resend API error {res.status_code}: {res.text}")
+                    # Fallback to SMTP if Resend fails
+        except Exception as e:
+            logger.error(f"Resend API exception: {e}")
+            # Fallback to SMTP on exception
+
+    # 2. Try SMTP fallback
     if not SMTP_USER or not SMTP_PASS:
-        logger.info(f"SMTP not configured. Would send to {to}: {subject}")
+        logger.info(f"No email provider configured (SMTP/Resend). Would send to {to}: {subject}")
         return False
 
     try:
@@ -41,10 +70,10 @@ def _send_email(to: str, subject: str, html_body: str):
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_FROM, to, msg.as_string())
 
-        logger.info(f"Sent to {to}: {subject}")
+        logger.info(f"Sent to {to} via SMTP: {subject}")
         return True
     except Exception as e:
-        logger.error(f"Failed to send to {to}: {e}")
+        logger.error(f"Failed to send to {to} via SMTP: {e}")
         return False
 
 

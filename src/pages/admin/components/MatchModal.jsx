@@ -15,7 +15,9 @@ const MatchModal = ({
     DURATION_OPTIONS = ['2x20', '2x25', '2x30', '2x35', '2x40', '2x45'],
     tournamentsList = [],
     terrains = [],
-    ageCategories = []
+    ageCategories = [],
+    convokedPlayersList = [],
+    onAttendanceChange
 }) => {
     if (!isOpen) return null;
 
@@ -208,6 +210,50 @@ const MatchModal = ({
                             )}
                         </div>
                     </div>
+
+                    {/* Match Attendance — حاضر/غائب — shown in edit mode when players are convoked */}
+                    {isEditMode && convokedPlayersList.length > 0 && (
+                        <div className="border-t border-slate-100 pt-6">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                                ✅ {isRTL ? 'الحضور والغياب' : 'Attendance'}
+                            </label>
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                {convokedPlayersList.map(player => {
+                                    const attendance = formData.match_attendance || {};
+                                    const status = attendance[player.id] || 'absent';
+                                    return (
+                                        <div key={player.id} className="flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-2.5">
+                                            <span className="text-sm font-bold text-slate-700">{player.full_name}</span>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onAttendanceChange && onAttendanceChange(player.id, 'present')}
+                                                    className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                                                        status === 'present'
+                                                            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
+                                                            : 'bg-white border border-slate-200 text-slate-400 hover:border-emerald-300'
+                                                    }`}
+                                                >
+                                                    {isRTL ? 'حاضر' : 'Present'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onAttendanceChange && onAttendanceChange(player.id, 'absent')}
+                                                    className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                                                        status === 'absent'
+                                                            ? 'bg-red-500 text-white shadow-md shadow-red-500/30'
+                                                            : 'bg-white border border-slate-200 text-slate-400 hover:border-red-300'
+                                                    }`}
+                                                >
+                                                    {isRTL ? 'غائب' : 'Absent'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="pt-6 flex gap-4 justify-end items-center border-t border-slate-100 mt-4 flex-row-reverse">
                         <button type="submit" className="flex-1 py-5 bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-fuchsia-600/20 hover:shadow-fuchsia-600/40 transition-all transform active:scale-95">

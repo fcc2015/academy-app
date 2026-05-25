@@ -7,6 +7,9 @@ export default defineConfig({
     // Allow JSX inside .js files (legacy useApi.js contains NetworkErrorCard JSX)
     react({ include: /\.(jsx|js)$/ }),
   ],
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
   build: {
     rollupOptions: {
       output: {
