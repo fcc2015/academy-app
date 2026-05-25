@@ -32,6 +32,8 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useToast } from '../../components/Toast';
 import { usePlan } from '../../hooks/usePlan';
+import StoriesFeed from '../../components/StoriesFeed';
+import AdBanner from '../../components/AdBanner';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -223,6 +225,12 @@ const AdminDashboard = () => {
             </div>
 
             <OnboardingWizard stats={stats} />
+
+            {/* Stories Feed */}
+            <StoriesFeed currentUser={{ id: localStorage.getItem('user_id') }} canCreate={true} />
+
+            {/* Ad Banner */}
+            <AdBanner userRole={role} limit={1} />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Main Content Column */}

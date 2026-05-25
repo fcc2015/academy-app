@@ -1,299 +1,28 @@
-import { useState, useEffect } from 'react';
-import { CreditCard, History, CheckCircle2, Loader2, Ban, X, Zap, Star, Crown, Clock, DollarSign, RefreshCw, ArrowUpRight, Calculator, Users, UserCog, Dumbbell, ShieldCheck, Bell, Send } from 'lucide-react';
-import { useToast } from '../../components/Toast';
-import { API_URL } from '../../config';
-import { authFetch } from '../../api';
-import SubscriptionsTable from './components/SubscriptionsTable';
-import SubscriptionDetailModal from './components/SubscriptionDetailModal';
+import re
 
-const PLANS = [
-    {
-        id: 'free',
-        name: 'Free',
-        price: 0,
-        currency: 'MAD',
-        period: '/month',
-        icon: Zap,
-        color: 'emerald',
-        features: ['Up to 15 Players', '1 Admin', '1 Coach', 'Basic Attendance', 'Email Support'],
-        limits: { players: 15, admins: 1, coaches: 1 },
-        recommended: false,
-    },
-    {
-        id: 'pro',
-        name: 'Pro',
-        price: 499,
-        currency: 'MAD',
-        period: '/month',
-        icon: Star,
-        color: 'blue',
-        features: ['Up to 100 Players', '4 Admins', '10 Coaches', 'Full Evaluations', 'Financial Reports', 'Priority Support'],
-        limits: { players: 100, admins: 4, coaches: 10 },
-        recommended: true,
-    },
-    {
-        id: 'enterprise',
-        name: 'Enterprise',
-        price: 999,
-        currency: 'MAD',
-        period: '/month',
-        icon: Crown,
-        color: 'violet',
-        features: ['Unlimited Players', 'Unlimited Admins', 'Unlimited Coaches', 'Custom Domain', 'Advanced Analytics', 'API Access', '24/7 Support'],
-        limits: { players: -1, admins: -1, coaches: -1 },
-        recommended: false,
-    },
-];
+filepath = r"c:\Users\hp\Desktop\python_learning\academy-app\src\pages\saas\SaasSubscriptions.jsx"
 
-// Pro-rata calculation helper
-function calculateProRata(currentPlan, newPlan, billingCycleStart) {
-    if (!currentPlan || !newPlan) return { amount: newPlan?.price || 0, daysRemaining: 30, totalDays: 30, credit: 0 };
-    
-    const now = new Date();
-    const cycleStart = billingCycleStart ? new Date(billingCycleStart) : new Date(now.getFullYear(), now.getMonth(), 1);
-    const cycleEnd = new Date(cycleStart);
-    cycleEnd.setMonth(cycleEnd.getMonth() + 1);
-    
-    const totalDays = Math.ceil((cycleEnd - cycleStart) / (1000 * 60 * 60 * 24));
-    const daysUsed = Math.ceil((now - cycleStart) / (1000 * 60 * 60 * 24));
-    const daysRemaining = Math.max(0, totalDays - daysUsed);
-    
-    // Credit from current plan (unused days)
-    const dailyRateCurrent = currentPlan.price / totalDays;
-    const credit = Math.round(dailyRateCurrent * daysRemaining);
-    
-    // Cost for new plan (remaining days)
-    const dailyRateNew = newPlan.price / totalDays;
-    const newCost = Math.round(dailyRateNew * daysRemaining);
-    
-    // Pro-rata amount = new cost - credit
-    const amount = Math.max(0, newCost - credit);
-    
-    return { amount, daysRemaining, totalDays, daysUsed, credit, newCost, dailyRateCurrent, dailyRateNew };
-}
+with open(filepath, 'r', encoding='utf-8') as f:
+    content = f.read()
 
-export default function SaasSubscriptions() {
-    const toast = useToast();
-    const [academies, setAcademies] = useState([]);
-    const [stats, setStats] = useState({ total_academies: 0, active_academies: 0, total_mrr: 0 });
-    const [loading, setLoading] = useState(true);
-    const [showPlanModal, setShowPlanModal] = useState(false);
-    const [selectedAcademy, setSelectedAcademy] = useState(null);
-    const [showHistoryModal, setShowHistoryModal] = useState(false);
-    const [transactions, setTransactions] = useState([]);
-    const [loadingTx, setLoadingTx] = useState(false);
-    const [assigningPlan, setAssigningPlan] = useState(false);
-    const [paymentProcessing, setPaymentProcessing] = useState(null);
-    const [showProRata, setShowProRata] = useState(null); // planId being previewed
-    const [verifyingOrder, setVerifyingOrder] = useState(null); // paypal_order_id being verified
-    const [daysAhead, setDaysAhead] = useState(7);
-    const [sendingReminders, setSendingReminders] = useState(false);
-    const [reminderResult, setReminderResult] = useState(null);
+# Let's find the start of the return statement
+start_marker = '    return (\n        <div className="space-y-8 animate-fade-in">'
+idx = content.find(start_marker)
+if idx == -1:
+    print("Start marker not found!")
+    exit(1)
 
-    useEffect(() => {
-        fetchData();
-        const params = new URLSearchParams(window.location.search);
-        const paymentStatus = params.get('payment');
-        const paypalOrderId = params.get('token');       // PayPal returns token=ORDER_ID
-        const academyId = params.get('academy_id');
-        const planId = params.get('plan_id');
+# The return block ends at the last closing parenthesis and semicolon before the end of the file.
+# Let's look for the end of the function. SaasSubscriptions ends with:
+#     );
+# }
+end_marker = '\n    );\n}'
+end_idx = content.rfind(end_marker)
+if end_idx == -1:
+    print("End marker not found!")
+    exit(1)
 
-        if (paymentStatus === 'success' && paypalOrderId) {
-            window.history.replaceState({}, '', '/saas/subscriptions');
-            // Capture the PayPal payment
-            authFetch(`${API_URL}/payments/gateway/capture-order`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    order_id: paypalOrderId,
-                    academy_id: academyId || '',
-                    plan_id: planId || null,
-                })
-            }).then(res => res.json()).then(data => {
-                if (data.success) {
-                    toast.success('Payment confirmed! Subscription activated.');
-                    fetchData();
-                } else {
-                    toast.error('Payment capture failed. Contact support.');
-                }
-            }).catch(() => toast.error('Payment verification failed.'));
-        } else if (paymentStatus === 'success') {
-            window.history.replaceState({}, '', '/saas/subscriptions');
-            toast.success('Payment received! Refreshing...');
-            fetchData();
-        } else if (paymentStatus === 'cancelled') {
-            window.history.replaceState({}, '', '/saas/subscriptions');
-            toast.error('Payment cancelled.');
-        }
-    }, []);
-
-    const fetchData = async () => {
-        try {
-            const [academiesRes, statsRes] = await Promise.all([
-                authFetch(`${API_URL}/saas/academies`),
-                authFetch(`${API_URL}/saas/stats`)
-            ]);
-            if (academiesRes.ok) {
-                const data = await academiesRes.json();
-                setAcademies(data);
-            }
-            if (statsRes.ok) {
-                const data = await statsRes.json();
-                setStats(data);
-            }
-        } catch (error) {
-            console.error("Failed to fetch subscription data", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleAssignPlan = async (academy, planId) => {
-        setAssigningPlan(true);
-        try {
-            const currentPlan = PLANS.find(p => p.id === academy.plan_id);
-            const newPlan = PLANS.find(p => p.id === planId);
-            const proRata = calculateProRata(currentPlan, newPlan, academy.billing_cycle_start);
-            
-            const res = await authFetch(`${API_URL}/saas/academies/${academy.id}/plan`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    plan_id: planId,
-                    pro_rata_amount: proRata.amount,
-                    pro_rata_credit: proRata.credit,
-                    upgrade_type: 'upgrade'
-                })
-            });
-            if (res.ok) {
-                fetchData();
-                setShowPlanModal(false);
-                setSelectedAcademy(null);
-                setShowProRata(null);
-            }
-        } catch (err) {
-            console.error("Failed to assign plan:", err);
-        } finally {
-            setAssigningPlan(false);
-        }
-    };
-
-    const handlePayPalCheckout = async (academy, planId) => {
-        setPaymentProcessing(academy.id);
-        const currentPlan = PLANS.find(p => p.id === academy.plan_id);
-        const newPlan = PLANS.find(p => p.id === planId);
-        if (!newPlan) return;
-        
-        const proRata = calculateProRata(currentPlan, newPlan, academy.billing_cycle_start);
-        const chargeAmount = currentPlan ? proRata.amount : newPlan.price;
-        
-        try {
-            const res = await authFetch(`${API_URL}/payments/gateway/create-order`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    academy_id: academy.id,
-                    plan_id: planId,
-                    amount: chargeAmount,
-                    currency: 'USD',
-                    description: currentPlan 
-                        ? `Upgrade ${currentPlan.name} → ${newPlan.name} (Pro-Rata: ${chargeAmount} MAD)`
-                        : `${newPlan.name} Plan - ${academy.name}`
-                })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.approve_url) {
-                    window.open(data.approve_url, '_blank');
-                }
-            } else {
-                const err = await res.json();
-                toast.error(err.detail || 'Payment failed');
-            }
-        } catch (err) {
-            console.error("PayPal checkout error:", err);
-        } finally {
-            setPaymentProcessing(null);
-        }
-    };
-
-    const handleVerifyOrder = async (paypalOrderId) => {
-        setVerifyingOrder(paypalOrderId);
-        try {
-            const res = await authFetch(`${API_URL}/payments/gateway/verify-order/${paypalOrderId}`, {
-                method: 'POST',
-            });
-            const data = await res.json();
-            if (data.success) {
-                toast.success(data.message || 'Payment verified and activated!');
-                // Refresh transactions and academies
-                if (selectedAcademy) await viewHistory(selectedAcademy);
-                fetchData();
-            } else {
-                toast.error(data.message || `Cannot verify: status is ${data.status}`);
-            }
-        } catch (err) {
-            toast.error('Verification request failed.');
-        } finally {
-            setVerifyingOrder(null);
-        }
-    };
-
-    const viewHistory = async (academy) => {
-        setSelectedAcademy(academy);
-        setShowHistoryModal(true);
-        setLoadingTx(true);
-        try {
-            const res = await authFetch(`${API_URL}/payments/gateway/transactions/${academy.id}`);
-            if (res.ok) {
-                const data = await res.json();
-                setTransactions(data);
-            }
-        } catch (err) {
-            console.error("Failed to load transactions:", err);
-        } finally {
-            setLoadingTx(false);
-        }
-    };
-
-    const handleSendReminders = async () => {
-        setSendingReminders(true);
-        setReminderResult(null);
-        try {
-            const res = await authFetch(`${API_URL}/saas/renewals/trigger`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ days_ahead: daysAhead }),
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setReminderResult(data);
-                if (data.reminders_sent > 0) {
-                    toast.success(`${data.reminders_sent} reminder(s) sent!`);
-                } else {
-                    toast.success('No renewals due — nothing to send.');
-                }
-            } else {
-                toast.error('Failed to trigger reminders.');
-            }
-        } catch (err) {
-            toast.error('Network error.');
-        } finally {
-            setSendingReminders(false);
-        }
-    };
-
-    const activeCount = academies.filter(a => a.status !== 'suspended').length;
-    const suspendedCount = academies.filter(a => a.status === 'suspended').length;
-
-    const mrr = academies.reduce((sum, a) => {
-        const plan = PLANS.find(p => p.id === a.plan_id);
-        return sum + (plan && a.status !== 'suspended' ? plan.price : 0);
-    }, 0);
-
-    const formatLimit = (v) => v === -1 ? '∞' : v;
-
-    return (
+new_return_block = """    return (
         <div className="space-y-8 animate-fade-in">
             <div className="flex justify-between items-end">
                 <div>
@@ -498,6 +227,11 @@ export default function SaasSubscriptions() {
                 verifyingOrder={verifyingOrder}
                 handleVerifyOrder={handleVerifyOrder}
             />
-        </div>
-    );
-}
+        </div>"""
+
+new_content = content[:idx] + new_return_block + content[end_idx:]
+
+with open(filepath, 'w', encoding='utf-8') as f:
+    f.write(new_content)
+
+print("SaasSubscriptions.jsx refactored successfully!")

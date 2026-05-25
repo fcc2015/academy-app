@@ -19,6 +19,7 @@ class MatchBase(BaseModel):
     status: MatchStatus = 'Scheduled'
     notes: Optional[str] = Field(None, max_length=2000)
     convoked_players: list[str] = []
+    match_attendance: Optional[dict] = Field(default_factory=dict)
 
     @field_validator("opponent_name", "location", "notes")
     @classmethod
@@ -43,6 +44,7 @@ class MatchUpdate(BaseModel):
     status: Optional[MatchStatus] = None
     notes: Optional[str] = Field(None, max_length=2000)
     convoked_players: Optional[list[str]] = None
+    match_attendance: Optional[dict] = None
 
 class MatchResponse(MatchBase):
     id: str

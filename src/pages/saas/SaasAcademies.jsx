@@ -7,6 +7,9 @@ import {
     MapPin, SlidersHorizontal, Building2, ChevronRight, Users, Search,
     Trash2, Download, Check, LogIn, KeyRound, Copy, ExternalLink, CheckCircle, Mail, Lock, Globe
 } from 'lucide-react';
+import AcademyKpis from './components/AcademyKpis';
+import AcademiesTable from './components/AcademiesTable';
+import CreateAcademyModal from './components/CreateAcademyModal';
 
 // Moroccan cities for rollout pipeline
 const ROLLOUT_CITIES = ['Casablanca', 'Rabat', 'Tanger', 'Fes', 'Marrakech', 'Agadir', 'Other'];
@@ -427,39 +430,13 @@ export default function SaasAcademies() {
             </div>
 
             {/* ── Rollout Pipeline ── */}
-            <div>
-                <div className="flex items-center gap-2 mb-4">
-                    <SlidersHorizontal className="w-4 h-4 text-surface-500" />
-                    <h3 className="text-sm font-bold text-surface-700 uppercase tracking-wider">Rollout Pipeline</h3>
-                </div>
-                <div className="flex items-stretch gap-0 overflow-x-auto pb-2">
-                    {rolloutStats.filter(s => s.total > 0 || ROLLOUT_CITIES.indexOf(s.city) < 3).map((s, i) => {
-                        const c = cityColors(s.city);
-                        const isActive = s.total > 0;
-                        return (
-                            <div key={s.city} className="flex items-center">
-                                <button
-                                    onClick={() => setCityFilter(cityFilter === s.city ? 'All' : s.city)}
-                                    className={`flex flex-col items-center px-5 py-3 rounded-xl border transition-all min-w-[110px] ${
-                                        cityFilter === s.city
-                                            ? `${c.bg} ${c.border} border-2 shadow-md`
-                                            : isActive
-                                                ? `bg-white border-surface-200 hover:${c.bg} hover:${c.border}`
-                                                : 'bg-surface-50 border-surface-100 opacity-50'
-                                    }`}
-                                >
-                                    <div className={`w-2.5 h-2.5 rounded-full mb-1.5 ${isActive ? c.dot : 'bg-surface-300'}`} />
-                                    <span className={`text-xs font-bold ${isActive ? c.text : 'text-surface-400'}`}>{s.city}</span>
-                                    <span className="text-[10px] text-surface-400 mt-0.5">{s.active} active</span>
-                                </button>
-                                {i < rolloutStats.filter(s2 => s2.total > 0 || ROLLOUT_CITIES.indexOf(s2.city) < 3).length - 1 && (
-                                    <ChevronRight className="w-4 h-4 text-surface-300 mx-1 shrink-0" />
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
+            <AcademyKpis
+                rolloutStats={rolloutStats}
+                cityColors={cityColors}
+                cityFilter={cityFilter}
+                setCityFilter={setCityFilter}
+                ROLLOUT_CITIES={ROLLOUT_CITIES}
+            />
 
             {/* ── City Filter Tabs ── */}
             <div className="flex gap-2 flex-wrap">
@@ -513,164 +490,26 @@ export default function SaasAcademies() {
             )}
 
             {/* ── Table ── */}
-            {loading ? (
-                <div className="py-20 text-center text-emerald-500"><Loader2 className="w-8 h-8 mx-auto animate-spin" /></div>
-            ) : (
-                <div className="table-container">
-                    <table className="table-premium w-full text-left">
-                        <thead>
-                            <tr>
-                                <th className="w-10">
-                                    <button onClick={toggleAll} className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                        selected.size === filtered.length && filtered.length > 0
-                                            ? 'bg-indigo-500 border-indigo-500 text-white'
-                                            : 'border-surface-300 hover:border-surface-400'
-                                    }`}>
-                                        {selected.size === filtered.length && filtered.length > 0 && <Check className="w-3 h-3" />}
-                                    </button>
-                                </th>
-                                <th>Academy</th>
-                                <th>City</th>
-                                <th>Plan</th>
-                                <th>Usage</th>
-                                <th>Status</th>
-                                <th>Created</th>
-                                <th className="text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.length === 0 ? (
-                                <tr><td colSpan="7" className="text-center py-8 text-surface-400">No academies found.</td></tr>
-                            ) : (
-                                filtered.map(acc => {
-                                    const city = cityOf(acc);
-                                    const c = cityColors(city);
-                                    return (
-                                        <tr key={acc.id} className={selected.has(acc.id) ? 'bg-indigo-50/50' : ''}>
-                                            <td>
-                                                <button onClick={() => toggleSelect(acc.id)} className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                                    selected.has(acc.id)
-                                                        ? 'bg-indigo-500 border-indigo-500 text-white'
-                                                        : 'border-surface-300 hover:border-surface-400'
-                                                }`}>
-                                                    {selected.has(acc.id) && <Check className="w-3 h-3" />}
-                                                </button>
-                                            </td>
-                                            <td>
-                                                <div className="flex items-center gap-3">
-                                                    {acc.logo_url ? (
-                                                        <img src={acc.logo_url} alt={acc.name} className="w-9 h-9 rounded-xl object-cover shadow-sm border border-surface-100" />
-                                                    ) : (
-                                                        <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm text-white shadow-sm"
-                                                            style={{ background: acc.primary_color || '#6366f1' }}>
-                                                            {(acc.name || 'A').charAt(0).toUpperCase()}
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <Link to={`/saas/academies/${acc.id}`} className="font-semibold text-surface-900 text-sm hover:text-indigo-600 transition-colors">{acc.name || 'Unnamed'}</Link>
-                                                        {acc.notes && <p className="text-[10px] text-surface-400 truncate max-w-[160px]">{acc.notes}</p>}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                {city !== 'Other' ? (
-                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${c.bg} ${c.text} ${c.border}`}>
-                                                        <MapPin className="w-3 h-3" /> {city}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-xs text-surface-400">—</span>
-                                                )}
-                                            </td>
-                                            <td>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openPlanChange(acc)}
-                                                    title="Click to change plan"
-                                                    className={`text-xs font-bold uppercase px-2 py-1 rounded-lg cursor-pointer hover:ring-2 hover:ring-offset-1 transition-all ${
-                                                        acc.plan_id === 'pro' ? 'bg-blue-50 text-blue-700 hover:ring-blue-300' :
-                                                        acc.plan_id === 'enterprise' ? 'bg-violet-50 text-violet-700 hover:ring-violet-300' :
-                                                        'bg-surface-100 text-surface-500 hover:ring-surface-300'
-                                                    }`}
-                                                >
-                                                    {acc.plan_id || 'free'}
-                                                </button>
-                                            </td>
-                                            <td>
-                                                <div className="flex items-center gap-2 text-[11px] text-surface-500 font-medium">
-                                                    <Users className="w-3 h-3" /> {acc.players_count || 0}
-                                                    {acc.plan_limits?.players > 0 && (
-                                                        <span className="text-surface-300">/ {acc.plan_limits.players}</span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                {acc.status === 'suspended' ? (
-                                                    <span className="badge badge-suspended flex items-center gap-1 w-max">
-                                                        <Ban className="w-3 h-3" /> Suspended
-                                                    </span>
-                                                ) : (
-                                                    <span className="badge badge-active flex items-center gap-1 w-max">
-                                                        <CheckCircle2 className="w-3 h-3" /> Active
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="text-xs text-surface-400">
-                                                {new Date(acc.created_at).toLocaleDateString()}
-                                            </td>
-                                            <td className="text-right">
-                                                <div className="flex items-center gap-1.5 justify-end">
-                                                    <button
-                                                        onClick={() => handleImpersonate(acc)}
-                                                        disabled={impersonatingId === acc.id}
-                                                        className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-50"
-                                                        title="Login as this academy's admin"
-                                                    >
-                                                        {impersonatingId === acc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogIn className="w-3.5 h-3.5" />}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { setResetTarget(acc); setNewPassword(''); setResetError(''); setResetSuccess(''); }}
-                                                        className="p-1.5 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors"
-                                                        title="إعادة تعيين كلمة المرور"
-                                                    >
-                                                        <KeyRound className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => openEdit(acc)}
-                                                        className="p-1.5 rounded-lg bg-surface-100 text-surface-600 hover:bg-surface-200 border border-surface-200 transition-colors"
-                                                        title="Edit academy"
-                                                    >
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => toggleStatus(acc.id, acc.status || 'active')}
-                                                        disabled={actionLoading === acc.id}
-                                                        className={`btn text-xs px-3 py-1.5 ${
-                                                            acc.status === 'suspended'
-                                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                                                                : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
-                                                        }`}
-                                                    >
-                                                        {actionLoading === acc.id
-                                                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                            : acc.status === 'suspended' ? 'Activate' : 'Suspend'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setDeleteTarget(acc)}
-                                                        className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition-colors"
-                                                        title="Delete academy"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            <AcademiesTable
+                loading={loading}
+                filtered={filtered}
+                selected={selected}
+                toggleSelect={toggleSelect}
+                toggleAll={toggleAll}
+                cityOf={cityOf}
+                cityColors={cityColors}
+                openPlanChange={openPlanChange}
+                impersonatingId={impersonatingId}
+                handleImpersonate={handleImpersonate}
+                setResetTarget={setResetTarget}
+                openEdit={openEdit}
+                toggleStatus={toggleStatus}
+                actionLoading={actionLoading}
+                setDeleteTarget={setDeleteTarget}
+                setNewPassword={setNewPassword}
+                setResetError={setResetError}
+                setResetSuccess={setResetSuccess}
+            />
 
             {/* ── Edit Modal ── */}
             {editAcademy && (
@@ -801,118 +640,16 @@ export default function SaasAcademies() {
             )}
 
             {/* ── Create Modal ── */}
-            {showCreate && (
-                <div className="modal-backdrop">
-                    <div className="modal-content max-w-xl flex flex-col" style={{ maxHeight: '90vh' }}>
-                        <div className="flex justify-between items-center p-6 border-b border-surface-200 shrink-0">
-                            <div className="flex items-center gap-2">
-                                <Building2 className="w-5 h-5 text-surface-600" />
-                                <h3 className="text-lg font-semibold text-surface-900">Provision New Academy</h3>
-                            </div>
-                            <button onClick={() => setShowCreate(false)} className="text-surface-400 hover:text-surface-900">
-                                <X size={22} />
-                            </button>
-                        </div>
-                        <form onSubmit={handleCreate} className="p-6 space-y-4 overflow-y-auto">
-                            {createError && (
-                                <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-sm">{createError}</div>
-                            )}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Academy Name *</label>
-                                    <input required className="input" name="name" value={createForm.name}
-                                        onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
-                                        placeholder="e.g., Elite Soccer Academy" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider flex items-center gap-1">
-                                        <MapPin className="w-3 h-3" /> City
-                                    </label>
-                                    <select className="input" value={createForm.city}
-                                        onChange={e => setCreateForm(f => ({ ...f, city: e.target.value }))}>
-                                        <option value="">— Select —</option>
-                                        {ROLLOUT_CITIES.filter(c => c !== 'Other').map(c => (
-                                            <option key={c} value={c}>{c}</option>
-                                        ))}
-                                        <option value="Other">Other</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Subdomain</label>
-                                    <input className="input" value={createForm.subdomain}
-                                        onChange={e => setCreateForm(f => ({ ...f, subdomain: e.target.value }))}
-                                        placeholder="elite-soccer" />
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-bold text-surface-600 mb-2 uppercase tracking-wider">Plan *</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {[
-                                            { id: 'free',       name: 'Free',       desc: '15 players · 1 admin',   gradient: 'from-slate-400 to-slate-600',     icon: '🆓' },
-                                            { id: 'pro',        name: 'Pro',        desc: '100 players · 4 admins', gradient: 'from-blue-500 to-cyan-600',        icon: '⚡' },
-                                            { id: 'enterprise', name: 'Enterprise', desc: 'Unlimited + 🏢 Branches', gradient: 'from-violet-500 to-purple-600',   icon: '👑' },
-                                        ].map(p => {
-                                            const selected = createForm.plan_id === p.id;
-                                            return (
-                                                <button
-                                                    key={p.id}
-                                                    type="button"
-                                                    onClick={() => setCreateForm(f => ({ ...f, plan_id: p.id }))}
-                                                    className={`p-3 rounded-xl border-2 text-center transition-all ${
-                                                        selected
-                                                            ? `bg-gradient-to-br ${p.gradient} text-white border-transparent shadow-lg`
-                                                            : 'bg-white border-surface-200 text-surface-700 hover:border-surface-300'
-                                                    }`}
-                                                >
-                                                    <div className="text-xl mb-1">{p.icon}</div>
-                                                    <div className="text-sm font-black uppercase tracking-wider">{p.name}</div>
-                                                    <div className={`text-[10px] mt-1 ${selected ? 'text-white/90' : 'text-surface-500'}`}>{p.desc}</div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Notes</label>
-                                    <input className="input" value={createForm.notes}
-                                        onChange={e => setCreateForm(f => ({ ...f, notes: e.target.value }))}
-                                        placeholder="Internal notes..." />
-                                </div>
-                            </div>
-
-                            <div className="border-t border-surface-200 pt-4">
-                                <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-4">Initial Admin Account</p>
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Admin Full Name *</label>
-                                        <input required className="input" value={createForm.admin_name}
-                                            onChange={e => setCreateForm(f => ({ ...f, admin_name: e.target.value }))}
-                                            placeholder="Jane Doe" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Admin Email *</label>
-                                        <input required type="email" className="input" value={createForm.admin_email}
-                                            onChange={e => setCreateForm(f => ({ ...f, admin_email: e.target.value }))}
-                                            placeholder="jane@elite.com" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Admin Password *</label>
-                                        <input required type="password" className="input" minLength="6" value={createForm.admin_password}
-                                            onChange={e => setCreateForm(f => ({ ...f, admin_password: e.target.value }))}
-                                            placeholder="Min. 6 characters" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3 justify-end pt-2">
-                                <button type="button" onClick={() => setShowCreate(false)} className="btn btn-secondary">Cancel</button>
-                                <button type="submit" disabled={creating} className="btn btn-brand w-[140px] justify-center">
-                                    {creating ? <Loader2 size={16} className="animate-spin" /> : 'Provision'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            <CreateAcademyModal
+                showCreate={showCreate}
+                setShowCreate={setShowCreate}
+                creating={creating}
+                createError={createError}
+                createForm={createForm}
+                setCreateForm={setCreateForm}
+                handleCreate={handleCreate}
+                ROLLOUT_CITIES={ROLLOUT_CITIES}
+            />
 
             {/* ── Provisioned Credentials Success Modal ── */}
             {provisioned && (

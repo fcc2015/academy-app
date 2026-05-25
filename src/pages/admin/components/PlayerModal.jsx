@@ -4,7 +4,8 @@ import PhotoUploadCrop from './PhotoUploadCrop';
 
 const PlayerModal = ({
     isOpen, onClose, onSubmit, title, isEdit, modalStep, setModalStep,
-    formData, handleInputChange, subscriptionPlans, isSubmitting, settings, t, isRTL, dir, branches = []
+    formData, handleInputChange, subscriptionPlans, isSubmitting, settings, t, isRTL, dir, branches = [],
+    showCoachNotes = false
 }) => {
     if (!isOpen) return null;
     const selectedPlanObj = subscriptionPlans.find(p => p.name === formData.subscription_type) || null;
@@ -140,6 +141,28 @@ const PlayerModal = ({
                                             <input type="text" name="allergies" value={formData.allergies || ''} onChange={handleInputChange} placeholder="لا يوجد" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
                                         </div>
                                     </div>
+                                    {/* Coach Notes — only visible to coach/admin/super_admin roles */}
+                                    {showCoachNotes && (
+                                        <div className="md:col-span-2 pt-4 border-t border-amber-100 mt-2">
+                                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                                                <label className="block text-[10px] font-black uppercase text-amber-600 tracking-widest mb-2">
+                                                    🔒 {isRTL ? 'ملاحظات المدرب (سرية)' : 'Coach Notes (Private)'}
+                                                </label>
+                                                <textarea
+                                                    name="coach_notes"
+                                                    value={formData.coach_notes || ''}
+                                                    onChange={handleInputChange}
+                                                    rows={4}
+                                                    maxLength={2000}
+                                                    placeholder={isRTL ? 'ملاحظات خاصة لا تظهر للاعب أو ولي الأمر...' : 'Private notes not visible to player or parent...'}
+                                                    className="w-full bg-white border border-amber-200 rounded-xl px-4 py-3 text-sm font-medium outline-none resize-none focus:ring-2 focus:ring-amber-300"
+                                                />
+                                                <p className="text-[9px] font-bold text-amber-500 mt-1">
+                                                    {isRTL ? '⚠️ هذه الملاحظات مشفرة ولا تظهر للاعب أو ولي أمره.' : '⚠️ These notes are encrypted and never visible to player or parent.'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

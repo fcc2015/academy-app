@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { SkeletonDashboard } from '../../components/Skeleton';
+import StoriesFeed from '../../components/StoriesFeed';
 
 const CoachDashboard = () => {
     const navigate = useNavigate();
@@ -161,6 +162,9 @@ const CoachDashboard = () => {
                     );
                 })}
             </div>
+
+            {/* Stories Feed */}
+            <StoriesFeed currentUser={{ id: userId }} canCreate={true} />
 
             {/* Quick Actions & Schedule */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

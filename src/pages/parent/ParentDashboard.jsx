@@ -21,6 +21,8 @@ import PlayerBadgeModal from '../../components/PlayerBadgeModal';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { useToast } from '../../components/Toast';
 import { SkeletonDashboard } from '../../components/Skeleton';
+import AdBanner from '../../components/AdBanner';
+import StoriesFeed from '../../components/StoriesFeed';
 
 const ParentDashboard = () => {
     const toast = useToast();
@@ -356,6 +358,9 @@ const ParentDashboard = () => {
                 </button>
             </div>
 
+            {/* Ad Banner */}
+            <AdBanner userRole="parent" limit={2} />
+
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 {quickStats.map((stat, i) => {
@@ -513,6 +518,9 @@ const ParentDashboard = () => {
                     </div>
                 )}
             </div>
+
+            {/* Stories Feed (read-only for parents) */}
+            <StoriesFeed currentUser={{ id: userId }} canCreate={false} />
 
             {/* Next Training */}
             <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-[2.5rem] border border-indigo-100 premium-shadow p-6 sm:p-8">
