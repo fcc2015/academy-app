@@ -11,7 +11,7 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      - key: FERNET_KEY
+      - key: ENCRYPTION_KEY
         sync: false
       - key: PAYPAL_CLIENT_ID
         sync: false
