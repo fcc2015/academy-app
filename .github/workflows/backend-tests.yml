@@ -57,7 +57,8 @@ jobs:
           PAYPAL_CLIENT_ID: test-paypal-client
           PAYPAL_CLIENT_SECRET: test-paypal-secret
           PAYPAL_SANDBOX: 'true'
-          FERNET_KEY: ${{ secrets.FERNET_KEY }}
+          # DEV_MODE=true auto-generates a transient key if ENCRYPTION_KEY missing
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
         run: |
           pytest tests/ \
             --cov=routers --cov=services --cov=core \
