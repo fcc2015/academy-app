@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.12', '3.13']
+        python-version: ['3.11', '3.12']
 
     defaults:
       run:
@@ -33,10 +33,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -57,6 +57,7 @@ jobs:
           PAYPAL_CLIENT_ID: test-paypal-client
           PAYPAL_CLIENT_SECRET: test-paypal-secret
           PAYPAL_SANDBOX: 'true'
+          FERNET_KEY: ${{ secrets.FERNET_KEY }}
         run: |
           pytest tests/ \
             --cov=routers --cov=services --cov=core \
@@ -65,23 +66,23 @@ jobs:
             --junitxml=junit.xml
 
       - name: Upload coverage report
-        if: always() && matrix.python-version == '3.13'
-        uses: actions/upload-artifact@v7
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: backend/coverage.xml
           retention-days: 7
 
       - name: Upload junit report
-        if: always() && matrix.python-version == '3.13'
-        uses: actions/upload-artifact@v7
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
         with:
           name: junit-report
           path: backend/junit.xml
           retention-days: 7
 
       - name: Coverage summary
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.12'
         run: |
           echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
