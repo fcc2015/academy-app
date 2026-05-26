@@ -18,6 +18,7 @@ export default function SubscriptionDetailModal({
     paymentProcessing,
     handlePayPalCheckout,
     transactions,
+    setTransactions,
     loadingTx,
     verifyingOrder,
     handleVerifyOrder
