@@ -61,7 +61,7 @@
 - [x] Sanitize all user-generated content (XSS prevention — HTML strip on all text fields in all schemas + chat)
 
 ### 1.3 Data Protection
-- [ ] Encrypt medical data at rest (PII)
+- [x] Encrypt medical data at rest (PII) (Fernet transparent column-level encryption)
 - [x] Audit logging for all mutating operations (AuditLogMiddleware in main.py)
 - [x] PayPal webhook signature verification (verify_paypal_webhook_signature via PayPal API, PAYPAL_WEBHOOK_ID in .env)
 - [x] API versioning (`/v1/` prefix)
@@ -178,14 +178,14 @@
 ## Phase 5: Email & Notifications
 
 ### 5.1 Email System
-- [ ] Email verification on registration (6-digit code, 10min expiry)
-- [ ] Password reset via email OTP
-- [ ] Welcome email after academy creation
-- [ ] Payment receipt email (auto-generated)
-- [ ] Subscription renewal reminder (7 days before)
-- [ ] Overdue payment notification (3 days after)
+- [x] Email verification on registration (6-digit code, 10min expiry)
+- [x] Password reset via email OTP
+- [x] Welcome email after academy creation
+- [x] Payment receipt email (auto-generated)
+- [x] Subscription renewal reminder (7 days before)
+- [x] Overdue payment notification (3 days after)
 - [ ] Monthly academy report email (player count, revenue, attendance %)
-- [ ] Provider: Resend / SendGrid / AWS SES
+- [x] Provider: Resend / SendGrid / AWS SES (Resend integration with SMTP fallback)
 
 ### 5.2 Push Notifications
 - [ ] Web push (service worker)
@@ -203,20 +203,20 @@
 ## Phase 6: Advanced Features
 
 ### 6.1 Analytics & Reporting
-- [ ] Admin analytics dashboard (Chart.js / Recharts)
-- [ ] Player progression over time (evaluation trends)
-- [ ] Revenue analytics (MRR, churn, growth)
-- [ ] Attendance analytics (best/worst days, seasonal trends)
+- [x] Admin analytics dashboard (Chart.js / Recharts)
+- [x] Player progression over time (evaluation trends)
+- [x] Revenue analytics (MRR, churn, growth)
+- [x] Attendance analytics (best/worst days, seasonal trends)
 - [ ] Coach performance metrics
-- [ ] PDF report generation (branded, exportable)
+- [x] PDF report generation (branded, exportable)
 
 ### 6.2 Subscription & Billing Engine
-- [ ] Auto-renewal reminders
-- [ ] Coupon/promo codes (already started)
-- [ ] Family discount (multiple children)
+- [x] Auto-renewal reminders (cron checks + multi-level alerts)
+- [x] Coupon/promo codes
+- [x] Family discount (multiple children) (dynamic percentage in settings)
 - [ ] Seasonal pricing (summer camps)
 - [ ] Payment methods: PayPal, Stripe, Bank transfer, CashPlus/Wafacash
-- [ ] Invoice PDF generation with academy branding
+- [x] Invoice PDF generation with academy branding
 - [ ] Tax calculation per country
 
 ### 6.3 Advanced Player Features
