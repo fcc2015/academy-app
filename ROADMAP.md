@@ -127,7 +127,7 @@
 - [ ] Form library (React Hook Form + Zod validation)
 - [ ] Data tables with sorting, filtering, pagination (TanStack Table)
 - [ ] Inline editing for quick updates
-- [ ] Bulk select & actions
+- [x] Bulk select & actions (implemented with premium floating bottom bar in Players Table)
 - [x] Export to Excel/PDF with branded header (ExportButtons.jsx)
 
 ### 3.5 Animations & Polish
