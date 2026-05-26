@@ -494,6 +494,7 @@ export default function SaasSubscriptions() {
                 paymentProcessing={paymentProcessing}
                 handlePayPalCheckout={handlePayPalCheckout}
                 transactions={transactions}
+                setTransactions={setTransactions}
                 loadingTx={loadingTx}
                 verifyingOrder={verifyingOrder}
                 handleVerifyOrder={handleVerifyOrder}
