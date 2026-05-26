@@ -10,7 +10,9 @@ import {
     Check,
     Calendar,
     Mail,
-    Phone
+    Phone,
+    Upload,
+    Loader2
 } from 'lucide-react';
 
 const GeneralBrandingSection = ({
@@ -30,7 +32,13 @@ const GeneralBrandingSection = ({
     DEFAULT_TOURNAMENTS,
     addTournament,
     addTournamentPreset,
-    removeTournament
+    removeTournament,
+    primaryColor,
+    setPrimaryColor,
+    secondaryColor,
+    setSecondaryColor,
+    uploadingLogo,
+    handleLogoUpload
 }) => {
     return (
         <div className="lg:col-span-2 space-y-8">
@@ -55,16 +63,71 @@ const GeneralBrandingSection = ({
                             </div>
                         </div>
                         <div>
-                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">رابط الشعار (Logo URL)</label>
-                            <div className="relative">
-                                <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                <input
-                                    name="logo_url"
-                                    value={settings.logo_url || ''}
-                                    onChange={handleInputChange}
-                                    placeholder="https://example.com/logo.png"
-                                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-500/20"
-                                />
+                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">شعار الأكاديمية (Logo)</label>
+                            <div className="flex items-center gap-3">
+                                {settings.logo_url ? (
+                                    <img
+                                        src={settings.logo_url}
+                                        alt="Logo"
+                                        className="h-12 w-12 rounded-xl object-contain border border-slate-200 bg-slate-50 p-1"
+                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                    />
+                                ) : (
+                                    <div className="h-12 w-12 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center">
+                                        <ImageIcon size={18} className="text-slate-300" />
+                                    </div>
+                                )}
+                                <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all font-bold text-sm ${uploadingLogo ? 'border-slate-200 text-slate-300 bg-slate-50' : 'border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-400'}`}>
+                                    {uploadingLogo ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                                    {uploadingLogo ? 'جاري الرفع...' : settings.logo_url ? 'تغيير الشعار' : 'رفع الشعار'}
+                                    <input type="file" accept="image/*" className="hidden" disabled={uploadingLogo} onChange={handleLogoUpload} />
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ألوان الهوية البصرية */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">اللون الأساسي (Primary Color)</label>
+                            <div className="flex items-center gap-3">
+                                <div className="relative flex-1">
+                                    <input
+                                        type="color"
+                                        value={primaryColor || '#4f46e5'}
+                                        onChange={(e) => setPrimaryColor(e.target.value)}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md border-0 cursor-pointer bg-transparent p-0"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={primaryColor || '#4f46e5'}
+                                        onChange={(e) => setPrimaryColor(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-sm focus:ring-2 focus:ring-indigo-500/20"
+                                        placeholder="#4f46e5"
+                                    />
+                                </div>
+                                <div className="w-10 h-10 rounded-xl border border-slate-200 shadow-sm flex-shrink-0" style={{ background: primaryColor || '#4f46e5' }} />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">اللون الثانوي (Secondary Color)</label>
+                            <div className="flex items-center gap-3">
+                                <div className="relative flex-1">
+                                    <input
+                                        type="color"
+                                        value={secondaryColor || '#7c3aed'}
+                                        onChange={(e) => setSecondaryColor(e.target.value)}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-md border-0 cursor-pointer bg-transparent p-0"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={secondaryColor || '#7c3aed'}
+                                        onChange={(e) => setSecondaryColor(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-sm focus:ring-2 focus:ring-indigo-500/20"
+                                        placeholder="#7c3aed"
+                                    />
+                                </div>
+                                <div className="w-10 h-10 rounded-xl border border-slate-200 shadow-sm flex-shrink-0" style={{ background: secondaryColor || '#7c3aed' }} />
                             </div>
                         </div>
                     </div>

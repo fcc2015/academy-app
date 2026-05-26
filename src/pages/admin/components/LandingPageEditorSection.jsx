@@ -3,7 +3,9 @@ import { Globe } from 'lucide-react';
 
 const LandingPageEditorSection = ({
     settings,
-    handleInputChange
+    handleInputChange,
+    aboutText,
+    setAboutText
 }) => {
     return (
         <div className="bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
@@ -41,8 +43,8 @@ const LandingPageEditorSection = ({
                     <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">من نحن (About Text)</label>
                     <textarea
                         name="about_text"
-                        value={settings.about_text || ''}
-                        onChange={handleInputChange}
+                        value={aboutText || ''}
+                        onChange={(e) => setAboutText(e.target.value)}
                         rows={5}
                         placeholder="اكتب قصة الأكاديمية، رسالتك، قيمك..."
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:ring-2 focus:ring-indigo-500/20 resize-none text-right"

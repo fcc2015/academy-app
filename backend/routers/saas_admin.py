@@ -1528,3 +1528,74 @@ async def impersonate_academy(academy_id: str):
         "academy": academy,
         "admin": admin,
     }
+
+
+@router.post("/academies/{academy_id}/send-monthly-report")
+async def send_monthly_report(academy_id: str, month_name: str | None = None):
+    """
+    Generate and email the monthly report to the academy admin.
+    Gathers player count, completed revenue, and average attendance percentage.
+    """
+    from services.email_service import send_monthly_academy_report
+    
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+        # Get academy info
+        acc_res = await client.get(
+            f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}&select=id,name",
+            headers=supabase.admin_headers
+        )
+        if acc_res.status_code != 200 or not acc_res.json():
+            raise HTTPException(status_code=404, detail="Academy not found.")
+        academy_name = acc_res.json()[0].get("name", "Academy")
+
+        # Get admin email
+        admin_res = await client.get(
+            f"{supabase.url}/rest/v1/admins?academy_id=eq.{academy_id}&status=eq.active&select=email&limit=1",
+            headers=supabase.admin_headers
+        )
+        if admin_res.status_code != 200 or not admin_res.json():
+            raise HTTPException(status_code=404, detail="Active admin not found for this academy.")
+        admin_email = admin_res.json()[0].get("email")
+
+        # Get player count
+        players_res = await client.get(
+            f"{supabase.url}/rest/v1/players?academy_id=eq.{academy_id}&select=id",
+            headers=supabase.admin_headers
+        )
+        player_count = len(players_res.json()) if players_res.status_code == 200 else 0
+
+        # Get payments (completed)
+        payments_res = await client.get(
+            f"{supabase.url}/rest/v1/payments?academy_id=eq.{academy_id}&status=eq.completed&select=amount",
+            headers=supabase.admin_headers
+        )
+        revenue = sum(float(p.get("amount", 0)) for p in payments_res.json()) if payments_res.status_code == 200 else 0.0
+
+        # Get attendance percentage
+        attendance_res = await client.get(
+            f"{supabase.url}/rest/v1/attendance?academy_id=eq.{academy_id}&select=status",
+            headers=supabase.admin_headers
+        )
+        att_list = attendance_res.json() if attendance_res.status_code == 200 else []
+        if att_list:
+            present_count = len([a for a in att_list if a.get("status") == "present"])
+            attendance_pct = (present_count / len(att_list)) * 100
+        else:
+            attendance_pct = 100.0
+
+    if not month_name:
+        month_name = datetime.now().strftime("%B %Y")
+
+    sent = send_monthly_academy_report(
+        to=admin_email,
+        academy_name=academy_name,
+        player_count=player_count,
+        revenue=revenue,
+        attendance_pct=attendance_pct,
+        month_name=month_name
+    )
+
+    if not sent:
+        raise HTTPException(status_code=500, detail="Failed to send report email.")
+
+    return {"success": True, "message": f"Monthly report for {month_name} sent to {admin_email}"}

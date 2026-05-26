@@ -64,23 +64,39 @@ async def get_public_academy(subdomain: str):
         st = await client.get(
             f"{_s.SUPABASE_URL}/rest/v1/academy_settings"
             f"?academy_id=eq.{row['id']}"
-            "&select=hero_title,hero_subtitle,about_text,facebook_url,instagram_url,youtube_url,whatsapp_number,contact_email,contact_phone,address",
+            "&select=hero_title,hero_subtitle,about_text,facebook_url,instagram_url,youtube_url,whatsapp_number,contact_email,contact_phone,address,logo_url",
             headers=supabase.admin_headers,
         )
         landing = (st.json()[0] if st.status_code == 200 and st.json() else {})
+
+        about_val = landing.get("about_text") or ""
+        primary_color = row.get("primary_color") or "#4f46e5"
+        secondary_color = "#7c3aed"
+
+        if about_val.startswith("{"):
+            try:
+                import json
+                parsed = json.loads(about_val)
+                if isinstance(parsed, dict):
+                    primary_color = parsed.get("primary_color") or primary_color
+                    secondary_color = parsed.get("secondary_color") or secondary_color
+                    about_val = parsed.get("about_text") or ""
+            except Exception:
+                pass
 
         return {
             "id": row["id"],
             "name": row.get("name"),
             "city": row.get("city"),
             "plan_id": plan_id,
-            "logo_url": row.get("logo_url"),
-            "primary_color": row.get("primary_color"),
+            "logo_url": row.get("logo_url") or landing.get("logo_url"),
+            "primary_color": primary_color,
+            "secondary_color": secondary_color,
             "has_branches_feature": plan_id == "enterprise",
             "branches": branches,
             "hero_title": landing.get("hero_title"),
             "hero_subtitle": landing.get("hero_subtitle"),
-            "about_text": landing.get("about_text"),
+            "about_text": about_val,
             "facebook_url": landing.get("facebook_url"),
             "instagram_url": landing.get("instagram_url"),
             "youtube_url": landing.get("youtube_url"),

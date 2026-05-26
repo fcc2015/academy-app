@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, PlusCircle, Trash2 } from 'lucide-react';
+import { Trophy, PlusCircle, Trash2, Edit } from 'lucide-react';
 
 const MatchList = ({
     tableRef,
@@ -22,7 +22,8 @@ const MatchList = ({
     terrains,
     tournamentsList,
     handleDelete,
-    handleAddRow
+    handleAddRow,
+    onEdit
 }) => {
     return (
         <div ref={tableRef} className="overflow-x-auto min-h-[400px] bg-white">
@@ -304,6 +305,13 @@ const MatchList = ({
                                         <div className="flex items-center justify-center gap-1">
                                             {isSaving && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="Saving..." />}
                                             {isSaved && <span className="w-2 h-2 rounded-full bg-emerald-500" title="Saved" />}
+                                            <button
+                                                onClick={() => onEdit && onEdit(match)}
+                                                className="p-1.5 text-slate-300 hover:text-fuchsia-600 hover:bg-fuchsia-50 rounded-md transition-all animate-scale-in"
+                                                title="Edit match"
+                                            >
+                                                <Edit size={14} />
+                                            </button>
                                             <button
                                                 onClick={() => handleDelete(match.id)}
                                                 className="p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"

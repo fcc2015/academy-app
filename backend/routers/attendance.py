@@ -75,18 +75,20 @@ async def bulk_upsert_attendance(payload: AttendanceBulkCreate):
                 from core.config import settings as _settings
                 async with _httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
                     p_res = await client.get(
-                        f"{_settings.SUPABASE_URL}/rest/v1/players?id=eq.{player_id}&select=parent_name,u_category,parent_id",
+                        f"{_settings.SUPABASE_URL}/rest/v1/players?id=eq.{player_id}&select=parent_name,full_name,parent_whatsapp,parent_id",
                         headers=supabase.admin_headers,
                     )
                     if p_res.status_code == 200 and p_res.json():
                         player = p_res.json()[0]
                         parent_id = player.get("parent_id")
-                        player_name = player.get("parent_name") or "اللاعب"
+                        player_name = player.get("full_name") or "لاعب"
+                        parent_name_val = player.get("parent_name") or "اللاعب"
+                        parent_whatsapp = player.get("parent_whatsapp")
                         date_str = payload.date.strftime("%d/%m/%Y")
 
                         notif = {
                             "title": "🔴 غياب اللاعب",
-                            "message": f"تم تسجيل غياب {player_name} بتاريخ {date_str}. إذا كان هناك عذر، يرجى التواصل مع الأكاديمية.",
+                            "message": f"تم تسجيل غياب {parent_name_val} بتاريخ {date_str}. إذا كان هناك عذر، يرجى التواصل مع الأكاديمية.",
                             "type": "alert",
                         }
                         if parent_id:
@@ -95,6 +97,23 @@ async def bulk_upsert_attendance(payload: AttendanceBulkCreate):
                             notif["target_role"] = "parent"
 
                         await supabase.insert_notification(notif)
+
+                        # WhatsApp Absence Alert
+                        if parent_whatsapp:
+                            try:
+                                from services.whatsapp_service import send_whatsapp_message
+                                wa_text = (
+                                    f"⚽ *Alerte Absence — Casablanca Football Academy*\n\n"
+                                    f"Bonjour,\n"
+                                    f"Nous vous informons que le joueur *{player_name}* a été enregistré *absent* "
+                                    f"à la séance d'entraînement du *{date_str}*.\n\n"
+                                    f"Si cette absence est justifiée, merci d'en informer l'administration.\n\n"
+                                    f"Sportivement,\n"
+                                    f"L'Administration"
+                                )
+                                await send_whatsapp_message(parent_whatsapp, wa_text)
+                            except Exception as wa_err:
+                                logger.warning(f"WhatsApp absence alert failed for {parent_whatsapp}: {wa_err}")
             except Exception as notif_err:
                 logger.warning("Failed to send absence notification for player %s: %s", player_id, notif_err)
 

@@ -112,31 +112,18 @@ export default function ForgotPassword() {
     };
 
     return (
-        <div style={{
-            minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)',
-            fontFamily: "'Inter', -apple-system, sans-serif", padding: '24px',
-        }}>
-            <div style={{
-                width: '100%', maxWidth: '420px',
-                background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.1)', borderRadius: '24px', padding: '40px',
-            }}>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] font-sans p-6">
+            <div className="w-full max-w-[420px] bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-3xl p-10">
                 {/* Logo */}
-                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                    <div style={{
-                        width: '64px', height: '64px', borderRadius: '20px', margin: '0 auto 16px',
-                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '28px',
-                    }}>⚽</div>
-                    <h1 style={{ color: 'white', fontSize: '20px', fontWeight: 900, margin: 0 }}>
+                <div className="text-center mb-8">
+                    <div className="w-16 h-16 rounded-[20px] mx-auto mb-4 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-3xl">⚽</div>
+                    <h1 className="text-white text-xl font-black m-0">
                         {step === 0 && 'Mot de passe oublié'}
                         {step === 1 && 'Vérification'}
                         {step === 2 && 'Nouveau mot de passe'}
                         {step === 3 && 'Succès !'}
                     </h1>
-                    <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginTop: '8px' }}>
+                    <p className="text-white/50 text-xs mt-2">
                         {step === 0 && 'Entrez votre email pour recevoir un code'}
                         {step === 1 && `Code envoyé à ${email}`}
                         {step === 2 && 'Choisissez un nouveau mot de passe'}
@@ -146,51 +133,33 @@ export default function ForgotPassword() {
 
                 {/* Progress dots */}
                 {step < 3 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '32px' }}>
+                    <div className="flex justify-center gap-2 mb-8">
                         {[0, 1, 2].map(i => (
-                            <div key={i} style={{
-                                width: i === step ? '24px' : '8px', height: '8px', borderRadius: '4px',
-                                background: i <= step ? '#6366f1' : 'rgba(255,255,255,0.15)',
-                                transition: 'all 0.3s ease',
-                            }} />
+                            <div key={i} className={`h-2 rounded-full transition-all duration-300 ${i === step ? 'w-6' : 'w-2'} ${i <= step ? 'bg-indigo-500' : 'bg-white/15'}`} />
                         ))}
                     </div>
                 )}
 
                 {/* Error */}
                 {error && (
-                    <div style={{
-                        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-                        borderRadius: '12px', padding: '12px 16px', marginBottom: '20px',
-                        color: '#fca5a5', fontSize: '13px', textAlign: 'center',
-                    }}>{error}</div>
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-5 text-red-300 text-xs text-center">{error}</div>
                 )}
 
                 {/* ── Step 0: Email ── */}
                 {step === 0 && (
                     <form onSubmit={sendOtp}>
-                        <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                        <label className="block text-white/60 text-[11px] font-bold mb-2 tracking-widest uppercase">
                             Email
                         </label>
-                        <div style={{ position: 'relative', marginBottom: '24px' }}>
-                            <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }} />
+                        <div className="relative mb-6">
+                            <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
                             <input
                                 type="email" value={email} onChange={e => setEmail(e.target.value)}
                                 required placeholder="votre@email.com"
-                                style={{
-                                    width: '100%', boxSizing: 'border-box',
-                                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                                    borderRadius: '12px', padding: '12px 12px 12px 40px',
-                                    color: 'white', fontSize: '14px', outline: 'none',
-                                }}
+                                className="w-full box-border bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-3 text-white text-sm outline-none focus:border-indigo-500 transition-colors"
                             />
                         </div>
-                        <button type="submit" disabled={loading} style={{
-                            width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
-                            background: loading ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                            color: 'white', fontWeight: 900, fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                        }}>
+                        <button type="submit" disabled={loading} className={`w-full py-3.5 rounded-xl border-none text-white font-black text-sm cursor-pointer flex items-center justify-center gap-2 ${loading ? 'bg-indigo-600/50 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:scale-[1.02] transition-transform shadow-lg shadow-indigo-500/20'}`}>
                             {loading ? 'Envoi...' : <><span>Envoyer le code</span><ArrowRight size={16} /></>}
                         </button>
                     </form>
@@ -199,44 +168,27 @@ export default function ForgotPassword() {
                 {/* ── Step 1: OTP ── */}
                 {step === 1 && (
                     <form onSubmit={verifyOtp}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '24px' }} onPaste={handleOtpPaste}>
+                        <div className="flex gap-2 justify-center mb-6" onPaste={handleOtpPaste}>
                             {otp.map((digit, i) => (
                                 <input
                                     key={i} id={`otp-${i}`} type="text" inputMode="numeric"
                                     value={digit} maxLength={1}
                                     onChange={e => handleOtpChange(e.target.value, i)}
                                     onKeyDown={e => handleOtpKeyDown(e, i)}
-                                    style={{
-                                        width: '48px', height: '56px', textAlign: 'center',
-                                        fontSize: '22px', fontWeight: 900, borderRadius: '12px',
-                                        background: digit ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.06)',
-                                        border: digit ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
-                                        color: 'white', outline: 'none',
-                                        transition: 'all 0.2s',
-                                    }}
+                                    className={`w-12 h-14 text-center text-xl font-black rounded-xl outline-none transition-all duration-200 ${digit ? 'bg-indigo-500/15 border-2 border-indigo-500 text-white' : 'bg-white/5 border border-white/10 text-white focus:border-indigo-500'}`}
                                 />
                             ))}
                         </div>
-                        <button type="submit" disabled={loading} style={{
-                            width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
-                            background: loading ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                            color: 'white', fontWeight: 900, fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                            marginBottom: '16px',
-                        }}>
+                        <button type="submit" disabled={loading} className={`w-full py-3.5 rounded-xl border-none text-white font-black text-sm cursor-pointer flex items-center justify-center gap-2 mb-4 ${loading ? 'bg-indigo-600/50 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:scale-[1.02] transition-transform shadow-lg shadow-indigo-500/20'}`}>
                             {loading ? 'Vérification...' : <><span>Vérifier le code</span><ArrowRight size={16} /></>}
                         </button>
-                        <div style={{ textAlign: 'center' }}>
+                        <div className="text-center">
                             {resendTimer > 0 ? (
-                                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
+                                <span className="text-white/40 text-xs">
                                     Renvoyer dans {resendTimer}s
                                 </span>
                             ) : (
-                                <button type="button" onClick={sendOtp} style={{
-                                    background: 'none', border: 'none', color: '#6366f1',
-                                    fontSize: '13px', cursor: 'pointer', fontWeight: 700,
-                                    display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                }}>
+                                <button type="button" onClick={sendOtp} className="bg-none border-none text-indigo-400 text-xs cursor-pointer font-bold inline-flex items-center gap-1 hover:text-indigo-300">
                                     <RefreshCw size={13} /> Renvoyer le code
                                 </button>
                             )}
@@ -251,40 +203,27 @@ export default function ForgotPassword() {
                             { label: 'Nouveau mot de passe', val: password, set: setPassword },
                             { label: 'Confirmer', val: confirm, set: setConfirm },
                         ].map(({ label, val, set }, i) => (
-                            <div key={i} style={{ marginBottom: '16px' }}>
-                                <label style={{ display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                            <div key={i} className="mb-4">
+                                <label className="block text-white/60 text-[11px] font-bold mb-2 tracking-widest uppercase">
                                     {label}
                                 </label>
-                                <div style={{ position: 'relative' }}>
-                                    <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)' }} />
+                                <div className="relative">
+                                    <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
                                     <input
                                         type={showPass ? 'text' : 'password'} value={val}
                                         onChange={e => set(e.target.value)} required minLength={6}
                                         placeholder="••••••••"
-                                        style={{
-                                            width: '100%', boxSizing: 'border-box',
-                                            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                                            borderRadius: '12px', padding: '12px 40px 12px 40px',
-                                            color: 'white', fontSize: '14px', outline: 'none',
-                                        }}
+                                        className="w-full box-border bg-white/5 border border-white/10 rounded-xl py-3 px-10 text-white text-sm outline-none focus:border-indigo-500 transition-colors"
                                     />
                                     {i === 0 && (
-                                        <button type="button" onClick={() => setShowPass(!showPass)} style={{
-                                            position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-                                            background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer',
-                                        }}>
+                                        <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3.5 top-1/2 -translate-y-1/2 bg-none border-none text-white/30 cursor-pointer hover:text-white transition-colors">
                                             {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                                         </button>
                                     )}
                                 </div>
                             </div>
                         ))}
-                        <button type="submit" disabled={loading} style={{
-                            width: '100%', padding: '14px', borderRadius: '12px', border: 'none', marginTop: '8px',
-                            background: loading ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                            color: 'white', fontWeight: 900, fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                        }}>
+                        <button type="submit" disabled={loading} className={`w-full py-3.5 rounded-xl border-none text-white font-black text-sm cursor-pointer flex items-center justify-center gap-2 mt-4 ${loading ? 'bg-indigo-600/50 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:scale-[1.02] transition-transform shadow-lg shadow-indigo-500/20'}`}>
                             {loading ? 'Enregistrement...' : <><span>Réinitialiser</span><Lock size={16} /></>}
                         </button>
                     </form>
@@ -292,22 +231,14 @@ export default function ForgotPassword() {
 
                 {/* ── Step 3: Success ── */}
                 {step === 3 && (
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{
-                            width: '72px', height: '72px', borderRadius: '50%', margin: '0 auto 24px',
-                            background: 'rgba(16,185,129,0.1)', border: '2px solid rgba(16,185,129,0.3)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                            <CheckCircle size={36} color="#10b981" />
+                    <div className="text-center">
+                        <div className="w-18 h-18 rounded-full mx-auto mb-6 bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center">
+                            <CheckCircle size={36} className="text-emerald-500" />
                         </div>
-                        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginBottom: '32px' }}>
+                        <p className="text-white/60 text-sm mb-8 leading-relaxed">
                             Votre mot de passe a été réinitialisé. Connectez-vous maintenant.
                         </p>
-                        <button onClick={() => navigate('/login')} style={{
-                            width: '100%', padding: '14px', borderRadius: '12px', border: 'none',
-                            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                            color: 'white', fontWeight: 900, fontSize: '14px', cursor: 'pointer',
-                        }}>
+                        <button onClick={() => navigate('/login')} className="w-full py-3.5 rounded-xl border-none bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black text-sm cursor-pointer hover:scale-[1.02] transition-transform shadow-lg shadow-indigo-500/20">
                             Se connecter →
                         </button>
                     </div>
@@ -315,8 +246,8 @@ export default function ForgotPassword() {
 
                 {/* Back to login */}
                 {step < 3 && (
-                    <div style={{ textAlign: 'center', marginTop: '24px' }}>
-                        <Link to="/login" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', textDecoration: 'none' }}>
+                    <div className="text-center mt-6">
+                        <Link to="/login" className="text-white/40 text-xs hover:text-white transition-colors">
                             ← Retour à la connexion
                         </Link>
                     </div>

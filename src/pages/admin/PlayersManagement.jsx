@@ -345,27 +345,27 @@ const PlayersManagement = () => {
         setIsProfileModalOpen(true);
     };
 
-    const handleAddSubmit = async (e) => {
-        e.preventDefault(); setIsSubmitting(true);
+    const handleAddSubmit = async (data) => {
+        setIsSubmitting(true);
         try {
             const payload = {
-                ...formData, user_id: generateUUID(),
-                discount_type: formData.discount_type === 'none' ? null : formData.discount_type,
-                discount_value: formData.discount_value === '' ? null : parseFloat(formData.discount_value),
-                birth_date: formData.birth_date || null,
-                medical_cert_valid_until: formData.medical_cert_valid_until || null,
-                blood_type: formData.blood_type || null,
-                transport_zone: formData.transport_zone || null,
-                allergies: formData.allergies || null,
-                emergency_contact: formData.emergency_contact || null,
-                parent_email: formData.parent_email || null
+                ...data, user_id: generateUUID(),
+                discount_type: data.discount_type === 'none' ? null : data.discount_type,
+                discount_value: data.discount_value === '' || data.discount_value === null || data.discount_value === undefined ? null : parseFloat(data.discount_value),
+                birth_date: data.birth_date || null,
+                medical_cert_valid_until: data.medical_cert_valid_until || null,
+                blood_type: data.blood_type || null,
+                transport_zone: data.transport_zone || null,
+                allergies: data.allergies || null,
+                emergency_contact: data.emergency_contact || null,
+                parent_email: data.parent_email || null
             };
             const res = await authFetch(`${API_URL}/players/`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
             });
             if (res.ok) {
-                const data = await res.json();
-                setPlayers([data, ...players]);
+                const responseData = await res.json();
+                setPlayers([responseData, ...players]);
                 setIsAddModalOpen(false); setModalStep(1);
 
                 // ─── Auto-add player to the chat group of their U category ──
@@ -374,15 +374,15 @@ const PlayersManagement = () => {
                     if (grpRes.ok) {
                         const groups = await grpRes.json();
                         const target = (groups || []).find(g =>
-                            g.category && g.category.toUpperCase() === (data.u_category || '').toUpperCase()
+                            g.category && g.category.toUpperCase() === (responseData.u_category || '').toUpperCase()
                         );
                         if (target) {
                             await authFetch(`${API_URL}/chat/groups/${target.id}/add_member`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
-                                    user_id: data.user_id,
-                                    user_name: data.full_name,
+                                    user_id: responseData.user_id,
+                                    user_name: responseData.full_name,
                                     user_role: 'player',
                                     is_moderator: false,
                                 }),
@@ -394,18 +394,17 @@ const PlayersManagement = () => {
                 }
 
                 // Show prominent success confirmation using SweetAlert2
-                // Show credentials popup if parent account was auto-created
-                if (data.temp_password && data.parent_email) {
+                if (responseData.temp_password && responseData.parent_email) {
                     Swal.fire({
                         title: isRTL ? '✅ تم التسجيل + حساب الأب!' : '✅ Registered + Parent Account!',
                         html: `
                             <div style="text-align:${isRTL ? 'right' : 'left'};direction:${isRTL ? 'rtl' : 'ltr'}">
-                                <p style="font-weight:700;color:#334155;margin-bottom:12px">${isRTL ? `تم تسجيل اللاعب <b>${data.full_name}</b> بنجاح.` : `Player <b>${data.full_name}</b> registered successfully.`}</p>
+                                <p style="font-weight:700;color:#334155;margin-bottom:12px">${isRTL ? `تم تسجيل اللاعب <b>${responseData.full_name}</b> بنجاح.` : `Player <b>${responseData.full_name}</b> registered successfully.`}</p>
                                 <div style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-radius:16px;padding:16px;border:1px solid #c7d2fe">
                                     <p style="font-size:11px;font-weight:900;color:#6366f1;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">${isRTL ? '🔐 بيانات دخول ولي الأمر' : '🔐 Parent Login Credentials'}</p>
                                     <div style="background:#fff;border-radius:12px;padding:12px;font-family:monospace;font-size:14px;font-weight:700;color:#1e293b;border:1px solid #e2e8f0">
-                                        <div style="margin-bottom:6px"><span style="color:#64748b;font-size:11px;font-family:sans-serif">${isRTL ? 'الإيميل:' : 'Email:'}</span><br/>${data.parent_email}</div>
-                                        <div><span style="color:#64748b;font-size:11px;font-family:sans-serif">${isRTL ? 'كلمة السر:' : 'Password:'}</span><br/>${data.temp_password}</div>
+                                        <div style="margin-bottom:6px"><span style="color:#64748b;font-size:11px;font-family:sans-serif">${isRTL ? 'الإيميل:' : 'Email:'}</span><br/>${responseData.parent_email}</div>
+                                        <div><span style="color:#64748b;font-size:11px;font-family:sans-serif">${isRTL ? 'كلمة السر:' : 'Password:'}</span><br/>${responseData.temp_password}</div>
                                     </div>
                                     <p style="font-size:10px;color:#f59e0b;font-weight:700;margin-top:8px">⚠️ ${isRTL ? 'أرسل هاد المعلومات للأب عبر WhatsApp!' : 'Send these credentials to the parent via WhatsApp!'}</p>
                                 </div>
@@ -424,19 +423,18 @@ const PlayersManagement = () => {
                         }
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            const text = `${isRTL ? 'بيانات الدخول للتطبيق' : 'App Login Credentials'}:\nEmail: ${data.parent_email}\nPassword: ${data.temp_password}`;
+                            const text = `${isRTL ? 'بيانات الدخول للتطبيق' : 'App Login Credentials'}:\nEmail: ${responseData.parent_email}\nPassword: ${responseData.temp_password}`;
                             navigator.clipboard.writeText(text).then(() => {
                                 toast.success(isRTL ? 'تم النسخ!' : 'Copied!');
                             }).catch(() => {
-                                // Fallback
                                 window.prompt(isRTL ? 'انسخ هاد المعلومات:' : 'Copy these credentials:', text);
                             });
                         }
                     });
-                } else if (data.parent_email && data.is_new_parent === false) {
+                } else if (responseData.parent_email && responseData.is_new_parent === false) {
                     Swal.fire({
                         title: isRTL ? '✅ تم التسجيل والربط!' : '✅ Registered & Linked!',
-                        text: isRTL ? `تم تسجيل اللاعب ${data.full_name} بنجاح وتم ربطه بحساب ولي الأمر الموجود مسبقاً (${data.parent_email}).` : `Player ${data.full_name} registered successfully and linked to existing parent account (${data.parent_email}).`,
+                        text: isRTL ? `تم تسجيل اللاعب ${responseData.full_name} بنجاح وتم ربطه بحساب ولي الأمر الموجود مسبقاً (${responseData.parent_email}).` : `Player ${responseData.full_name} registered successfully and linked to existing parent account (${responseData.parent_email}).`,
                         icon: 'success',
                         confirmButtonText: isRTL ? 'حسناً' : 'OK',
                         confirmButtonColor: '#4f46e5',
@@ -450,7 +448,7 @@ const PlayersManagement = () => {
                 } else {
                     Swal.fire({
                         title: isRTL ? 'نجاح!' : 'Success!',
-                        text: isRTL ? `تم تسجيل اللاعب ${data.full_name} بنجاح.` : `Player ${data.full_name} registered successfully.`,
+                        text: isRTL ? `تم تسجيل اللاعب ${responseData.full_name} بنجاح.` : `Player ${responseData.full_name} registered successfully.`,
                         icon: 'success',
                         confirmButtonText: isRTL ? 'تأكيد' : 'OK',
                         confirmButtonColor: '#4f46e5',
@@ -483,26 +481,26 @@ const PlayersManagement = () => {
         } finally { setIsSubmitting(false); }
     };
 
-    const handleEditSubmit = async (e) => {
-        e.preventDefault(); setIsSubmitting(true);
+    const handleEditSubmit = async (data) => {
+        setIsSubmitting(true);
         try {
             const payload = {
-                ...formData,
-                discount_type: formData.discount_type === 'none' ? null : formData.discount_type,
-                discount_value: formData.discount_value === '' ? null : parseFloat(formData.discount_value),
-                birth_date: formData.birth_date || null,
-                medical_cert_valid_until: formData.medical_cert_valid_until || null,
-                blood_type: formData.blood_type || null,
-                transport_zone: formData.transport_zone || null,
-                allergies: formData.allergies || null,
-                emergency_contact: formData.emergency_contact || null
+                ...data,
+                discount_type: data.discount_type === 'none' ? null : data.discount_type,
+                discount_value: data.discount_value === '' || data.discount_value === null || data.discount_value === undefined ? null : parseFloat(data.discount_value),
+                birth_date: data.birth_date || null,
+                medical_cert_valid_until: data.medical_cert_valid_until || null,
+                blood_type: data.blood_type || null,
+                transport_zone: data.transport_zone || null,
+                allergies: data.allergies || null,
+                emergency_contact: data.emergency_contact || null
             };
             const res = await authFetch(`${API_URL}/players/${currentPlayer.user_id}`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
             });
             if (res.ok) {
-                const data = await res.json();
-                setPlayers(players.map(p => p.user_id === data.user_id ? data : p));
+                const updatedData = await res.json();
+                setPlayers(players.map(p => p.user_id === updatedData.user_id ? updatedData : p));
                 setIsEditModalOpen(false); setModalStep(1);
                 showBanner(isRTL ? 'تم تحديث البيانات بنجاح!' : 'Data updated successfully!', 'success');
             } else {
@@ -615,7 +613,7 @@ const PlayersManagement = () => {
                 proCount={proCount}
                 fetchError={fetchError}
                 loading={loading}
-                pagedPlayers={pagedPlayers}
+                players={filteredPlayers}
                 openAddModal={openAddModal}
                 fetchPlayers={fetchPlayers}
                 openProfileModal={openProfileModal}
@@ -625,9 +623,6 @@ const PlayersManagement = () => {
                 openEditModal={openEditModal}
                 handleDelete={handleDelete}
                 navigate={navigate}
-                page={page}
-                totalPages={totalPages}
-                setPage={setPage}
                 selectedPlayerIds={selectedPlayerIds}
                 setSelectedPlayerIds={setSelectedPlayerIds}
             />

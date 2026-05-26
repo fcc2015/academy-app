@@ -15,6 +15,7 @@ import httpx
 import base64
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 router = APIRouter(
     prefix="/payments/gateway",
@@ -532,3 +533,242 @@ def payment_status():
         "mode": "sandbox" if settings.PAYPAL_SANDBOX else "live",
         "frontend_url": settings.FRONTEND_URL
     }
+
+
+# =========================================================
+# STRIPE GATEWAY
+# =========================================================
+
+import stripe
+import os
+
+class CreateStripeSessionRequest(BaseModel):
+    academy_id: str
+    plan_id: str
+    amount: float
+    currency: str = "mad"
+    description: str = "Academy SaaS Subscription"
+
+class StripeWebhookRequest(BaseModel):
+    pass
+
+@router.post("/stripe/create-checkout-session")
+async def create_stripe_checkout_session(req: CreateStripeSessionRequest):
+    """Create a Stripe Checkout Session for subscription payment."""
+    stripe_key = os.getenv("STRIPE_SECRET_KEY") or "mock_stripe_key_for_testing"
+    stripe.api_key = stripe_key
+
+    # URLs for redirection after payment
+    success_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success&provider=stripe&academy_id={req.academy_id}&plan_id={req.plan_id}"
+    cancel_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=cancelled"
+
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": req.currency.lower(),
+                    "product_data": {
+                        "name": req.plan_id.upper(),
+                        "description": req.description,
+                    },
+                    "unit_amount": int(req.amount * 100), # Stripe expects amount in cents
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            client_reference_id=f"{req.academy_id}|{req.plan_id}",
+            metadata={
+                "academy_id": req.academy_id,
+                "plan_id": req.plan_id,
+            }
+        )
+
+        # Save pending transaction to DB
+        try:
+            async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+                await client.post(
+                    f"{supabase.url}/rest/v1/payment_transactions",
+                    json={
+                        "paypal_order_id": f"stripe_{session.id[:20]}", # reuse order_id column for Stripe session reference
+                        "academy_id": req.academy_id,
+                        "plan_id": req.plan_id,
+                        "amount": req.amount,
+                        "currency": req.currency,
+                        "status": "pending",
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    },
+                    headers=supabase.admin_headers
+                )
+        except Exception as db_err:
+            logger.warning(f"Failed to record pending Stripe session: {db_err}")
+
+        return {
+            "session_id": session.id,
+            "checkout_url": session.url
+        }
+    except Exception as e:
+        logger.error(f"Stripe session creation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Stripe integration failed: {str(e)}")
+
+
+@router.post("/stripe/webhook")
+async def stripe_webhook(request: Request):
+    """Handle Stripe Webhook events."""
+    payload = await request.body()
+    sig_header = request.headers.get("Stripe-Signature")
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET") or "mock_webhook_secret"
+
+    try:
+        # Verify webhook signature in production, fallback to generic parsing in dev
+        if webhook_secret and not webhook_secret.startswith("mock"):
+            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+        else:
+            import json
+            event_data = json.loads(payload.decode("utf-8"))
+            event = stripe.Event.construct_from(event_data, stripe.api_key)
+
+        if event.type == "checkout.session.completed":
+            session = event.data.object
+            client_ref = session.get("client_reference_id")
+            session_id = session.get("id") or getattr(session, "id", "")
+            if client_ref and "|" in client_ref:
+                academy_id, plan_id = client_ref.split("|", 1)
+                
+                # Update transaction in DB
+                async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+                    await client.patch(
+                        f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.stripe_{session_id[:20]}",
+                        json={
+                            "status": "completed",
+                            "completed_at": datetime.now(timezone.utc).isoformat()
+                        },
+                        headers=supabase.admin_headers
+                    )
+                    
+                    # Update academy subscription status
+                    await client.patch(
+                        f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+                        json={
+                            "subscription_status": "active",
+                            "plan_id": plan_id,
+                            "last_payment_at": datetime.now(timezone.utc).isoformat()
+                        },
+                        headers=supabase.admin_headers
+                    )
+                    logger.info(f"Stripe subscription activated successfully for {academy_id} - {plan_id}")
+
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"Stripe Webhook error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# =========================================================
+# MOROCCAN CASH DEPOSITS (Wafacash / CashPlus)
+# =========================================================
+
+class CashPaymentRequest(BaseModel):
+    academy_id: str
+    plan_id: str
+    amount: float
+    provider: str  # "wafacash" or "cashplus"
+
+class CashConfirmRequest(BaseModel):
+    transaction_id: str
+    deposit_proof_reference: str
+
+@router.post("/cash/generate-code")
+async def generate_cash_payment_code(req: CashPaymentRequest):
+    """
+    Generate a cash payment reference code (Wafacash / CashPlus).
+    Creates a pending transaction in state 'waiting_deposit'.
+    """
+    import random
+    prefix = "WC" if req.provider.lower() == "wafacash" else "CP"
+    random_code = f"{prefix}-{random.randint(100000, 999999)}"
+    
+    transaction_data = {
+        "paypal_order_id": random_code, # Reuse order_id column for cash reference code
+        "academy_id": req.academy_id,
+        "plan_id": req.plan_id,
+        "amount": req.amount,
+        "currency": "MAD",
+        "status": "waiting_deposit",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "paypal_capture_id": req.provider.upper() # Store provider type in capture_id column
+    }
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            res = await client.post(
+                f"{supabase.url}/rest/v1/payment_transactions",
+                json=transaction_data,
+                headers=supabase.admin_headers
+            )
+            if res.status_code not in (200, 201):
+                logger.error(f"DB insert failed: {res.text}")
+                raise HTTPException(status_code=500, detail="Failed to save cash transaction.")
+    except Exception as e:
+        logger.error(f"Cash transaction save error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "success": True,
+        "provider": req.provider.upper(),
+        "payment_code": random_code,
+        "amount": req.amount,
+        "instructions": (
+            f"Veuillez vous rendre dans une agence {req.provider.upper()} "
+            f"et effectuer un versement de {req.amount:.2f} MAD "
+            f"avec le code de référence : {random_code}."
+        )
+    }
+
+@router.post("/cash/confirm-deposit")
+async def confirm_cash_deposit(req: CashConfirmRequest):
+    """
+    Confirm Wafacash / CashPlus deposit by deposit proof reference.
+    Marks transaction as completed and activates subscription.
+    """
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+        # 1. Fetch the transaction
+        tx_res = await client.get(
+            f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{quote(req.transaction_id)}&select=*",
+            headers=supabase.admin_headers
+        )
+        if tx_res.status_code != 200 or not tx_res.json():
+            raise HTTPException(status_code=404, detail="Cash transaction not found.")
+            
+        tx = tx_res.json()[0]
+        if tx.get("status") == "completed":
+            return {"success": True, "message": "Transaction already completed."}
+            
+        academy_id = tx.get("academy_id")
+        plan_id = tx.get("plan_id")
+        
+        # 2. Update transaction status
+        await client.patch(
+            f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{quote(req.transaction_id)}",
+            json={
+                "status": "completed",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "paypal_capture_id": f"{tx.get('paypal_capture_id', 'CASH')}|PROOF:{req.deposit_proof_reference}"
+            },
+            headers=supabase.admin_headers
+        )
+        
+        # 3. Activate subscription
+        await client.patch(
+            f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+            json={
+                "subscription_status": "active",
+                "plan_id": plan_id,
+                "last_payment_at": datetime.now(timezone.utc).isoformat()
+            },
+            headers=supabase.admin_headers
+        )
+        
+    return {"success": True, "message": f"Cash deposit confirmed successfully for {academy_id}. Subscription activated!"}

@@ -541,6 +541,23 @@ async def run_alert_check():
                             )
                         except Exception as e:
                             logger.warning(f"Email reminder failed for {parent_email}: {e}")
+                    
+                    # Automated WhatsApp Alert
+                    parent_phone = player_info.get("parent_whatsapp") or player_info.get("phone")
+                    if parent_phone and amount:
+                        try:
+                            from services.whatsapp_service import send_whatsapp_message
+                            wa_text = (
+                                f"⚽ *Rappel de paiement — Casablanca Football Academy*\n\n"
+                                f"Bonjour,\n"
+                                f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
+                                f"d'un montant de *{float(amount):.2f} MAD* est dû (Échéance: {next_due}).\n\n"
+                                f"Merci de régulariser la situation.\n"
+                                f"L'Administration"
+                            )
+                            await send_whatsapp_message(parent_phone, wa_text)
+                        except Exception as wa_err:
+                            logger.warning(f"WhatsApp alert failed for {parent_phone}: {wa_err}")
 
             # ── Actions based on alert level ──
             if alert == "suspended" and player_id:
@@ -693,3 +710,57 @@ async def send_test_notification(user_id: str):
     except Exception as e:
         logger.error("Error sending test notification: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+
+
+@router.post("/payments/{payment_id}/whatsapp-reminder")
+async def trigger_whatsapp_payment_reminder(
+    payment_id: str,
+    user: dict = Depends(require_role("admin", "super_admin"))
+):
+    """Generate a WhatsApp click-to-chat web link and send an automated notification for a payment."""
+    from services.whatsapp_service import generate_whatsapp_link, send_whatsapp_message
+    from core.config import settings
+    
+    # 1. Fetch payment details
+    res = await supabase.client.get(
+        f"{settings.SUPABASE_URL}/rest/v1/payments?id=eq.{payment_id}&select=*,players(*)"
+    )
+    if res.status_code != 200 or not res.json():
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    payment = res.json()[0]
+    player = payment.get("players") or {}
+    
+    player_name = player.get("full_name", "Player")
+    parent_whatsapp = player.get("parent_whatsapp")
+    amount = payment.get("amount", 0.0)
+    due_date = payment.get("due_date", "—")
+    
+    if not parent_whatsapp:
+        raise HTTPException(
+            status_code=400,
+            detail="Parent Whatsapp phone number not set for this player. | رقم واتساب الأب غير مسجل لهذا اللاعب."
+        )
+    
+    message_text = (
+        f"⚽ *Rappel de paiement — Casablanca Football Academy*\n\n"
+        f"Bonjour,\n"
+        f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
+        f"d'un montant de *{amount:.2f} MAD* est en attente (Échéance: {due_date}).\n\n"
+        f"Merci de régulariser la situation au plus vite.\n"
+        f"Sportivement,\n"
+        f"L'Administration"
+    )
+    
+    # Generate direct link
+    web_link = generate_whatsapp_link(parent_whatsapp, message_text)
+    
+    # Try sending automated message
+    automated_sent = await send_whatsapp_message(parent_whatsapp, message_text)
+    
+    return {
+        "success": True,
+        "automated_sent": automated_sent,
+        "whatsapp_web_link": web_link,
+        "message": f"WhatsApp reminder generated for {player_name}"
+    }
