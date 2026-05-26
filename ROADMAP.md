@@ -104,7 +104,8 @@
 - [x] Typography scale (Inter + Cairo/Noto Sans Arabic for RTL)
 - [x] Color tokens (brand-50→900 + surface-50→900 + status badges in tailwind.config.js)
 - [ ] Remove inline styles — use design system classes only
-- [ ] Reduce component file sizes (split 400+ line files: FinancesManagement 64KB, PlayersManagement 64KB)
+- [x] Reduce component file sizes (split 400+ line files: FinancesManagement 64KB, PlayersManagement 64KB)
+- [x] Split ParentChildProfile.jsx (102KB, 1211 lines) into 7 modular sub-components under `src/pages/parent/components/`
 
 ### 3.2 Admin Dashboard Redesign
 - [x] Modern KPI cards with color-coded icons
