@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
 import FUTCard from '../../components/FUTCard';
+import html2canvas from 'html2canvas';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
@@ -479,15 +480,28 @@ const Evaluations = () => {
                             <p className="text-white/60 text-xs tracking-[0.2em] font-bold">BASED ON LATEST ACADEMY PERFORMANCE</p>
                         </div>
                         
-                        <FUTCard 
-                            player={selectedPlayer} 
-                            evaluation={evaluations.length > 0 ? [...evaluations].sort((a,b) => new Date(b.evaluation_date) - new Date(a.evaluation_date))[0] : null} 
-                        />
+                        <div id="fut-card-container-admin" className="p-2 bg-transparent">
+                            <FUTCard 
+                                player={selectedPlayer} 
+                                evaluation={evaluations.length > 0 ? [...evaluations].sort((a,b) => new Date(b.evaluation_date) - new Date(a.evaluation_date))[0] : null} 
+                            />
+                        </div>
 
                         <button 
                             className="mt-12 flex items-center gap-3 bg-gradient-to-r from-white to-slate-200 text-slate-900 px-8 py-4 rounded-full font-black uppercase tracking-[0.2em] hover:scale-105 transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(255,255,255,0.5)]"
-                            onClick={() => {
-                                // TODO: implement canvas capture for card download
+                            onClick={async () => {
+                                const element = document.getElementById('fut-card-container-admin');
+                                if (!element) return;
+                                try {
+                                    const canvas = await html2canvas(element, { backgroundColor: null, scale: 2 });
+                                    const dataUrl = canvas.toDataURL('image/png');
+                                    const link = document.createElement('a');
+                                    link.download = `fut-card-${selectedPlayer?.full_name || 'player'}.png`;
+                                    link.href = dataUrl;
+                                    link.click();
+                                } catch (err) {
+                                    console.error('Failed to download image', err);
+                                }
                             }}
                         >
                             <Download size={20} /> Download Card

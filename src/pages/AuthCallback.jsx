@@ -156,8 +156,7 @@ const AuthCallback = () => {
 
     return (
         <div
-            className="min-h-screen flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)' }}
+            className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e]"
         >
             <div className="text-center max-w-sm mx-4">
                 {error ? (
@@ -168,8 +167,7 @@ const AuthCallback = () => {
                         <div className="flex flex-col gap-3">
                             <button
                                 onClick={() => navigate('/login')}
-                                className="px-6 py-3 rounded-xl font-black text-white text-sm transition-all hover:scale-105"
-                                style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
+                                className="px-6 py-3 rounded-xl font-black text-white text-sm transition-all hover:scale-105 bg-gradient-to-r from-indigo-600 to-purple-600"
                             >
                                 تسجيل الدخول بالإيميل
                             </button>

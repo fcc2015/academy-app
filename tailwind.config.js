@@ -8,6 +8,16 @@ export default {
   theme: {
     extend: {
       colors: {
+        primary: {
+          DEFAULT: 'var(--color-primary, #4f46e5)',
+          hover: 'color-mix(in srgb, var(--color-primary, #4f46e5) 85%, black)',
+          light: 'color-mix(in srgb, var(--color-primary, #4f46e5) 10%, white)',
+        },
+        secondary: {
+          DEFAULT: 'var(--color-secondary, #7c3aed)',
+          hover: 'color-mix(in srgb, var(--color-secondary, #7c3aed) 85%, black)',
+          light: 'color-mix(in srgb, var(--color-secondary, #7c3aed) 10%, white)',
+        },
         brand: {
           50: '#f6f8f6',
           100: '#eef3ef',

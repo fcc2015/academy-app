@@ -1,17 +1,103 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { X, Loader2, Check, CheckCircle } from 'lucide-react';
 import PhotoUploadCrop from './PhotoUploadCrop';
 
+const playerSchema = z.object({
+    full_name: z.string().min(3, { message: 'Must be at least 3 characters' }),
+    parent_name: z.string().min(3, { message: 'Must be at least 3 characters' }),
+    birth_date: z.string().min(1, { message: 'Birth date is required' }),
+    parent_whatsapp: z.string().regex(/^\+?[0-9]{8,15}$/, { message: 'Invalid phone format (e.g. +212600000000)' }),
+    parent_email: z.string().email({ message: 'Invalid email format' }).or(z.literal('')).optional().nullable(),
+    address: z.string().min(3, { message: 'Must be at least 3 characters' }),
+    u_category: z.string().min(1, { message: 'Age category is required' }),
+    technical_level: z.string().default('B'),
+    account_status: z.string().default('Pending'),
+    branch_id: z.string().optional().nullable(),
+    subscription_type: z.string().default('Monthly'),
+    blood_type: z.string().optional().nullable(),
+    medical_cert_valid_until: z.string().optional().nullable(),
+    emergency_contact: z.string().optional().nullable(),
+    transport_zone: z.string().optional().nullable(),
+    allergies: z.string().optional().nullable(),
+    coach_notes: z.string().optional().nullable(),
+    photo_url: z.string().optional().nullable(),
+});
+
 const PlayerModal = ({
     isOpen, onClose, onSubmit, title, isEdit, modalStep, setModalStep,
-    formData, handleInputChange, subscriptionPlans, isSubmitting, settings, t, isRTL, dir, branches = [],
+    formData, subscriptionPlans, isSubmitting, settings, t, isRTL, dir, branches = [],
     showCoachNotes = false
 }) => {
-    if (!isOpen) return null;
-    const selectedPlanObj = subscriptionPlans.find(p => p.name === formData.subscription_type) || null;
+    const { register, handleSubmit, trigger, formState: { errors }, setValue, watch, reset } = useForm({
+        resolver: zodResolver(playerSchema),
+        defaultValues: formData
+    });
 
-    const goNext = (e) => { e.preventDefault(); setModalStep(2); };
-    const doSubmit = (e) => { onSubmit(e); };
+    useEffect(() => {
+        if (isOpen) {
+            reset(formData);
+        }
+    }, [isOpen, formData, reset]);
+
+    if (!isOpen) return null;
+
+    const currentSubscriptionType = watch('subscription_type');
+    const photoUrl = watch('photo_url');
+    const selectedPlanObj = subscriptionPlans.find(p => p.name === currentSubscriptionType) || null;
+
+    const computeUCategory = (birthDateStr, ageCategories) => {
+        if (!birthDateStr || !ageCategories?.length) return null;
+        const birth = new Date(birthDateStr);
+        if (isNaN(birth)) return null;
+        const today = new Date();
+        const seasonYear = today.getMonth() >= 7 ? today.getFullYear() : today.getFullYear() - 1;
+        const ageAtSeasonStart = seasonYear - birth.getFullYear();
+        const targetU = `U${ageAtSeasonStart}`;
+        const exact = ageCategories.find(c => c.toUpperCase() === targetU);
+        if (exact) return exact;
+        const prefix = ageCategories.find(c =>
+            c.toUpperCase() === targetU ||
+            c.toUpperCase().startsWith(targetU + ' ') ||
+            c.toUpperCase().startsWith(targetU + '-')
+        );
+        if (prefix) return prefix;
+        if (ageAtSeasonStart >= 18) {
+            const senior = ageCategories.find(c => c.toLowerCase().includes('senior'));
+            if (senior) return senior;
+        }
+        return null;
+    };
+
+    const getErrorMessage = (field) => {
+        const err = errors[field];
+        if (!err) return null;
+        if (isRTL) {
+            if (err.type === 'required' || err.message.includes('required') || err.message.includes('required')) return 'هذا الحقل مطلوب';
+            if (err.message.includes('at least 3')) return 'يجب أن يكون 3 أحرف على الأقل';
+            if (err.message.includes('Invalid phone')) return 'رقم الهاتف غير صالح (مثال: +212600000000)';
+            if (err.message.includes('Invalid email')) return 'البريد الإلكتروني غير صالح';
+            return err.message;
+        }
+        return err.message;
+    };
+
+    const goNext = async (e) => {
+        e.preventDefault();
+        const fieldsToValidate = [
+            'full_name', 'parent_name', 'birth_date', 'parent_whatsapp', 'parent_email', 'address', 'u_category'
+        ];
+        const isValid = await trigger(fieldsToValidate);
+        if (isValid) {
+            setModalStep(2);
+        }
+    };
+
+    const doSubmit = (data) => {
+        onSubmit(data);
+    };
 
     return (
         <div className={`fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-start justify-center p-4 sm:p-6 overflow-y-auto ${isRTL ? 'text-right' : 'text-left'}`} dir={dir}>
@@ -33,13 +119,13 @@ const PlayerModal = ({
                 </div>
 
                 {(isEdit || modalStep === 1) && (
-                    <form onSubmit={isEdit ? doSubmit : goNext} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <form onSubmit={isEdit ? handleSubmit(doSubmit) : goNext} className="flex-1 flex flex-col min-h-0 overflow-hidden">
                         <div className="p-6 sm:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
-                            {/* Photo upload — centered above the grid */}
+                            {/* Photo upload */}
                             <div className="flex flex-col items-center gap-1 pb-4 border-b border-slate-100">
                                 <PhotoUploadCrop
-                                    value={formData.photo_url}
-                                    onChange={(url) => handleInputChange({ target: { name: 'photo_url', value: url } })}
+                                    value={photoUrl || ''}
+                                    onChange={(url) => setValue('photo_url', url)}
                                 />
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Player Photo (optional)</p>
                             </div>
@@ -47,50 +133,62 @@ const PlayerModal = ({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.fullName')}</label>
-                                    <input required type="text" name="full_name" value={formData.full_name} onChange={handleInputChange} placeholder={isRTL ? 'الاسم والنسب' : 'Full Name'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                    <input type="text" {...register('full_name')} placeholder={isRTL ? 'الاسم والنسب' : 'Full Name'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                    {errors.full_name && <p className="text-xs text-red-500 font-bold mt-1">{getErrorMessage('full_name')}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.parentName')}</label>
-                                    <input required type="text" name="parent_name" value={formData.parent_name} onChange={handleInputChange} placeholder={isRTL ? 'اسم المسؤول' : 'Parent Name'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                    <input type="text" {...register('parent_name')} placeholder={isRTL ? 'اسم المسؤول' : 'Parent Name'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                    {errors.parent_name && <p className="text-xs text-red-500 font-bold mt-1">{getErrorMessage('parent_name')}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.birthDate')}</label>
-                                    <input required type="date" name="birth_date" value={formData.birth_date} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                    <input type="date" {...register('birth_date', {
+                                        onChange: (e) => {
+                                            const val = e.target.value;
+                                            if (val) {
+                                                const auto = computeUCategory(val, settings?.age_categories);
+                                                if (auto) setValue('u_category', auto);
+                                            }
+                                        }
+                                    })} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                    {errors.birth_date && <p className="text-xs text-red-500 font-bold mt-1">{getErrorMessage('birth_date')}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.phone')}</label>
-                                    <input required type="tel" name="parent_whatsapp" value={formData.parent_whatsapp} onChange={handleInputChange} 
-                                        pattern="^\+?[0-9]{8,15}$" 
-                                        title="Must be a valid phone number, e.g., +212600000000"
-                                        placeholder="+212 6..." className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" dir="ltr" />
+                                    <input type="tel" {...register('parent_whatsapp')} placeholder="+212 6..." className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" dir="ltr" />
+                                    {errors.parent_whatsapp && <p className="text-xs text-red-500 font-bold mt-1">{getErrorMessage('parent_whatsapp')}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{isRTL ? 'إيميل ولي الأمر (اختياري)' : 'Parent Email (optional)'}</label>
-                                    <input type="email" name="parent_email" value={formData.parent_email || ''} onChange={handleInputChange} placeholder={isRTL ? 'email@example.com — لإنشاء حساب تلقائي' : 'email@example.com — auto-creates login'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" dir="ltr" />
+                                    <input type="text" {...register('parent_email')} placeholder={isRTL ? 'email@example.com' : 'email@example.com'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" dir="ltr" />
+                                    {errors.parent_email && <p className="text-xs text-red-500 font-bold mt-1">{getErrorMessage('parent_email')}</p>}
                                     <p className="text-[9px] text-indigo-500 font-bold mt-1">{isRTL ? '💡 إلا دخلتي الإيميل، غادي يتخلق حساب تلقائي للأب' : '💡 If provided, a login account is auto-created for the parent'}</p>
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.address')}</label>
-                                    <input required type="text" name="address" value={formData.address} onChange={handleInputChange} placeholder={isRTL ? 'الحي الشارع، المدينة' : 'Neighborhood, Street, City'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                    <input type="text" {...register('address')} placeholder={isRTL ? 'الحي الشارع، المدينة' : 'Neighborhood, Street, City'} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                    {errors.address && <p className="text-xs text-red-500 font-bold mt-1">{getErrorMessage('address')}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.ageCategory')}</label>
-                                    <select name="u_category" value={formData.u_category} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
+                                    <select {...register('u_category')} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
                                         {settings?.age_categories?.map(c => <option key={c} value={c}>{c}</option>) || <option value="U11">U11</option>}
                                     </select>
+                                    {errors.u_category && <p className="text-xs text-red-500 font-bold mt-1">{getErrorMessage('u_category')}</p>}
                                 </div>
                                 {isEdit && (
                                     <>
                                         <div>
                                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.technicalLevel')}</label>
-                                            <select name="technical_level" value={formData.technical_level} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
+                                            <select {...register('technical_level')} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
                                                 <option value="A">{isRTL ? 'نخبة (A)' : 'Elite (A)'}</option>
                                                 <option value="B">{isRTL ? 'هاوي (B)' : 'Amateur (B)'}</option>
                                             </select>
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('common.status')}</label>
-                                            <select name="account_status" value={formData.account_status} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
+                                            <select {...register('account_status')} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
                                                 <option value="Active">{t('players.active')}</option>
                                                 <option value="Pending">{t('players.pending')}</option>
                                                 <option value="Suspended">{t('players.suspended')}</option>
@@ -99,7 +197,7 @@ const PlayerModal = ({
                                         {branches.length > 0 && (
                                             <div>
                                                 <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{isRTL ? 'الفرع' : 'Branch'}</label>
-                                                <select name="branch_id" value={formData.branch_id || ''} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
+                                                <select {...register('branch_id')} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
                                                     <option value="">{isRTL ? '— بدون فرع —' : '— No branch —'}</option>
                                                     {branches.map(b => <option key={b.id} value={b.id}>{b.name}{b.city ? ` (${b.city})` : ''}</option>)}
                                                 </select>
@@ -107,7 +205,7 @@ const PlayerModal = ({
                                         )}
                                         <div>
                                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{t('players.subscriptionType')}</label>
-                                            <select name="subscription_type" value={formData.subscription_type} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
+                                            <select {...register('subscription_type')} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
                                                 <option value="Free">{isRTL ? 'مجاني (للمعوزين)' : 'Free (Social Case)'}</option>
                                                 {subscriptionPlans.map(plan => <option key={plan.id} value={plan.name}>{plan.name}</option>)}
                                             </select>
@@ -119,29 +217,28 @@ const PlayerModal = ({
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
                                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">فصيلة الدم</label>
-                                            <select name="blood_type" value={formData.blood_type || ''} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" dir="ltr">
+                                            <select {...register('blood_type')} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" dir="ltr">
                                                 <option value="">-- غير محدد --</option>
                                                 {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bt => <option key={bt} value={bt}>{bt}</option>)}
                                             </select>
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">صلاحية الشهادة الطبية</label>
-                                            <input type="date" name="medical_cert_valid_until" value={formData.medical_cert_valid_until || ''} onChange={handleInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                            <input type="date" {...register('medical_cert_valid_until')} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">جهة الاتصال للطوارئ</label>
-                                            <input type="text" name="emergency_contact" value={formData.emergency_contact || ''} onChange={handleInputChange} placeholder="الاسم ورقم الهاتف..." className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                            <input type="text" {...register('emergency_contact')} placeholder="الاسم ورقم الهاتف..." className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">منطقة النقل</label>
-                                            <input type="text" name="transport_zone" value={formData.transport_zone || ''} onChange={handleInputChange} placeholder="مثال: وسط المدينة" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                            <input type="text" {...register('transport_zone')} placeholder="مثال: وسط المدينة" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
                                         </div>
                                         <div className="md:col-span-2">
                                             <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">حساسية أو أمراض سابقة</label>
-                                            <input type="text" name="allergies" value={formData.allergies || ''} onChange={handleInputChange} placeholder="لا يوجد" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
+                                            <input type="text" {...register('allergies')} placeholder="لا يوجد" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none" />
                                         </div>
                                     </div>
-                                    {/* Coach Notes — only visible to coach/admin/super_admin roles */}
                                     {showCoachNotes && (
                                         <div className="md:col-span-2 pt-4 border-t border-amber-100 mt-2">
                                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
@@ -149,9 +246,7 @@ const PlayerModal = ({
                                                     🔒 {isRTL ? 'ملاحظات المدرب (سرية)' : 'Coach Notes (Private)'}
                                                 </label>
                                                 <textarea
-                                                    name="coach_notes"
-                                                    value={formData.coach_notes || ''}
-                                                    onChange={handleInputChange}
+                                                    {...register('coach_notes')}
                                                     rows={4}
                                                     maxLength={2000}
                                                     placeholder={isRTL ? 'ملاحظات خاصة لا تظهر للاعب أو ولي الأمر...' : 'Private notes not visible to player or parent...'}
@@ -177,12 +272,12 @@ const PlayerModal = ({
                 )}
 
                 {!isEdit && modalStep === 2 && (
-                    <form onSubmit={doSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <form onSubmit={handleSubmit(doSubmit)} className="flex-1 flex flex-col min-h-0 overflow-hidden">
                         <div className="p-6 sm:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
                             <label className={`block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>🏆 {t('players.choosePlan')}</label>
                             <div className="grid grid-cols-1 gap-4">
-                                <label className={`flex items-center gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all ${isRTL ? 'flex-row-reverse' : ''} ${formData.subscription_type === 'Free' ? 'border-emerald-500 bg-emerald-50/50 shadow-sm' : 'border-slate-100'}`}>
-                                    <input type="radio" name="subscription_type" value="Free" checked={formData.subscription_type === 'Free'} onChange={handleInputChange} className="accent-emerald-500" />
+                                <label className={`flex items-center gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all ${isRTL ? 'flex-row-reverse' : ''} ${currentSubscriptionType === 'Free' ? 'border-emerald-500 bg-emerald-50/50 shadow-sm' : 'border-slate-100'}`}>
+                                    <input type="radio" value="Free" {...register('subscription_type')} className="accent-emerald-500" />
                                     <div className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
                                         <div className="font-extrabold text-slate-800 text-sm">{isRTL ? 'مجاني (عرض خاص)' : 'Free (Special Offer)'}</div>
                                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{isRTL ? 'للأيتام أو الحالات الاجتماعية' : 'For orphans or social cases'}</div>
@@ -190,8 +285,8 @@ const PlayerModal = ({
                                     <span className="text-lg font-black text-emerald-600">0 {t('common.currency')}</span>
                                 </label>
                                 {subscriptionPlans.filter(p => !p.billing_cycles?.includes('free')).map(plan => (
-                                    <label key={plan.id} className={`flex items-center gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all ${isRTL ? 'flex-row-reverse' : ''} ${formData.subscription_type === plan.name ? 'border-indigo-500 bg-indigo-50/50 shadow-sm' : 'border-slate-100'}`}>
-                                        <input type="radio" name="subscription_type" value={plan.name} checked={formData.subscription_type === plan.name} onChange={handleInputChange} className="accent-indigo-600" />
+                                    <label key={plan.id} className={`flex items-center gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all ${isRTL ? 'flex-row-reverse' : ''} ${currentSubscriptionType === plan.name ? 'border-indigo-500 bg-indigo-50/50 shadow-sm' : 'border-slate-100'}`}>
+                                        <input type="radio" value={plan.name} {...register('subscription_type')} className="accent-indigo-600" />
                                         <div className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
                                             <div className="font-extrabold text-slate-800 text-sm">{plan.name}</div>
                                         </div>
@@ -204,8 +299,8 @@ const PlayerModal = ({
                             <div className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100">
                                 <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">{t('players.profileSummary')}</div>
                                 <div className="space-y-3">
-                                    <div className={`flex justify-between text-sm font-bold ${isRTL ? 'flex-row-reverse' : ''}`}><span className="text-slate-400">{isRTL ? 'اللاعب:' : 'Player:'}</span><span className="text-slate-900">{formData.full_name}</span></div>
-                                    <div className={`flex justify-between text-sm font-bold border-t border-slate-200 pt-3 mt-1 ${isRTL ? 'flex-row-reverse' : ''}`}><span className="text-slate-400">{t('players.totalMonthly')}:</span><span className="text-lg font-black text-slate-900">{formData.subscription_type === 'Free' ? `0 ${t('common.currency')}` : `${selectedPlanObj?.monthly_price || 0} ${t('common.currency')}`}</span></div>
+                                    <div className={`flex justify-between text-sm font-bold ${isRTL ? 'flex-row-reverse' : ''}`}><span className="text-slate-400">{isRTL ? 'اللاعب:' : 'Player:'}</span><span className="text-slate-900">{watch('full_name')}</span></div>
+                                    <div className={`flex justify-between text-sm font-bold border-t border-slate-200 pt-3 mt-1 ${isRTL ? 'flex-row-reverse' : ''}`}><span className="text-slate-400">{t('players.totalMonthly')}:</span><span className="text-lg font-black text-slate-900">{currentSubscriptionType === 'Free' ? `0 ${t('common.currency')}` : `${selectedPlanObj?.monthly_price || 0} ${t('common.currency')}`}</span></div>
                                 </div>
                             </div>
                         </div>

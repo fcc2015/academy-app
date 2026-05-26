@@ -124,8 +124,8 @@
 - [x] FUT-style player card (FUTCard.jsx + PlayerBadgeModal.jsx)
 
 ### 3.4 Forms & Tables
-- [ ] Form library (React Hook Form + Zod validation)
-- [ ] Data tables with sorting, filtering, pagination (TanStack Table)
+- [x] Form library (React Hook Form + Zod validation)
+- [x] Data tables with sorting, filtering, pagination (TanStack Table)
 - [ ] Inline editing for quick updates
 - [x] Bulk select & actions (implemented with premium floating bottom bar in Players Table)
 - [x] Export to Excel/PDF with branded header (ExportButtons.jsx)
@@ -184,7 +184,7 @@
 - [x] Payment receipt email (auto-generated)
 - [x] Subscription renewal reminder (7 days before)
 - [x] Overdue payment notification (3 days after)
-- [ ] Monthly academy report email (player count, revenue, attendance %)
+- [x] Monthly academy report email (player count, revenue, attendance %)
 - [x] Provider: Resend / SendGrid / AWS SES (Resend integration with SMTP fallback)
 
 ### 5.2 Push Notifications

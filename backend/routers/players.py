@@ -5,6 +5,8 @@ from core.context import user_id_ctx, role_ctx
 from typing import List
 import secrets
 import string
+import httpx
+from pydantic import BaseModel
 
 logger = logging.getLogger("players")
 from schemas.users import PlayerCreate, PlayerResponse, UserBase
@@ -153,6 +155,27 @@ async def create_player(player: PlayerCreate):
         # Link to parent if we created/found one
         if parent_auth_id:
             player_dict["parent_id"] = parent_auth_id
+
+        # Auto age category assignment
+        if player_dict.get("birth_date") and not player_dict.get("u_category"):
+            try:
+                settings_res = await supabase._get("/rest/v1/academy_settings")
+                if settings_res:
+                    age_categories = settings_res[0].get("age_categories")
+                    from datetime import datetime, date
+                    birth = datetime.strptime(player_dict["birth_date"], "%Y-%m-%d").date()
+                    today = date.today()
+                    season_year = today.year if today.month >= 8 else today.year - 1
+                    age = season_year - birth.year
+                    target_u = f"U{age}"
+                    matched = None
+                    if age_categories:
+                        matched = next((c for c in age_categories if c.upper() == target_u), None)
+                        if not matched:
+                            matched = next((c for c in age_categories if c.upper().startswith(target_u + ' ') or c.upper().startswith(target_u + '-')), None)
+                    player_dict["u_category"] = matched or target_u
+            except Exception as e:
+                logger.warning(f"Auto category calculation failed: {e}")
 
         response = await supabase.insert_player(player_dict)
 
@@ -304,6 +327,27 @@ async def update_player(user_id: str, player: PlayerCreate):
                     player_dict["parent_id"] = auth_user["id"]
             except Exception as parent_err:
                 logger.error("Failed to auto-create parent on update: %s", parent_err)
+        # Auto age category assignment
+        if player_dict.get("birth_date") and not player_dict.get("u_category"):
+            try:
+                settings_res = await supabase._get("/rest/v1/academy_settings")
+                if settings_res:
+                    age_categories = settings_res[0].get("age_categories")
+                    from datetime import datetime, date
+                    birth = datetime.strptime(player_dict["birth_date"], "%Y-%m-%d").date()
+                    today = date.today()
+                    season_year = today.year if today.month >= 8 else today.year - 1
+                    age = season_year - birth.year
+                    target_u = f"U{age}"
+                    matched = None
+                    if age_categories:
+                        matched = next((c for c in age_categories if c.upper() == target_u), None)
+                        if not matched:
+                            matched = next((c for c in age_categories if c.upper().startswith(target_u + ' ') or c.upper().startswith(target_u + '-')), None)
+                    player_dict["u_category"] = matched or target_u
+            except Exception as e:
+                logger.warning(f"Auto category calculation failed: {e}")
+
         response = await supabase.update_player(user_id, player_dict)
         if not response:
             raise HTTPException(status_code=404, detail="Player not found")
@@ -460,3 +504,76 @@ async def upgrade_player_plan(player_id: str, payload: dict, user: dict = Depend
     except Exception as e:
         logger.error(f"Error upgrading player: {e}")
         raise HTTPException(status_code=500, detail="Failed to upgrade player")
+
+
+class PlayerTransferCreate(BaseModel):
+    destination_club: str
+    transfer_fee: float | None = 0.0
+    departure_reason: str | None = None
+    transfer_date: str | None = None
+
+@router.post("/{player_id}/transfer", dependencies=[Depends(require_role("admin", "super_admin"))])
+async def record_player_transfer(player_id: str, transfer: PlayerTransferCreate):
+    """
+    Log a player's transfer/departure. 
+    Updates the player account status to 'Suspended' and logs the transfer details.
+    """
+    from datetime import date
+    t_date = transfer.transfer_date or date.today().isoformat()
+    
+    # 1. Fetch player
+    from core.config import settings
+    res = await supabase.client.get(
+        f"{settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{player_id}&select=full_name,id"
+    )
+    if res.status_code != 200 or not res.json():
+        raise HTTPException(status_code=404, detail="Player not found")
+        
+    player_name = res.json()[0].get("full_name", "Player")
+
+    transfer_data = {
+        "player_id": player_id,
+        "player_name": player_name,
+        "destination_club": transfer.destination_club,
+        "transfer_fee": transfer.transfer_fee,
+        "departure_reason": transfer.departure_reason,
+        "transfer_date": t_date
+    }
+    
+    # Insert transfer record into DB (using fallback/safe check if table does not exist)
+    async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+        db_res = await client.post(
+            f"{settings.SUPABASE_URL}/rest/v1/player_transfers",
+            json=transfer_data,
+            headers=supabase.admin_headers
+        )
+        # If player_transfers table doesn't exist, we fall back to logging in player's notes
+        if db_res.status_code >= 400:
+            logger.warning("player_transfers table not found. Appending to player's notes...")
+            note_text = f"\n[TRANSFER LOG | {t_date}] Transferred to {transfer.destination_club} (Fee: {transfer.transfer_fee} MAD, Reason: {transfer.departure_reason})"
+            # Fetch current notes
+            player_get = await supabase.client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{player_id}&select=notes"
+            )
+            curr_notes = player_get.json()[0].get("notes") or "" if player_get.status_code == 200 else ""
+            await supabase.update_player(player_id, {"notes": curr_notes + note_text, "account_status": "Suspended"})
+        else:
+            # Update player status to Suspended
+            await supabase.update_player(player_id, {"account_status": "Suspended"})
+            
+    return {"success": True, "message": f"Player {player_name} transfer to {transfer.destination_club} logged successfully."}
+
+
+@router.get("/{player_id}/transfers")
+async def get_player_transfers(player_id: str):
+    """Get the transfer history for a player."""
+    from core.config import settings
+    async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+        res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/player_transfers?player_id=eq.{player_id}&select=*",
+            headers=supabase.admin_headers
+        )
+        if res.status_code == 200:
+            return res.json()
+            
+    return []

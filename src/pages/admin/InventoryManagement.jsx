@@ -138,6 +138,29 @@ const InventoryManagement = () => {
         }
     };
 
+    const updateQuantity = async (item, newQty) => {
+        try {
+            const res = await authFetch(`${API_URL}/inventory/${item.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    item_name: item.item_name,
+                    category: item.category,
+                    condition: item.condition,
+                    quantity: newQty
+                })
+            });
+            if (res.ok) {
+                setItems(prev => prev.map(i => i.id === item.id ? { ...i, quantity: newQty } : i));
+                toast.success(isRTL ? 'تم تحديث الكمية بنجاح' : 'Quantity updated successfully');
+            } else {
+                throw new Error('Failed to update');
+            }
+        } catch {
+            showBanner(t('ui.saveError'), 'error');
+        }
+    };
+
     const filteredItems = items.filter(i => 
         i.item_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         i.category?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -307,10 +330,28 @@ const InventoryManagement = () => {
                                             </div>
                                         </td>
                                         <td className="px-8 py-6">
-                                            <span className={`font-black text-lg tracking-tighter ${item.quantity <= 5 ? 'text-red-500' : 'text-slate-900'}`}>
-                                                {item.quantity}
-                                            </span>
-                                            <span className="text-slate-400 text-xs mr-1">{t('inventory.unit')}</span>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { if (item.quantity > 0) updateQuantity(item, item.quantity - 1); }}
+                                                    className="h-8 w-8 rounded-xl bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all font-black text-sm flex items-center justify-center border border-slate-200/50 shadow-sm"
+                                                    title={isRTL ? 'إنقاص الكمية' : 'Decrease Quantity'}
+                                                >
+                                                    -
+                                                </button>
+                                                <span className={`font-black text-lg tracking-tighter min-w-[20px] text-center ${item.quantity <= 5 ? 'text-red-500' : 'text-slate-900'}`}>
+                                                    {item.quantity}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateQuantity(item, item.quantity + 1)}
+                                                    className="h-8 w-8 rounded-xl bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition-all font-black text-sm flex items-center justify-center border border-slate-200/50 shadow-sm"
+                                                    title={isRTL ? 'زيادة الكمية' : 'Increase Quantity'}
+                                                >
+                                                    +
+                                                </button>
+                                                <span className="text-slate-400 text-xs mr-1">{t('inventory.unit')}</span>
+                                            </div>
                                         </td>
                                         <td className="px-8 py-6">
                                             {getConditionBadge(item.condition)}

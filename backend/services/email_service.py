@@ -272,3 +272,27 @@ def send_overdue_notification(to: str, player_name: str, amount: float, days_ove
     </div>
     """
     return _send_email(to, f"⚠️ Retard de paiement — {player_name}", html)
+
+
+def send_monthly_academy_report(to: str, academy_name: str, player_count: int, revenue: float, attendance_pct: float, month_name: str):
+    """Send a monthly report email to an academy admin."""
+    html = f"""
+    <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+        <div style="background: linear-gradient(135deg, #6366f1, #4f46e5); border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 24px;">
+            <h1 style="color: white; font-size: 24px; margin: 0;">📊 Rapport Mensuel - {month_name}</h1>
+            <p style="color: rgba(255, 255, 255, 0.9); margin-top: 8px; font-size: 14px;">{academy_name}</p>
+        </div>
+        <p style="font-size: 16px; color: #374151;">Bonjour,</p>
+        <p style="color: #6b7280;">Voici les statistiques clés de votre académie pour le mois de <strong>{month_name}</strong>:</p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 20px 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 12px 0; color: #64748b; font-size: 14px;">Total Joueurs</td><td style="padding: 12px 0; text-align: right; font-weight: 700; color: #0f172a; font-size: 16px;">{player_count}</td></tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 12px 0; color: #64748b; font-size: 14px;">Revenus Générés</td><td style="padding: 12px 0; text-align: right; font-weight: 900; color: #059669; font-size: 18px;">{revenue:.2f} MAD</td></tr>
+                <tr><td style="padding: 12px 0; color: #64748b; font-size: 14px;">Taux de Présence Moyen</td><td style="padding: 12px 0; text-align: right; font-weight: 700; color: #3b82f6; font-size: 16px;">{attendance_pct:.1f}%</td></tr>
+            </table>
+        </div>
+        <p style="color: #6b7280; font-size: 14px;">Ces données vous aident à suivre la croissance et la performance de votre académie.</p>
+        <p style="font-size: 12px; color: #9ca3af; text-align: center; margin-top: 32px;">{ACADEMY_NAME}</p>
+    </div>
+    """
+    return _send_email(to, f"Rapport Mensuel ({month_name}) — {academy_name}", html)

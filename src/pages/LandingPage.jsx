@@ -39,6 +39,18 @@ const LandingPage = () => {
             .catch(() => {});
     }, []);
 
+    // Apply custom branding from academyCtx when loaded
+    useEffect(() => {
+        if (!academyCtx) return;
+        // Backend already parses the JSON and returns these as direct fields
+        if (academyCtx.primary_color) {
+            document.documentElement.style.setProperty('--color-primary', academyCtx.primary_color);
+        }
+        if (academyCtx.secondary_color) {
+            document.documentElement.style.setProperty('--color-secondary', academyCtx.secondary_color);
+        }
+    }, [academyCtx]);
+
     // Registration Form State
     const [regForm, setRegForm] = useState({ name: '', email: '', player_name: '', phone: '', birth_date: '', address: '', plan_name: '' });
     const [regStatus, setRegStatus] = useState(null);

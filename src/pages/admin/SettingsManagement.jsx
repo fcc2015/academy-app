@@ -51,6 +51,12 @@ const SettingsManagement = () => {
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null });
     const toast = useToast();
 
+    // ─── Branding States ────────────────────────────────────────
+    const [primaryColor, setPrimaryColor] = useState('#4f46e5');
+    const [secondaryColor, setSecondaryColor] = useState('#7c3aed');
+    const [aboutText, setAboutText] = useState('');
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+
     const showBanner = (message, type = 'success') => {
         if (type === 'error') toast.error(message);
         else toast.success(message);
@@ -269,6 +275,22 @@ const SettingsManagement = () => {
             const res = await authFetch(`${API_URL}/settings/`);
             if (res.ok) {
                 const data = await res.json();
+                // Parse branding colors serialized in about_text as JSON
+                const rawAbout = data.about_text || '';
+                if (rawAbout.startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(rawAbout);
+                        if (parsed && typeof parsed === 'object') {
+                            setPrimaryColor(parsed.primary_color || '#4f46e5');
+                            setSecondaryColor(parsed.secondary_color || '#7c3aed');
+                            setAboutText(parsed.about_text || '');
+                            document.documentElement.style.setProperty('--color-primary', parsed.primary_color || '#4f46e5');
+                            document.documentElement.style.setProperty('--color-secondary', parsed.secondary_color || '#7c3aed');
+                        }
+                    } catch { setAboutText(rawAbout); }
+                } else {
+                    setAboutText(rawAbout);
+                }
                 setSettings(data);
             }
         } catch (error) {
@@ -277,6 +299,38 @@ const SettingsManagement = () => {
             setIsLoading(false);
         }
     };
+
+    // ─── Logo Upload ─────────────────────────────────────────────
+    const handleLogoUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file || !settings?.id) return;
+        setUploadingLogo(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await authFetch(
+                `${API_URL}/storage/upload/profile-image?entity_type=academy&entity_id=${settings.academy_id || settings.id}`,
+                { method: 'POST', body: fd }
+            );
+            if (!res.ok) throw new Error('Upload failed');
+            const { url } = await res.json();
+            setSettings(prev => ({ ...prev, logo_url: url }));
+            showBanner('تم رفع الشعار بنجاح!', 'success');
+        } catch (err) {
+            showBanner('فشل رفع الشعار: ' + err.message, 'error');
+        } finally {
+            setUploadingLogo(false);
+        }
+    };
+
+    // ─── Apply CSS variables live on color change ─────────────────
+    React.useEffect(() => {
+        document.documentElement.style.setProperty('--color-primary', primaryColor || '#4f46e5');
+    }, [primaryColor]);
+
+    React.useEffect(() => {
+        document.documentElement.style.setProperty('--color-secondary', secondaryColor || '#7c3aed');
+    }, [secondaryColor]);
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -409,8 +463,14 @@ const SettingsManagement = () => {
         setIsSaving(true);
         setSaveSuccess(false);
         try {
-            // Filter out empty season fields to avoid schema errors if they aren't supported
-            const cleanedSettings = { ...settings };
+            // Serialize branding colors + about text into about_text JSON
+            const serializedAbout = JSON.stringify({
+                primary_color: primaryColor || '#4f46e5',
+                secondary_color: secondaryColor || '#7c3aed',
+                about_text: aboutText || '',
+            });
+
+            const cleanedSettings = { ...settings, about_text: serializedAbout };
             if (!cleanedSettings.season_start) delete cleanedSettings.season_start;
             if (!cleanedSettings.season_end) delete cleanedSettings.season_end;
 
@@ -423,16 +483,17 @@ const SettingsManagement = () => {
             if (res.ok) {
                 setSaveSuccess(true);
                 const updated = await res.json();
+                // Re-parse the response to keep state clean
                 setSettings(updated);
-                showBanner('Settings saved successfully!', 'success');
+                showBanner('تم حفظ الإعدادات بنجاح!', 'success');
                 setTimeout(() => setSaveSuccess(false), 3000);
             } else {
                 const err = await res.json().catch(() => ({}));
-                showBanner(`Error: ${err.detail || 'Failed to save settings'}`, 'error');
+                showBanner(`خطأ: ${err.detail || 'فشل حفظ الإعدادات'}`, 'error');
             }
         } catch (error) {
             console.error('Error saving settings:', error);
-            showBanner('Connection failed. Is the backend server running?', 'error');
+            showBanner('فشل الاتصال. هل الخادم يعمل؟', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -488,6 +549,12 @@ const SettingsManagement = () => {
                     addTournament={addTournament}
                     addTournamentPreset={addTournamentPreset}
                     removeTournament={removeTournament}
+                    primaryColor={primaryColor}
+                    setPrimaryColor={setPrimaryColor}
+                    secondaryColor={secondaryColor}
+                    setSecondaryColor={setSecondaryColor}
+                    uploadingLogo={uploadingLogo}
+                    handleLogoUpload={handleLogoUpload}
                 />
 
                 {/* Right Column: Pricing, Landing Page Editor, Save */}
@@ -518,6 +585,8 @@ const SettingsManagement = () => {
                     <LandingPageEditorSection
                         settings={settings}
                         handleInputChange={handleInputChange}
+                        aboutText={aboutText}
+                        setAboutText={setAboutText}
                     />
                 </div>
             </form>

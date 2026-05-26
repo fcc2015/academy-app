@@ -29,6 +29,7 @@ const MatchesManagement = () => {
     const [editingId, setEditingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [weekendOnly, setWeekendOnly] = useState(false);
+    const [players, setPlayers] = useState([]);
 
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null });
     const toast = useToast();
@@ -45,6 +46,8 @@ const MatchesManagement = () => {
         notes: '',
         category: '',
         match_duration: '2x30',
+        convoked_players: [],
+        match_attendance: {},
     });
 
     const terrains = academySettings?.terrains || [];
@@ -106,12 +109,13 @@ const MatchesManagement = () => {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [matchesRes, squadsRes, settingsRes, adminsRes, coachesRes] = await Promise.all([
+            const [matchesRes, squadsRes, settingsRes, adminsRes, coachesRes, playersRes] = await Promise.all([
                 authFetch(`${API_URL}/matches/`),
                 authFetch(`${API_URL}/squads/`).catch(() => ({ ok: false })),
                 authFetch(`${API_URL}/settings/`).catch(() => ({ ok: false })),
                 authFetch(`${API_URL}/admins/`).catch(() => ({ ok: false })),
                 authFetch(`${API_URL}/coaches/`).catch(() => ({ ok: false })),
+                authFetch(`${API_URL}/players/`).catch(() => ({ ok: false })),
             ]);
 
             if (matchesRes.ok) {
@@ -141,6 +145,9 @@ const MatchesManagement = () => {
             if (coachesRes && coachesRes.ok) {
                 setCoaches(await coachesRes.json());
             }
+            if (playersRes && playersRes.ok) {
+                setPlayers(await playersRes.json());
+            }
         } catch (error) {
             console.error('Error fetching matches:', error);
             showBanner(t('ui.loadError'), 'error');
@@ -162,6 +169,16 @@ const MatchesManagement = () => {
     const defaultMatchType = () => (tournamentsList[0] || 'Friendly');
     const defaultLocation = () => (terrains[0] ? `${terrains[0].name} (${terrains[0].size})` : 'Home');
 
+    const handleAttendanceChange = (playerId, status) => {
+        setFormData(prev => ({
+            ...prev,
+            match_attendance: {
+                ...(prev.match_attendance || {}),
+                [playerId]: status
+            }
+        }));
+    };
+
     const handleAddClick = () => {
         setFormData({
             squad_id: squads.length > 0 ? squads[0].id : '',
@@ -175,6 +192,8 @@ const MatchesManagement = () => {
             notes: '',
             category: ageCategories[0] || '',
             match_duration: '2x30',
+            convoked_players: [],
+            match_attendance: {},
         });
         setIsEditMode(false);
         setEditingId(null);
@@ -195,6 +214,8 @@ const MatchesManagement = () => {
             notes: cleanNotes,
             category: match.category || (ageCategories[0] || ''),
             match_duration: duration || '2x30',
+            convoked_players: match.convoked_players || [],
+            match_attendance: match.match_attendance || {},
         });
         setIsEditMode(true);
         setEditingId(match.id);
@@ -630,7 +651,6 @@ const MatchesManagement = () => {
                     searchTerm={searchTerm}
                     setSearchTerm={setSearchTerm}
                 />
-
                 <MatchList
                     tableRef={tableRef}
                     filteredMatches={filteredMatches}
@@ -653,6 +673,7 @@ const MatchesManagement = () => {
                     tournamentsList={tournamentsList}
                     handleDelete={handleDelete}
                     handleAddRow={handleAddRow}
+                    onEdit={handleEditClick}
                 />
             </div>
 
@@ -671,6 +692,10 @@ const MatchesManagement = () => {
                 tournamentsList={tournamentsList}
                 terrains={terrains}
                 ageCategories={ageCategories}
+                convokedPlayersList={players
+                    .filter(p => (formData.convoked_players || []).includes(p.user_id))
+                    .map(p => ({ id: p.user_id, full_name: p.full_name }))}
+                onAttendanceChange={handleAttendanceChange}
             />
 
             <ConfirmDialog

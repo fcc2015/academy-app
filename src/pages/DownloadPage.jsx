@@ -73,8 +73,7 @@ const DownloadPage = () => {
     const steps = platform === 'ios' ? iosSteps : androidSteps;
 
     return (
-        <div className="min-h-screen relative overflow-hidden" dir={dir}
-            style={{ background: 'linear-gradient(135deg, #0f0c29 0%, #1a1145 30%, #302b63 60%, #24243e 100%)' }}>
+        <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-[#0f0c29] via-[#1a1145] via-[#302b63] to-[#24243e]" dir={dir}>
             
             {/* Ambient Effects */}
             <div className="absolute top-20 left-1/4 w-[500px] h-[500px] bg-indigo-600 opacity-[0.07] blur-[150px] rounded-full pointer-events-none" />
@@ -93,11 +92,10 @@ const DownloadPage = () => {
                 <div className="text-center mb-16">
                     {/* App Icon */}
                     <div className="inline-block mb-8 relative">
-                        <div className="w-28 h-28 rounded-[2rem] flex items-center justify-center relative overflow-hidden"
-                            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 20px 60px rgba(79,70,229,0.4)' }}>
+                        <div className="w-28 h-28 rounded-[2rem] flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-indigo-600 to-purple-600 shadow-[0_20px_60px_rgba(79,70,229,0.4)]">
                             <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain"
                                 onError={(e) => { e.target.style.display = 'none'; }} />
-                            <span className="text-5xl absolute" style={{ display: 'none' }}>⚽</span>
+                            <span className="text-5xl absolute hidden">⚽</span>
                         </div>
                         {/* Glow ring */}
                         <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-[2.5rem] opacity-20 blur-lg -z-10 animate-pulse" />
@@ -124,8 +122,7 @@ const DownloadPage = () => {
                 <div className="grid lg:grid-cols-2 gap-8 mb-16">
                     
                     {/* Left: QR Code */}
-                    <div className="rounded-[2.5rem] p-8 text-center"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(24px)' }}>
+                    <div className="rounded-[2.5rem] p-8 text-center bg-white/5 border border-white/10 backdrop-blur-[24px]">
                         
                         <h2 className="text-white font-black text-lg mb-2">
                             {isRTL ? '📷 امسح بالكاميرا' : '📷 Scan with Camera'}
@@ -148,21 +145,18 @@ const DownloadPage = () => {
 
                         {/* URL Copy */}
                         <div className="mt-6 flex items-center gap-2 max-w-xs mx-auto">
-                            <div className="flex-1 px-4 py-3 rounded-xl text-white/40 text-xs font-mono truncate"
-                                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }} dir="ltr">
+                            <div className="flex-1 px-4 py-3 rounded-xl text-white/40 text-xs font-mono truncate bg-white/5 border border-white/10" dir="ltr">
                                 {appUrl}
                             </div>
                             <button onClick={handleCopy}
-                                className="p-3 rounded-xl transition-all"
-                                style={{ background: copied ? 'rgba(16,185,129,0.2)' : 'rgba(79,70,229,0.3)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                className={`p-3 rounded-xl border border-white/10 transition-all ${copied ? 'bg-emerald-500/20' : 'bg-indigo-600/30'}`}>
                                 {copied ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} className="text-indigo-300" />}
                             </button>
                         </div>
                     </div>
 
                     {/* Right: Install Steps */}
-                    <div className="rounded-[2.5rem] p-8"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(24px)' }}>
+                    <div className="rounded-[2.5rem] p-8 bg-white/5 border border-white/10 backdrop-blur-[24px]">
                         
                         {/* Platform Tabs */}
                         <div className="flex gap-2 mb-6">
@@ -184,10 +178,8 @@ const DownloadPage = () => {
 
                         <div className="space-y-4">
                             {steps.map((s, i) => (
-                                <div key={i} className="flex items-center gap-4 p-4 rounded-2xl transition-all hover:bg-white/5"
-                                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                                        style={{ background: 'rgba(79,70,229,0.2)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                                <div key={i} className="flex items-center gap-4 p-4 rounded-2xl transition-all hover:bg-white/5 bg-white/5 border border-white/10">
+                                    <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-indigo-600/20 border border-indigo-400/30">
                                         <span className="text-lg">{s.icon}</span>
                                     </div>
                                     <div className="flex-1">
@@ -201,8 +193,7 @@ const DownloadPage = () => {
                         {/* Install Button (PWA) */}
                         {deferredPrompt && !installed && (
                             <button onClick={handleInstall}
-                                className="w-full mt-6 py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] text-white flex items-center justify-center gap-3 transition-all hover:-translate-y-0.5 active:scale-95"
-                                style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', boxShadow: '0 12px 40px rgba(79,70,229,0.4)' }}>
+                                className="w-full mt-6 py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] text-white flex items-center justify-center gap-3 transition-all hover:-translate-y-0.5 active:scale-95 bg-gradient-to-r from-indigo-500 to-purple-600 shadow-[0_12px_40px_rgba(79,70,229,0.4)]">
                                 <Download size={18} />
                                 {isRTL ? 'تثبيت الآن' : 'Install Now'}
                             </button>
@@ -222,8 +213,7 @@ const DownloadPage = () => {
                 {/* Features Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
                     {features.map((f, i) => (
-                        <div key={i} className="rounded-2xl p-6 text-center transition-all hover:-translate-y-1 hover:bg-white/[0.06]"
-                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div key={i} className="rounded-2xl p-6 text-center transition-all hover:-translate-y-1 hover:bg-white/[0.06] bg-white/5 border border-white/10">
                             <span className="text-3xl block mb-3">{f.icon}</span>
                             <h3 className="text-white font-black text-xs uppercase tracking-widest mb-1">{f.title}</h3>
                             <p className="text-white/30 text-[10px] font-bold">{f.desc}</p>

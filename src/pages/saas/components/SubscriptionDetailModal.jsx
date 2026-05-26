@@ -1,5 +1,10 @@
-import React from 'react';
-import { X, ArrowUpRight, CheckCircle2, Calculator, Loader2, Calendar, CreditCard, ShieldCheck, Dumbbell, UserCog, Users, ArrowUpRight as ArrowUpRightIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+    X, ArrowUpRight, CheckCircle2, Calculator, Loader2, CreditCard,
+    Building2, Zap, ShieldCheck, CheckCircle, AlertCircle, Copy
+} from 'lucide-react';
+import { API_URL } from '../../../config';
+import { authFetch } from '../../../api';
 
 export default function SubscriptionDetailModal({
     showPlanModal,
@@ -21,29 +26,151 @@ export default function SubscriptionDetailModal({
     setTransactions,
     loadingTx,
     verifyingOrder,
-    handleVerifyOrder
+    handleVerifyOrder,
 }) {
+    const [stripeProcessing, setStripeProcessing] = useState(null);   // plan id
+    const [cashProcessing, setCashProcessing] = useState(null);       // plan id
+    const [cashCodes, setCashCodes] = useState({});                   // planId → { wafacash|cashplus: codeData }
+    const [activeCashProvider, setActiveCashProvider] = useState({}); // planId → provider
+    const [confirmingDeposit, setConfirmingDeposit] = useState(null); // tx.paypal_order_id
+    const [proofRef, setProofRef] = useState('');
+    const [confirmResult, setConfirmResult] = useState(null);
+    const [codeCopied, setCodeCopied] = useState(null);
+
+    const handleStripeCheckout = async (academy, planId) => {
+        setStripeProcessing(planId);
+        const newPlan = PLANS.find(p => p.id === planId);
+        const currentPlan = PLANS.find(p => p.id === academy.plan_id);
+        if (!newPlan) return;
+        const proRata = calculateProRata(currentPlan, newPlan, academy.billing_cycle_start);
+        const chargeAmount = currentPlan ? proRata.amount : newPlan.price;
+
+        try {
+            const res = await authFetch(`${API_URL}/payments/gateway/stripe/create-checkout-session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    academy_id: academy.id,
+                    plan_id: planId,
+                    amount: chargeAmount || newPlan.price,
+                    currency: 'MAD',
+                    description: currentPlan
+                        ? `Upgrade ${currentPlan.name} → ${newPlan.name} (Pro-Rata: ${chargeAmount} MAD)`
+                        : `${newPlan.name} Plan - ${academy.name}`
+                })
+            });
+            const data = await res.json();
+            if (data.checkout_url) {
+                window.open(data.checkout_url, '_blank');
+            }
+        } catch (err) {
+            console.error('Stripe error:', err);
+        } finally {
+            setStripeProcessing(null);
+        }
+    };
+
+    const handleCashCode = async (academy, planId, provider) => {
+        setCashProcessing(planId);
+        const newPlan = PLANS.find(p => p.id === planId);
+        const currentPlan = PLANS.find(p => p.id === academy.plan_id);
+        if (!newPlan) return;
+        const proRata = calculateProRata(currentPlan, newPlan, academy.billing_cycle_start);
+        const chargeAmount = currentPlan ? proRata.amount : newPlan.price;
+
+        try {
+            const res = await authFetch(`${API_URL}/payments/gateway/cash/generate-code`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    academy_id: academy.id,
+                    plan_id: planId,
+                    amount: chargeAmount || newPlan.price,
+                    provider
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setCashCodes(prev => ({ ...prev, [planId]: { ...(prev[planId] || {}), [provider]: data } }));
+                setActiveCashProvider(prev => ({ ...prev, [planId]: provider }));
+            }
+        } catch (err) {
+            console.error('Cash code error:', err);
+        } finally {
+            setCashProcessing(null);
+        }
+    };
+
+    const handleConfirmDeposit = async (txId) => {
+        if (!proofRef.trim()) return;
+        setConfirmingDeposit(txId);
+        try {
+            const res = await authFetch(`${API_URL}/payments/gateway/cash/confirm-deposit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    transaction_id: txId,
+                    deposit_proof_reference: proofRef.trim()
+                })
+            });
+            const data = await res.json();
+            setConfirmResult({ success: data.success, message: data.message });
+            if (data.success) {
+                setTransactions(prev =>
+                    prev.map(t =>
+                        t.paypal_order_id === txId
+                            ? { ...t, status: 'completed' }
+                            : t
+                    )
+                );
+                setProofRef('');
+            }
+        } catch (err) {
+            setConfirmResult({ success: false, message: 'Network error. Try again.' });
+        } finally {
+            setConfirmingDeposit(null);
+        }
+    };
+
+    const copyCode = (code, id) => {
+        navigator.clipboard.writeText(code).then(() => {
+            setCodeCopied(id);
+            setTimeout(() => setCodeCopied(null), 2000);
+        });
+    };
+
+    const isCashTx = (tx) =>
+        tx.paypal_order_id?.startsWith('WC-') || tx.paypal_order_id?.startsWith('CP-');
+    const isStripeTx = (tx) => tx.paypal_order_id?.startsWith('stripe_');
+
     return (
         <>
-            {/* ═══ UPGRADE PLAN MODAL WITH PRO-RATA ═══ */}
+            {/* ═══ UPGRADE PLAN MODAL ═══ */}
             {showPlanModal && selectedAcademy && (
                 <div className="modal-backdrop">
                     <div className="bg-white border border-surface-200 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center p-6 border-b border-surface-200">
                             <div>
                                 <h3 className="text-lg font-semibold text-surface-900">Change Plan</h3>
-                                <p className="text-sm text-surface-500 mt-0.5">For: <strong className="text-surface-800">{selectedAcademy.name}</strong>
+                                <p className="text-sm text-surface-500 mt-0.5">
+                                    For: <strong className="text-surface-800">{selectedAcademy.name}</strong>
                                     {selectedAcademy.plan_id && (
                                         <span className="ml-2 text-xs text-surface-400">
-                                            Current: <strong className="text-emerald-600">{PLANS.find(p => p.id === selectedAcademy.plan_id)?.name || 'None'}</strong>
+                                            Current: <strong className="text-emerald-600">
+                                                {PLANS.find(p => p.id === selectedAcademy.plan_id)?.name || 'None'}
+                                            </strong>
                                         </span>
                                     )}
                                 </p>
                             </div>
-                            <button onClick={() => { setShowPlanModal(false); setSelectedAcademy(null); setShowProRata(null); }} className="text-surface-400 hover:text-surface-900 transition-colors">
+                            <button
+                                onClick={() => { setShowPlanModal(false); setSelectedAcademy(null); setShowProRata(null); setCashCodes({}); setActiveCashProvider({}); }}
+                                className="text-surface-400 hover:text-surface-900 transition-colors"
+                            >
                                 <X size={22} />
                             </button>
                         </div>
+
                         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                             {PLANS.map(plan => {
                                 const Icon = plan.icon;
@@ -54,6 +181,8 @@ export default function SubscriptionDetailModal({
                                     ? calculateProRata(currentPlan, plan, selectedAcademy.billing_cycle_start)
                                     : null;
                                 const isPreview = showProRata === plan.id;
+                                const activeProv = activeCashProvider[plan.id];
+                                const cashCodeData = activeProv && cashCodes[plan.id]?.[activeProv];
 
                                 return (
                                     <div key={plan.id} className={`border rounded-xl p-5 transition-all flex flex-col justify-between ${
@@ -69,9 +198,14 @@ export default function SubscriptionDetailModal({
                                                 <span className="font-semibold text-surface-800">{plan.name}</span>
                                                 {isUpgrade && <ArrowUpRight className="w-4 h-4 text-emerald-600 ml-auto" />}
                                             </div>
-                                            <p className="text-2xl font-bold text-surface-900 mb-1">{plan.price === 0 ? 'FREE' : plan.price} <span className="text-sm font-medium text-surface-500">{plan.price > 0 ? `${plan.currency}/mo` : ''}</span></p>
+                                            <p className="text-2xl font-bold text-surface-900 mb-1">
+                                                {plan.price === 0 ? 'FREE' : plan.price}{' '}
+                                                <span className="text-sm font-medium text-surface-500">
+                                                    {plan.price > 0 ? `${plan.currency}/mo` : ''}
+                                                </span>
+                                            </p>
 
-                                            {/* Resource Limits in modal */}
+                                            {/* Resource Limits */}
                                             <div className="grid grid-cols-3 gap-1 mb-3 p-2 bg-surface-100 rounded-lg border border-surface-200">
                                                 <div className="text-center">
                                                     <p className="text-[9px] text-surface-500 font-semibold">Players</p>
@@ -124,8 +258,26 @@ export default function SubscriptionDetailModal({
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {/* Cash code display (inside plan card) */}
+                                            {cashCodeData && (
+                                                <div className="my-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl animate-fade-in">
+                                                    <p className="text-[10px] font-black text-emerald-700 uppercase tracking-wider mb-2">{cashCodeData.provider} Reference</p>
+                                                    <div className="flex items-center gap-2 justify-between">
+                                                        <span className="text-base font-black font-mono tracking-widest text-slate-800">{cashCodeData.payment_code}</span>
+                                                        <button
+                                                            onClick={() => copyCode(cashCodeData.payment_code, `${plan.id}-${activeProv}`)}
+                                                            className="p-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 transition-colors"
+                                                        >
+                                                            {codeCopied === `${plan.id}-${activeProv}` ? <CheckCircle size={13} /> : <Copy size={13} />}
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-[10px] text-emerald-600 mt-1">Show this code at any {cashCodeData.provider} agency — {cashCodeData.amount} MAD</p>
+                                                </div>
+                                            )}
                                         </div>
 
+                                        {/* Action Buttons */}
                                         <div className="space-y-2 mt-3">
                                             {isCurrentPlan ? (
                                                 <button disabled className="w-full py-2 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 cursor-default border border-emerald-200">
@@ -137,7 +289,7 @@ export default function SubscriptionDetailModal({
                                                 </button>
                                             ) : (
                                                 <>
-                                                    {/* Preview Pro-Rata button (upgrade only) */}
+                                                    {/* Preview Pro-Rata (upgrade only) */}
                                                     {currentPlan && isUpgrade && !isPreview && (
                                                         <button
                                                             type="button"
@@ -148,7 +300,7 @@ export default function SubscriptionDetailModal({
                                                         </button>
                                                     )}
 
-                                                    {/* Free instant activation / Admin override */}
+                                                    {/* Admin instant override */}
                                                     <button
                                                         type="button"
                                                         onClick={() => handleAssignPlan(selectedAcademy, plan.id)}
@@ -158,20 +310,72 @@ export default function SubscriptionDetailModal({
                                                         {assigningPlan ? 'Applying...' : 'Instant Override (No Charge)'}
                                                     </button>
 
-                                                    {/* Paid checkout via PayPal */}
                                                     {plan.price > 0 && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handlePayPalCheckout(selectedAcademy, plan.id)}
-                                                            disabled={paymentProcessing === selectedAcademy.id}
-                                                            className="w-full py-2 rounded-lg text-xs font-black bg-amber-400 text-amber-950 hover:bg-amber-500 border-0 shadow-sm transition-colors flex items-center justify-center gap-1.5"
-                                                        >
-                                                            {paymentProcessing === selectedAcademy.id ? (
-                                                                <Loader2 size={14} className="animate-spin" />
-                                                            ) : (
-                                                                'Pay now with PayPal'
-                                                            )}
-                                                        </button>
+                                                        <>
+                                                            {/* PayPal */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handlePayPalCheckout(selectedAcademy, plan.id)}
+                                                                disabled={paymentProcessing === selectedAcademy.id}
+                                                                className="w-full py-2 rounded-lg text-xs font-black border-0 shadow-sm transition-colors flex items-center justify-center gap-1.5 text-white"
+                                                                style={{ background: 'linear-gradient(135deg, #0070ba, #1546a0)' }}
+                                                            >
+                                                                {paymentProcessing === selectedAcademy.id ? (
+                                                                    <Loader2 size={14} className="animate-spin" />
+                                                                ) : (
+                                                                    <CreditCard size={13} />
+                                                                )}
+                                                                Pay via PayPal
+                                                            </button>
+
+                                                            {/* Stripe */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleStripeCheckout(selectedAcademy, plan.id)}
+                                                                disabled={stripeProcessing === plan.id}
+                                                                className="w-full py-2 rounded-lg text-xs font-black border-0 shadow-sm transition-colors flex items-center justify-center gap-1.5 text-white"
+                                                                style={{ background: 'linear-gradient(135deg, #635bff, #9d68ff)' }}
+                                                            >
+                                                                {stripeProcessing === plan.id ? (
+                                                                    <Loader2 size={14} className="animate-spin" />
+                                                                ) : (
+                                                                    <Zap size={13} />
+                                                                )}
+                                                                Pay via Stripe
+                                                            </button>
+
+                                                            {/* Moroccan Cash */}
+                                                            <div className="grid grid-cols-2 gap-1.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleCashCode(selectedAcademy, plan.id, 'wafacash')}
+                                                                    disabled={cashProcessing === plan.id}
+                                                                    className="py-2 rounded-lg text-[11px] font-black text-white flex items-center justify-center gap-1 transition-colors"
+                                                                    style={{ background: '#e63c2f' }}
+                                                                >
+                                                                    {cashProcessing === plan.id && activeCashProvider[plan.id] === 'wafacash' ? (
+                                                                        <Loader2 size={12} className="animate-spin" />
+                                                                    ) : (
+                                                                        <Building2 size={12} />
+                                                                    )}
+                                                                    Wafacash
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleCashCode(selectedAcademy, plan.id, 'cashplus')}
+                                                                    disabled={cashProcessing === plan.id}
+                                                                    className="py-2 rounded-lg text-[11px] font-black text-white flex items-center justify-center gap-1 transition-colors"
+                                                                    style={{ background: '#1a7f37' }}
+                                                                >
+                                                                    {cashProcessing === plan.id && activeCashProvider[plan.id] === 'cashplus' ? (
+                                                                        <Loader2 size={12} className="animate-spin" />
+                                                                    ) : (
+                                                                        <Building2 size={12} />
+                                                                    )}
+                                                                    CashPlus
+                                                                </button>
+                                                            </div>
+                                                        </>
                                                     )}
                                                 </>
                                             )}
@@ -193,54 +397,123 @@ export default function SubscriptionDetailModal({
                                 <h3 className="text-lg font-semibold text-surface-900">Payment &amp; Billing History</h3>
                                 <p className="text-xs text-surface-500 mt-1">Academy: <strong>{selectedAcademy.name}</strong></p>
                             </div>
-                            <button onClick={() => { setShowHistoryModal(false); setSelectedAcademy(null); setTransactions([]); }} className="text-surface-400 hover:text-surface-900 transition-colors">
+                            <button
+                                onClick={() => { setShowHistoryModal(false); setSelectedAcademy(null); setTransactions([]); setConfirmResult(null); }}
+                                className="text-surface-400 hover:text-surface-900 transition-colors"
+                            >
                                 <X size={22} />
                             </button>
                         </div>
+
                         <div className="p-6 overflow-y-auto flex-1">
                             {loadingTx ? (
-                                <div className="py-12 flex justify-center text-emerald-500"><Loader2 className="w-8 h-8 animate-spin" /></div>
+                                <div className="py-12 flex justify-center text-emerald-500">
+                                    <Loader2 className="w-8 h-8 animate-spin" />
+                                </div>
                             ) : transactions.length === 0 ? (
-                                <div className="py-16 text-center text-surface-400 font-medium">No transactions found for this academy.</div>
+                                <div className="py-16 text-center text-surface-400 font-medium">
+                                    No transactions found for this academy.
+                                </div>
                             ) : (
                                 <div className="space-y-4">
                                     {transactions.map(tx => (
-                                        <div key={tx.id} className="border border-surface-100 rounded-xl p-4 flex items-center justify-between hover:bg-surface-50/50 transition-colors">
-                                            <div className="flex items-center gap-4">
-                                                <div className={`p-3 rounded-xl ${tx.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                                                    <CreditCard className="w-5 h-5" />
+                                        <div key={tx.id || tx.paypal_order_id} className="border border-surface-100 rounded-xl p-4 hover:bg-surface-50/50 transition-colors">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`p-3 rounded-xl ${
+                                                        tx.status === 'completed' ? 'bg-emerald-50 text-emerald-600'
+                                                        : tx.status === 'waiting_deposit' ? 'bg-amber-50 text-amber-600'
+                                                        : 'bg-slate-50 text-slate-500'
+                                                    }`}>
+                                                        {isCashTx(tx) ? <Building2 className="w-5 h-5" /> :
+                                                         isStripeTx(tx) ? <Zap className="w-5 h-5" /> :
+                                                         <CreditCard className="w-5 h-5" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-surface-900 text-sm">
+                                                            {tx.description || `Plan: ${tx.plan_id}`}
+                                                        </p>
+                                                        <div className="flex items-center gap-3 text-xs text-surface-400 mt-1">
+                                                            <span>{new Date(tx.created_at).toLocaleDateString()}</span>
+                                                            <span>•</span>
+                                                            <span className="font-mono">
+                                                                {isCashTx(tx) ? `💵 ${tx.paypal_order_id}` :
+                                                                 isStripeTx(tx) ? `⚡ Stripe` :
+                                                                 `PayPal`}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-bold text-surface-900 text-sm">{tx.description || `Plan: ${tx.plan_id}`}</p>
-                                                    <div className="flex items-center gap-3 text-xs text-surface-400 mt-1">
-                                                        <span>{new Date(tx.created_at).toLocaleDateString()}</span>
-                                                        <span>•</span>
-                                                        <span className="font-mono">ID: {tx.paypal_order_id || 'manual'}</span>
+                                                <div className="text-right">
+                                                    <p className="font-black text-surface-900 text-base">{tx.amount} {tx.currency || 'USD'}</p>
+                                                    <div className="flex items-center gap-2 mt-1.5 justify-end">
+                                                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                            tx.status === 'completed'
+                                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                                                : tx.status === 'waiting_deposit'
+                                                                    ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                                                                    : 'bg-slate-50 text-slate-600 border border-slate-100'
+                                                        }`}>
+                                                            {tx.status === 'waiting_deposit' ? 'Awaiting Cash' : tx.status}
+                                                        </span>
+
+                                                        {/* PayPal verify */}
+                                                        {tx.status === 'pending' && tx.paypal_order_id && !isCashTx(tx) && !isStripeTx(tx) && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleVerifyOrder(tx.paypal_order_id)}
+                                                                disabled={verifyingOrder === tx.paypal_order_id}
+                                                                className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                                                            >
+                                                                {verifyingOrder === tx.paypal_order_id ? 'Verifying...' : 'Verify PayPal'}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="font-black text-surface-900 text-base">{tx.amount} {tx.currency || 'USD'}</p>
-                                                <div className="flex items-center gap-2 mt-1.5 justify-end">
-                                                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                                        tx.status === 'completed' 
-                                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                                                            : 'bg-amber-50 text-amber-700 border border-amber-100'
-                                                    }`}>
-                                                        {tx.status}
-                                                    </span>
-                                                    {tx.status === 'pending' && tx.paypal_order_id && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleVerifyOrder(tx.paypal_order_id)}
-                                                            disabled={verifyingOrder === tx.paypal_order_id}
-                                                            className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 hover:bg-indigo-100 transition-colors"
-                                                        >
-                                                            {verifyingOrder === tx.paypal_order_id ? 'Verifying...' : 'Verify PayPal'}
-                                                        </button>
+
+                                            {/* Cash deposit confirmation panel */}
+                                            {tx.status === 'waiting_deposit' && isCashTx(tx) && (
+                                                <div className="mt-3 pt-3 border-t border-surface-100">
+                                                    {confirmResult && confirmingDeposit === null && (
+                                                        <div className={`flex items-center gap-2 p-3 rounded-xl text-xs font-bold mb-3 ${
+                                                            confirmResult.success
+                                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                                : 'bg-red-50 text-red-600 border border-red-200'
+                                                        }`}>
+                                                            {confirmResult.success ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+                                                            {confirmResult.message}
+                                                        </div>
                                                     )}
+                                                    <p className="text-[10px] font-black text-surface-500 uppercase tracking-wider mb-2">
+                                                        Confirm Cash Deposit
+                                                    </p>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Enter deposit proof reference..."
+                                                            value={proofRef}
+                                                            onChange={e => setProofRef(e.target.value)}
+                                                            className="flex-1 text-xs px-3 py-2 rounded-lg border border-surface-200 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-300 font-mono"
+                                                        />
+                                                        <button
+                                                            onClick={() => handleConfirmDeposit(tx.paypal_order_id)}
+                                                            disabled={confirmingDeposit === tx.paypal_order_id || !proofRef.trim()}
+                                                            className="px-4 py-2 rounded-lg text-xs font-black bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-60 flex items-center gap-1.5"
+                                                        >
+                                                            {confirmingDeposit === tx.paypal_order_id ? (
+                                                                <Loader2 size={12} className="animate-spin" />
+                                                            ) : (
+                                                                <ShieldCheck size={12} />
+                                                            )}
+                                                            Confirm
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-[10px] text-surface-400 mt-1.5">
+                                                        Code: <strong className="font-mono text-surface-600">{tx.paypal_order_id}</strong> — Enter the deposit receipt number from the agency
+                                                    </p>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
