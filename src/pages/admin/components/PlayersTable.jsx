@@ -28,7 +28,9 @@ const PlayersTable = ({
     navigate,
     page,
     totalPages,
-    setPage
+    setPage,
+    selectedPlayerIds = [],
+    setSelectedPlayerIds
 }) => {
     return (
         <div className={`bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden border-b-8 border-b-slate-900 ${isRTL ? 'text-right' : 'text-left'}`}>
@@ -80,6 +82,24 @@ const PlayersTable = ({
                     <table className="w-full" dir={dir}>
                         <thead>
                             <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                                <th className="px-6 py-6 text-center w-12">
+                                    <input 
+                                        type="checkbox" 
+                                        className="h-4.5 w-4.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
+                                        checked={pagedPlayers.length > 0 && pagedPlayers.every(p => selectedPlayerIds.includes(p.user_id))}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                const newSelections = [...selectedPlayerIds];
+                                                pagedPlayers.forEach(p => {
+                                                    if (!newSelections.includes(p.user_id)) newSelections.push(p.user_id);
+                                                });
+                                                setSelectedPlayerIds(newSelections);
+                                            } else {
+                                                setSelectedPlayerIds(selectedPlayerIds.filter(id => !pagedPlayers.some(p => p.user_id === id)));
+                                            }
+                                        }}
+                                    />
+                                </th>
                                 <th className={`px-8 py-6 ${isRTL ? 'text-right' : 'text-left'}`}>{t('players.playerProfile')}</th>
                                 <th className={`px-8 py-6 ${isRTL ? 'text-right' : 'text-left'}`}>{t('players.parentName')}</th>
                                 <th className="px-8 py-6 text-center">{t('players.subscription')}</th>
@@ -90,6 +110,20 @@ const PlayersTable = ({
                         <tbody className="divide-y divide-slate-50">
                             {pagedPlayers.map((player) => (
                                 <tr key={player.user_id} className="hover:bg-slate-50/50 group">
+                                    <td className="px-6 py-6 text-center w-12">
+                                        <input 
+                                            type="checkbox" 
+                                            className="h-4.5 w-4.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
+                                            checked={selectedPlayerIds.includes(player.user_id)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedPlayerIds([...selectedPlayerIds, player.user_id]);
+                                                } else {
+                                                    setSelectedPlayerIds(selectedPlayerIds.filter(id => id !== player.user_id));
+                                                }
+                                            }}
+                                        />
+                                    </td>
                                     <td className={`px-8 py-6 ${isRTL ? 'text-right' : 'text-left'}`}>
                                         <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
                                             <div className="h-14 w-14 rounded-2xl shrink-0 group-hover:rotate-3 transition-transform relative overflow-hidden">

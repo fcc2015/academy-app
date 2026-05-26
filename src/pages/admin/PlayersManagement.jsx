@@ -55,6 +55,7 @@ const PlayersManagement = () => {
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState([]);
 
     const generateUUID = () => {
         if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -78,6 +79,10 @@ const PlayersManagement = () => {
     useEffect(() => {
         return () => document.body.classList.remove('modal-open');
     }, []);
+
+    useEffect(() => {
+        setSelectedPlayerIds([]);
+    }, [page, searchTerm, proOnly]);
 
     const [formData, setFormData] = useState({
         full_name: '', parent_name: '', parent_whatsapp: '', parent_email: '', birth_date: '', address: '',
@@ -155,6 +160,102 @@ const PlayersManagement = () => {
             const res = await authFetch(`${API_URL}/players/${userId}`, { method: 'DELETE' });
             if (res.ok) setPlayers(players.filter(p => p.user_id !== userId));
         } catch (err) { showBanner(err.message, 'error'); }
+    };
+
+    const handleBulkStatusChange = async (newStatus) => {
+        const result = await Swal.fire({
+            title: isRTL ? 'تعديل حالة اللاعبين؟' : 'Change Status for Selected Players?',
+            text: isRTL 
+                ? `هل أنت متأكد من تغيير حالة اللاعبين المحددين (${selectedPlayerIds.length}) إلى: ${newStatus === 'Active' ? 'نشط' : 'مجمّد'}؟`
+                : `Are you sure you want to change the status of ${selectedPlayerIds.length} selected players to ${newStatus}?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: isRTL ? 'نعم، تغيير' : 'Yes, change',
+            cancelButtonText: t('common.cancel'),
+            confirmButtonColor: '#4f46e5'
+        });
+        if (!result.isConfirmed) return;
+
+        setIsSubmitting(true);
+        try {
+            const promises = selectedPlayerIds.map(id => 
+                authFetch(`${API_URL}/players/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account_status: newStatus })
+                })
+            );
+            const responses = await Promise.all(promises);
+            const successfulIds = [];
+            for (let i = 0; i < responses.length; i++) {
+                if (responses[i].ok) {
+                    successfulIds.push(selectedPlayerIds[i]);
+                }
+            }
+            
+            if (successfulIds.length > 0) {
+                setPlayers(prev => prev.map(p => 
+                    successfulIds.includes(p.user_id) ? { ...p, account_status: newStatus } : p
+                ));
+                showBanner(isRTL 
+                    ? `تم تحديث ${successfulIds.length} لاعبين بنجاح!` 
+                    : `Successfully updated ${successfulIds.length} players!`,
+                    'success'
+                );
+                setSelectedPlayerIds([]);
+            } else {
+                showBanner(isRTL ? 'فشل تحديث حالة اللاعبين' : 'Failed to update players', 'error');
+            }
+        } catch (err) {
+            showBanner(err.message, 'error');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        const result = await Swal.fire({
+            title: isRTL ? 'حذف اللاعبين المحددين؟' : 'Delete Selected Players?',
+            text: isRTL 
+                ? `هل أنت متأكد من حذف اللاعبين المحددين (${selectedPlayerIds.length}) نهائياً؟ هذا الإجراء لا يمكن التراجع عنه!`
+                : `Are you sure you want to permanently delete ${selectedPlayerIds.length} selected players? This cannot be undone!`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: isRTL ? 'نعم، حذف الكل' : 'Yes, delete all',
+            cancelButtonText: t('common.cancel'),
+            confirmButtonColor: '#ef4444'
+        });
+        if (!result.isConfirmed) return;
+
+        setIsSubmitting(true);
+        try {
+            const promises = selectedPlayerIds.map(id => 
+                authFetch(`${API_URL}/players/${id}`, { method: 'DELETE' })
+            );
+            const responses = await Promise.all(promises);
+            const successfulIds = [];
+            for (let i = 0; i < responses.length; i++) {
+                if (responses[i].ok) {
+                    successfulIds.push(selectedPlayerIds[i]);
+                }
+            }
+            
+            if (successfulIds.length > 0) {
+                setPlayers(prev => prev.filter(p => !successfulIds.includes(p.user_id)));
+                showBanner(isRTL 
+                    ? `تم حذف ${successfulIds.length} لاعبين بنجاح!` 
+                    : `Successfully deleted ${successfulIds.length} players!`,
+                    'success'
+                );
+                setSelectedPlayerIds([]);
+            } else {
+                showBanner(isRTL ? 'فشل حذف اللاعبين المحددين' : 'Failed to delete selected players', 'error');
+            }
+        } catch (err) {
+            showBanner(err.message, 'error');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
 
@@ -527,7 +628,51 @@ const PlayersManagement = () => {
                 page={page}
                 totalPages={totalPages}
                 setPage={setPage}
+                selectedPlayerIds={selectedPlayerIds}
+                setSelectedPlayerIds={setSelectedPlayerIds}
             />
+
+            {/* Floating Bulk Actions Bar */}
+            {selectedPlayerIds.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-6 z-50 animate-slide-up border border-slate-800">
+                    <div className="flex items-center gap-2 border-r border-slate-800 pr-6">
+                        <span className="h-2.5 w-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-400">
+                            {isRTL ? `تم تحديد ${selectedPlayerIds.length}` : `${selectedPlayerIds.length} Selected`}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => handleBulkStatusChange('Active')}
+                            disabled={isSubmitting}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                        >
+                            {isRTL ? 'تفعيل' : 'Activate'}
+                        </button>
+                        <button
+                            onClick={() => handleBulkStatusChange('Suspended')}
+                            disabled={isSubmitting}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                        >
+                            {isRTL ? 'تجميد' : 'Suspend'}
+                        </button>
+                        <button
+                            onClick={handleBulkDelete}
+                            disabled={isSubmitting}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                        >
+                            {isRTL ? 'حذف' : 'Delete'}
+                        </button>
+                        <button
+                            onClick={() => setSelectedPlayerIds([])}
+                            className="p-2 text-slate-400 hover:text-white transition-colors"
+                            title={isRTL ? 'إلغاء التحديد' : 'Deselect All'}
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <PlayerModal
                 isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)}
