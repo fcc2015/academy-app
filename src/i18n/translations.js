@@ -83,6 +83,8 @@ const translations = {
         noNotifications: { ar: 'لا توجد إشعارات جديدة', en: 'No new notifications', fr: 'Aucune nouvelle notification' },
         markRead: { ar: 'تحديد كمقروء', en: 'Mark as read', fr: 'Marquer comme lu' },
         deleteNotif: { ar: 'حذف الإشعار', en: 'Delete notification', fr: 'Supprimer la notification' },
+        enablePush: { ar: 'تفعيل التنبيهات المباشرة', en: 'Enable Push Notifications', fr: 'Activer les notifications push' },
+        disablePush: { ar: 'إيقاف التنبيهات المباشرة', en: 'Disable Push Notifications', fr: 'Désactiver les notifications push' },
     },
 
     // ========== FINANCES ==========

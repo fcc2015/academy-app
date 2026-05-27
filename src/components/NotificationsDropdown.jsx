@@ -1,9 +1,10 @@
 import { API_URL } from '../config';
 import { authFetch } from '../api';
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, CheckCircle, Info, AlertCircle, Trash2, BellRing, CheckCheck, Sparkles, Volume2, VolumeX, Zap } from 'lucide-react';
+import { Bell, CheckCircle, Info, AlertCircle, Trash2, BellRing, CheckCheck, Sparkles, Volume2, VolumeX, Zap, BellOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 // Play a short two-tone "PIP" beep using the Web Audio API (no asset needed).
 // Returns silently if AudioContext is unavailable or blocked.
@@ -55,6 +56,14 @@ const NotificationsDropdown = () => {
     const dropdownRef = useRef(null);
     const prevUnreadRef = useRef(0);
     const initializedRef = useRef(false);
+
+    const {
+        isSupported,
+        isSubscribed,
+        subscribe,
+        unsubscribe,
+        loading: pushLoading
+    } = usePushNotifications();
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -255,6 +264,24 @@ const NotificationsDropdown = () => {
                             >
                                 {soundOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
                             </button>
+                            {isSupported && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (isSubscribed) {
+                                            unsubscribe();
+                                        } else {
+                                            subscribe();
+                                        }
+                                    }}
+                                    className="text-[10px] font-black uppercase tracking-wider transition-colors hover:text-indigo-600"
+                                    style={{ color: pushLoading ? '#cbd5e1' : isSubscribed ? '#10b981' : '#cbd5e1' }}
+                                    title={isSubscribed ? t('notifications.disablePush') : t('notifications.enablePush')}
+                                    disabled={pushLoading}
+                                >
+                                    {isSubscribed ? <BellRing size={14} /> : <BellOff size={14} />}
+                                </button>
+                            )}
                             {unreadCount > 0 && (
                                 <button onClick={markAllAsRead}
                                     className="text-[10px] font-black uppercase tracking-wider transition-colors hover:text-indigo-600"
