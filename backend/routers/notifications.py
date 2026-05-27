@@ -5,6 +5,8 @@ from typing import List, Optional
 from pydantic import BaseModel
 from services.supabase_client import supabase
 
+from core.config import settings
+
 logger = logging.getLogger("notifications")
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"], dependencies=[Depends(verify_token)])
@@ -25,6 +27,19 @@ class NotificationResponse(BaseModel):
     type: str
     is_read: bool
     created_at: str
+
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+class PushSubscriptionCreate(BaseModel):
+    endpoint: str
+    keys: PushSubscriptionKeys
+    user_agent: Optional[str] = None
+
+class UnsubscribeRequest(BaseModel):
+    endpoint: str
+
 
 @router.get("/", response_model=List[NotificationResponse])
 async def get_notifications(user_id: Optional[str] = None, role: Optional[str] = None):
@@ -78,3 +93,44 @@ async def delete_notification(notification_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred. Please try again."
         )
+
+@router.get("/vapid-key")
+async def get_vapid_key(user: dict = Depends(verify_token)):
+    if not settings.VAPID_PUBLIC_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="VAPID public key not configured on server"
+        )
+    return {"publicKey": settings.VAPID_PUBLIC_KEY}
+
+@router.post("/subscribe")
+async def subscribe_push(sub: PushSubscriptionCreate, user: dict = Depends(verify_token)):
+    try:
+        await supabase.save_push_subscription(
+            user_id=user["user_id"],
+            academy_id=user["academy_id"],
+            endpoint=sub.endpoint,
+            p256dh=sub.keys.p256dh,
+            auth=sub.keys.auth,
+            user_agent=sub.user_agent
+        )
+        return {"success": True, "message": "Subscribed to push notifications successfully."}
+    except Exception as e:
+        logger.error("Error subscribing to push notifications: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not save subscription."
+        )
+
+@router.post("/unsubscribe")
+async def unsubscribe_push(req: UnsubscribeRequest, user: dict = Depends(verify_token)):
+    try:
+        await supabase.delete_push_subscription(req.endpoint)
+        return {"success": True, "message": "Unsubscribed from push notifications successfully."}
+    except Exception as e:
+        logger.error("Error unsubscribing from push notifications: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not remove subscription."
+        )
+

@@ -542,7 +542,17 @@ class SupabaseHttpClient:
         return await self._get(url)
 
     async def insert_notification(self, data: dict):
-        return await self._post("/rest/v1/notifications", data)
+        response = await self._post("/rest/v1/notifications", data)
+        if response:
+            # Get the record data (can be a list or a single dictionary)
+            record = response[0] if isinstance(response, list) and response else response
+            if isinstance(record, dict):
+                try:
+                    from services.push_service import trigger_push_for_notification
+                    asyncio.create_task(trigger_push_for_notification(self, record))
+                except Exception as e:
+                    logger.error("Error launching background push task: %s", e)
+        return response
 
     async def mark_notification_read(self, notification_id: str):
         res = await self.client.patch(f"/rest/v1/notifications?id=eq.{notification_id}", json={"is_read": True})
@@ -1085,6 +1095,36 @@ class SupabaseHttpClient:
         if res.status_code not in [200, 201, 204]:
             res.raise_for_status()
         return {"success": True}
+
+    # =========================================================
+    # Push Subscriptions Management
+    # =========================================================
+    async def save_push_subscription(self, user_id: str, academy_id: str, endpoint: str, p256dh: str, auth: str, user_agent: str = None):
+        """Save or update a Web Push subscription."""
+        existing = await self._get(f"/rest/v1/push_subscriptions?endpoint=eq.{endpoint}&select=id")
+        data = {
+            "user_id": user_id,
+            "academy_id": academy_id,
+            "endpoint": endpoint,
+            "p256dh": p256dh,
+            "auth": auth,
+            "user_agent": user_agent
+        }
+        if existing:
+            sub_id = existing[0]["id"]
+            res = await self.client.patch(f"/rest/v1/push_subscriptions?id=eq.{sub_id}", json=data)
+            res.raise_for_status()
+            return res.json()
+        else:
+            return await self._post("/rest/v1/push_subscriptions", data)
+
+    async def delete_push_subscription(self, endpoint: str):
+        """Delete a Web Push subscription by its endpoint."""
+        res = await self.client.delete(f"/rest/v1/push_subscriptions?endpoint=eq.{endpoint}")
+        if res.status_code not in [200, 201, 204]:
+            res.raise_for_status()
+        return {"success": True}
+
 
 
 supabase = SupabaseHttpClient(

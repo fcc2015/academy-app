@@ -56,3 +56,56 @@ self.addEventListener('fetch', (event) => {
         })
     );
 });
+
+// Push Event: Handle notifications sent by backend
+self.addEventListener('push', (event) => {
+    let data = { title: 'أكاديمية Akmil', body: 'تنبيه جديد!' };
+    try {
+        if (event.data) {
+            data = event.data.json();
+        }
+    } catch (e) {
+        console.error('Error parsing push data', e);
+        if (event.data) {
+            data = { title: 'أكاديمية Akmil', body: event.data.text() };
+        }
+    }
+
+    const options = {
+        body: data.body,
+        icon: data.icon || '/logo.png',
+        badge: data.badge || '/logo.png',
+        data: data.data || { url: '/' },
+        actions: data.actions || []
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(data.title, options)
+    );
+});
+
+// Notification Click: Open URL or focus existing window
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    
+    let urlToOpen = '/';
+    if (event.notification.data && event.notification.data.url) {
+        urlToOpen = event.notification.data.url;
+    }
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            // Try to find a window with the same URL and focus it
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if (client.url.endsWith(urlToOpen) && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // If no window found, open a new one
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        })
+    );
+});
