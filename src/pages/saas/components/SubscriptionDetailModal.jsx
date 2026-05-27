@@ -125,7 +125,7 @@ export default function SubscriptionDetailModal({
                 );
                 setProofRef('');
             }
-        } catch (err) {
+        } catch {
             setConfirmResult({ success: false, message: 'Network error. Try again.' });
         } finally {
             setConfirmingDeposit(null);

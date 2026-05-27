@@ -13,7 +13,7 @@ const PWAInstallPrompt = ({ isRTL = false }) => {
     useEffect(() => {
         // فحص إذا التطبيق مثبت أصلاً
         if (window.matchMedia('(display-mode: standalone)').matches) {
-            setIsInstalled(true);
+            requestAnimationFrame(() => setIsInstalled(true));
             return;
         }
 
@@ -32,16 +32,19 @@ const PWAInstallPrompt = ({ isRTL = false }) => {
             setTimeout(() => setShowBanner(true), 3000);
         };
 
-        window.addEventListener('beforeinstallprompt', handler);
-
-        // فحص إذا تم التثبيت
-        window.addEventListener('appinstalled', () => {
+        const onAppInstalled = () => {
             setIsInstalled(true);
             setShowBanner(false);
             setDeferredPrompt(null);
-        });
+        };
 
-        return () => window.removeEventListener('beforeinstallprompt', handler);
+        window.addEventListener('beforeinstallprompt', handler);
+        window.addEventListener('appinstalled', onAppInstalled);
+
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handler);
+            window.removeEventListener('appinstalled', onAppInstalled);
+        };
     }, []);
 
     const handleInstall = async () => {

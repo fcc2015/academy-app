@@ -6,20 +6,13 @@ import { authFetch } from '../api';
 import { useToast } from './Toast';
 
 const UpgradeModal = ({ isOpen, onClose, currentPlanName, playerId }) => {
-    const { t, isRTL, dir } = useLanguage();
-    const [plans, setPlans] = useState([]);
+    const { isRTL, dir } = useLanguage();
     const [currentPlan, setCurrentPlan] = useState(null);
     const [availableUpgrades, setAvailableUpgrades] = useState([]);
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isUpgrading, setIsUpgrading] = useState(false);
     const toast = useToast();
-
-    useEffect(() => {
-        if (isOpen) {
-            fetchPlans();
-        }
-    }, [isOpen]);
 
     const fetchPlans = async () => {
         setIsLoading(true);
@@ -30,7 +23,6 @@ const UpgradeModal = ({ isOpen, onClose, currentPlanName, playerId }) => {
                 
                 // Sort plans by price (annual) to determine hierarchy
                 const sortedPlans = data.sort((a, b) => (a.annual_price || 0) - (b.annual_price || 0));
-                setPlans(sortedPlans);
 
                 const current = sortedPlans.find(p => p.name === currentPlanName);
                 setCurrentPlan(current);
@@ -43,13 +35,20 @@ const UpgradeModal = ({ isOpen, onClose, currentPlanName, playerId }) => {
                     setAvailableUpgrades(sortedPlans);
                 }
             }
-        } catch (error) {
-            console.error('Failed to fetch plans', error);
+        } catch (fetchErr) {
+            console.error('Failed to fetch plans', fetchErr);
             toast.error(isRTL ? 'خطأ في تحميل الباقات' : 'Error loading plans');
         } finally {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (isOpen) {
+            fetchPlans();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen]);
 
     const handleUpgrade = async () => {
         if (!selectedPlan) return;
@@ -71,7 +70,7 @@ const UpgradeModal = ({ isOpen, onClose, currentPlanName, playerId }) => {
                 const errorData = await res.json().catch(() => ({}));
                 toast.error(errorData.detail || (isRTL ? 'فشل في الترقية' : 'Upgrade failed'));
             }
-        } catch (error) {
+        } catch {
             toast.error(isRTL ? 'خطأ في الاتصال' : 'Network error');
         } finally {
             setIsUpgrading(false);

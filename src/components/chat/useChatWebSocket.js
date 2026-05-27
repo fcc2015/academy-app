@@ -54,8 +54,12 @@ export default function useChatWebSocket(groupId, myUserId) {
     // ── WebSocket lifecycle ─────────────────────────
     useEffect(() => {
         if (!groupId) {
+            // Synchronous reset on group change — intentional, not a cascade risk
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setMessages([]);
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setMembers([]);
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setTyping([]);
             return;
         }

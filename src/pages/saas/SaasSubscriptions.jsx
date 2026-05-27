@@ -125,9 +125,10 @@ export default function SaasSubscriptions() {
             window.history.replaceState({}, '', '/saas/subscriptions');
             toast.error('Payment cancelled.');
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const fetchData = async () => {
+    async function fetchData() {
         try {
             const [academiesRes, statsRes] = await Promise.all([
                 authFetch(`${API_URL}/saas/academies`),
@@ -146,7 +147,7 @@ export default function SaasSubscriptions() {
         } finally {
             setLoading(false);
         }
-    };
+    }
 
     const handleAssignPlan = async (academy, planId) => {
         setAssigningPlan(true);
@@ -232,7 +233,7 @@ export default function SaasSubscriptions() {
             } else {
                 toast.error(data.message || `Cannot verify: status is ${data.status}`);
             }
-        } catch (err) {
+        } catch {
             toast.error('Verification request failed.');
         } finally {
             setVerifyingOrder(null);
@@ -276,7 +277,7 @@ export default function SaasSubscriptions() {
             } else {
                 toast.error('Failed to trigger reminders.');
             }
-        } catch (err) {
+        } catch {
             toast.error('Network error.');
         } finally {
             setSendingReminders(false);
@@ -463,11 +464,6 @@ export default function SaasSubscriptions() {
                 suspendedCount={suspendedCount}
                 mrr={mrr}
                 stats={stats}
-                daysAhead={daysAhead}
-                setDaysAhead={setDaysAhead}
-                sendingReminders={sendingReminders}
-                handleSendReminders={handleSendReminders}
-                reminderResult={reminderResult}
                 PLANS={PLANS}
                 formatLimit={formatLimit}
                 fetchData={fetchData}

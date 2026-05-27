@@ -57,6 +57,9 @@ export function SkeletonTable({ rows = 5, cols = 4 }) {
   );
 }
 
+// Fixed bar heights for skeleton chart — avoids Math.random() during render
+const SKELETON_CHART_HEIGHTS = [55, 80, 45, 70, 35, 88, 60];
+
 export function SkeletonDashboard() {
   return (
     <div className="animate-fade-in space-y-8">
@@ -70,8 +73,8 @@ export function SkeletonDashboard() {
           <div className="bg-white rounded-[2rem] border border-slate-100 p-6 h-72">
             <div className="h-5 bg-slate-200 rounded-full animate-pulse w-40 mb-6" />
             <div className="flex items-end gap-3 h-48">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className="flex-1 bg-slate-100 rounded-t-lg animate-pulse" style={{ height: `${30 + Math.random() * 60}%` }} />
+              {SKELETON_CHART_HEIGHTS.map((h, i) => (
+                <div key={i} className="flex-1 bg-slate-100 rounded-t-lg animate-pulse" style={{ height: `${h}%` }} />
               ))}
             </div>
           </div>
