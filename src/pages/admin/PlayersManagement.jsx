@@ -56,6 +56,8 @@ const PlayersManagement = () => {
     const [fetchError, setFetchError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPlayerIds, setSelectedPlayerIds] = useState([]);
+    const [page, setPage] = useState(1);
+    const [proOnly, setProOnly] = useState(false);
 
     const generateUUID = () => {
         if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -547,8 +549,6 @@ const PlayersManagement = () => {
         } catch (err) { showBanner(err.message, 'error'); }
     };
 
-    const [page, setPage] = useState(1);
-    const [proOnly, setProOnly] = useState(false);
     const PAGE_SIZE = 20;
     const proCount = players.filter(p => p.technical_level === 'A').length;
     const filteredPlayers = players.filter(p => {

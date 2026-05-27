@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
 import { CheckCircle2, AlertCircle, Info, X, AlertTriangle } from 'lucide-react';
 
 const ToastContext = createContext(null);
@@ -47,10 +47,10 @@ function ToastItem({ id, type = 'info', message, onDismiss }) {
 
 export function ToastProvider({ children }) {
     const [toasts, setToasts] = useState([]);
-    let idCounter = 0;
+    const idCounter = useRef(0);
 
     const toast = useCallback((type, message) => {
-        const id = Date.now() + (idCounter++);
+        const id = Date.now() + (idCounter.current++);
         setToasts(prev => [...prev.slice(-4), { id, type, message }]);
     }, []);
 

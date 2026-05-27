@@ -4,6 +4,95 @@ import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import { SkeletonDashboard } from '../../components/Skeleton';
 
+const Toggle = ({ label, desc, checked, onChange }) => (
+    <label className="flex items-center justify-between p-4 bg-surface-50 border border-surface-200 rounded-xl cursor-pointer hover:bg-surface-100 transition-colors">
+        <div>
+            <h4 className="font-medium text-surface-800 text-sm">{label}</h4>
+            <p className="text-xs text-surface-500 mt-0.5">{desc}</p>
+        </div>
+        <div
+            onClick={() => onChange(!checked)}
+            className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-200 shrink-0 ml-4 ${checked ? 'bg-emerald-500' : 'bg-surface-300'}`}
+        >
+            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-[22px]' : 'translate-x-1'}`} />
+        </div>
+    </label>
+);
+
+const PlanCard = ({ planKey, icon, colorBg, colorBorder, colorText, config, handleChange }) => {
+    const nameKey = `plan_${planKey}_name`;
+    const priceKey = `plan_${planKey}_price`;
+    const playersKey = `plan_${planKey}_max_players`;
+    const adminsKey = `plan_${planKey}_max_admins`;
+    const coachesKey = `plan_${planKey}_max_coaches`;
+    const isUnlimited = (val) => val === -1;
+    const IconComponent = icon;
+
+    return (
+        <div className={`border ${colorBorder} bg-white rounded-2xl p-6 transition-all hover:shadow-md`}>
+            <div className="flex items-center gap-3 mb-5">
+                <div className={`p-2.5 rounded-xl ${colorBg}`}>
+                    <IconComponent className={`w-5 h-5 ${colorText}`} />
+                </div>
+                <input
+                    type="text"
+                    value={config[nameKey] || ''}
+                    onChange={e => handleChange(nameKey, e.target.value)}
+                    className="bg-transparent font-bold text-lg text-surface-900 border-none outline-none w-full"
+                />
+            </div>
+
+            <div className="mb-5">
+                <label className="block text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-1.5">Monthly Price (MAD)</label>
+                <div className="relative">
+                    <input
+                        type="number"
+                        value={config[priceKey] || 0}
+                        onChange={e => handleChange(priceKey, parseInt(e.target.value) || 0)}
+                        className="input pr-16"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-surface-400 font-medium">MAD/mo</span>
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                {[
+                    { key: playersKey, label: 'Max Players', icon: Users, default: 50 },
+                    { key: adminsKey, label: 'Max Admins', icon: UserCog, default: 2 },
+                    { key: coachesKey, label: 'Max Coaches', icon: Dumbbell, default: 5 },
+                ].map(({ key, label, icon: FieldIcon, default: def }) => {
+                    const IconComponent = FieldIcon;
+                    return (
+                        <div key={key}>
+                            <label className="flex items-center gap-1.5 text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-1.5">
+                                <IconComponent className="w-3 h-3" /> {label}
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    value={isUnlimited(config[key]) ? '' : (config[key] || 0)}
+                                    onChange={e => handleChange(key, e.target.value === '' ? -1 : parseInt(e.target.value) || 0)}
+                                    placeholder="∞ Unlimited"
+                                    disabled={isUnlimited(config[key])}
+                                    className="input flex-1 disabled:opacity-40"
+                                />
+                                <button
+                                    onClick={() => handleChange(key, isUnlimited(config[key]) ? def : -1)}
+                                    className={`px-3 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                                        isUnlimited(config[key])
+                                        ? 'bg-violet-50 text-violet-600 border border-violet-200'
+                                        : 'bg-surface-100 text-surface-500 border border-surface-200 hover:border-surface-300'
+                                    }`}
+                                >∞</button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 export default function SaasSettings() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -73,7 +162,7 @@ export default function SaasSettings() {
         fetchLanding();
     }, []);
 
-    const fetchLanding = async () => {
+    async function fetchLanding() {
         try {
             const res = await authFetch(`${API_URL}/saas/landing-settings`);
             if (res.ok) {
@@ -94,7 +183,7 @@ export default function SaasSettings() {
                 }
             }
         } catch { /* ignore */ }
-    };
+    }
 
     const saveLanding = async () => {
         setLandingSaving(true);
@@ -125,7 +214,7 @@ export default function SaasSettings() {
         }
     };
 
-    const fetchSettings = async () => {
+    async function fetchSettings() {
         try {
             const res = await authFetch(`${API_URL}/saas/settings`);
             if (res.ok) {
@@ -139,9 +228,9 @@ export default function SaasSettings() {
         } finally {
             setLoading(false);
         }
-    };
+    }
 
-    const fetchPaypalStatus = async () => {
+    async function fetchPaypalStatus() {
         try {
             const res = await fetch(`${API_URL}/payments/gateway/status`);
             if (res.ok) {
@@ -151,7 +240,7 @@ export default function SaasSettings() {
         } catch (err) {
             console.error("Failed to fetch PayPal status:", err);
         }
-    };
+    }
 
     const handleSave = async () => {
         setSaving(true);
@@ -170,7 +259,7 @@ export default function SaasSettings() {
                 const data = await res.json();
                 setError(data.detail || 'Failed to save settings.');
             }
-        } catch (err) {
+        } catch {
             setError('Network error.');
         } finally {
             setSaving(false);
@@ -181,21 +270,6 @@ export default function SaasSettings() {
         setConfig(prev => ({ ...prev, [key]: value }));
     };
 
-    const Toggle = ({ label, desc, checked, onChange }) => (
-        <label className="flex items-center justify-between p-4 bg-surface-50 border border-surface-200 rounded-xl cursor-pointer hover:bg-surface-100 transition-colors">
-            <div>
-                <h4 className="font-medium text-surface-800 text-sm">{label}</h4>
-                <p className="text-xs text-surface-500 mt-0.5">{desc}</p>
-            </div>
-            <div
-                onClick={() => onChange(!checked)}
-                className={`w-11 h-6 rounded-full relative cursor-pointer transition-colors duration-200 shrink-0 ml-4 ${checked ? 'bg-emerald-500' : 'bg-surface-300'}`}
-            >
-                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-[22px]' : 'translate-x-1'}`} />
-            </div>
-        </label>
-    );
-
     const tabs = [
         { id: 'general', label: 'General', icon: Globe },
         { id: 'landing', label: 'Landing Page', icon: Layout },
@@ -205,76 +279,6 @@ export default function SaasSettings() {
     ];
 
     if (loading) return <SkeletonDashboard />;
-
-    const PlanCard = ({ planKey, icon: Icon, colorBg, colorBorder, colorText  }) => {
-        const nameKey = `plan_${planKey}_name`;
-        const priceKey = `plan_${planKey}_price`;
-        const playersKey = `plan_${planKey}_max_players`;
-        const adminsKey = `plan_${planKey}_max_admins`;
-        const coachesKey = `plan_${planKey}_max_coaches`;
-        const isUnlimited = (val) => val === -1;
-
-        return (
-            <div className={`border ${colorBorder} bg-white rounded-2xl p-6 transition-all hover:shadow-md`}>
-                <div className="flex items-center gap-3 mb-5">
-                    <div className={`p-2.5 rounded-xl ${colorBg}`}>
-                        <Icon className={`w-5 h-5 ${colorText}`} />
-                    </div>
-                    <input
-                        type="text"
-                        value={config[nameKey]}
-                        onChange={e => handleChange(nameKey, e.target.value)}
-                        className="bg-transparent font-bold text-lg text-surface-900 border-none outline-none w-full"
-                    />
-                </div>
-
-                <div className="mb-5">
-                    <label className="block text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-1.5">Monthly Price (MAD)</label>
-                    <div className="relative">
-                        <input
-                            type="number"
-                            value={config[priceKey]}
-                            onChange={e => handleChange(priceKey, parseInt(e.target.value) || 0)}
-                            className="input pr-16"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-surface-400 font-medium">MAD/mo</span>
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    {[
-                        { key: playersKey, label: 'Max Players', icon: Users, default: 50 },
-                        { key: adminsKey, label: 'Max Admins', icon: UserCog, default: 2 },
-                        { key: coachesKey, label: 'Max Coaches', icon: Dumbbell, default: 5 },
-                    ].map(({ key, label, icon: FieldIcon, default: def }) => (
-                        <div key={key}>
-                            <label className="flex items-center gap-1.5 text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-1.5">
-                                <FieldIcon className="w-3 h-3" /> {label}
-                            </label>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="number"
-                                    value={isUnlimited(config[key]) ? '' : config[key]}
-                                    onChange={e => handleChange(key, e.target.value === '' ? -1 : parseInt(e.target.value) || 0)}
-                                    placeholder="∞ Unlimited"
-                                    disabled={isUnlimited(config[key])}
-                                    className="input flex-1 disabled:opacity-40"
-                                />
-                                <button
-                                    onClick={() => handleChange(key, isUnlimited(config[key]) ? def : -1)}
-                                    className={`px-3 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                                        isUnlimited(config[key])
-                                        ? 'bg-violet-50 text-violet-600 border border-violet-200'
-                                        : 'bg-surface-100 text-surface-500 border border-surface-200 hover:border-surface-300'
-                                    }`}
-                                >∞</button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    };
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -624,9 +628,9 @@ export default function SaasSettings() {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                        <PlanCard planKey="free" icon={Zap} colorBg="bg-emerald-50" colorBorder="border-emerald-200" colorText="text-emerald-600" />
-                        <PlanCard planKey="pro" icon={Star} colorBg="bg-blue-50" colorBorder="border-blue-200" colorText="text-blue-600" />
-                        <PlanCard planKey="enterprise" icon={Crown} colorBg="bg-violet-50" colorBorder="border-violet-200" colorText="text-violet-600" />
+                        <PlanCard planKey="free" icon={Zap} colorBg="bg-emerald-50" colorBorder="border-emerald-200" colorText="text-emerald-600" config={config} handleChange={handleChange} />
+                        <PlanCard planKey="pro" icon={Star} colorBg="bg-blue-50" colorBorder="border-blue-200" colorText="text-blue-600" config={config} handleChange={handleChange} />
+                        <PlanCard planKey="enterprise" icon={Crown} colorBg="bg-violet-50" colorBorder="border-violet-200" colorText="text-violet-600" config={config} handleChange={handleChange} />
                     </div>
 
                     {/* Preview Summary */}
