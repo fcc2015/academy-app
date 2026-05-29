@@ -42,19 +42,6 @@ const AttendanceManagement = () => {
         else toast.success(message);
     };
 
-    useEffect(() => {
-        fetchSquads();
-        fetchPlayers();
-        fetchSettings();
-    }, []);
-
-    useEffect(() => {
-        if (selectedSquad && selectedDate) {
-            loadAttendance();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedSquad, selectedDate]);
-
     const fetchSquads = async () => {
         try {
             const res = await authFetch(`${API_URL}/squads/`);
@@ -100,6 +87,19 @@ const AttendanceManagement = () => {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        fetchSquads();
+        fetchPlayers();
+        fetchSettings();
+    }, []);
+
+    useEffect(() => {
+        if (selectedSquad && selectedDate) {
+            loadAttendance();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedSquad, selectedDate]);
 
     const handleStatusChange = (playerId, status) => {
         setAttendanceData(prev => ({ ...prev, [playerId]: status }));

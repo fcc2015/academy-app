@@ -69,11 +69,6 @@ const CoachAttendance = () => {
         fetchData();
     }, []);
 
-    useEffect(() => {
-        if (selectedSquad && selectedDate) loadAttendance();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedSquad, selectedDate]);
-
     const loadAttendance = async () => {
         setIsLoading(true);
         try {
@@ -100,6 +95,12 @@ const CoachAttendance = () => {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (selectedSquad && selectedDate) loadAttendance();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedSquad, selectedDate]);
+
 
     const handleStatusChange = (playerId, status) => {
         setAttendanceData(prev => ({ ...prev, [playerId]: status }));
