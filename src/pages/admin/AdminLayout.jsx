@@ -19,6 +19,20 @@ const AdminLayout = () => {
     const [authChecked, setAuthChecked] = useState(false);
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [bannerOffset, setBannerOffset] = useState(0);
+
+    // Detect impersonation banner and push layout down to avoid overlap
+    useEffect(() => {
+        const checkBanner = () => {
+            const hasUserImpersonation = !!localStorage.getItem('impersonating_user_id');
+            const hasAcademyImpersonation = !!localStorage.getItem('impersonating_academy_id');
+            setBannerOffset((hasUserImpersonation || hasAcademyImpersonation) ? 40 : 0);
+        };
+        checkBanner();
+        window.addEventListener('storage', checkBanner);
+        const id = setInterval(checkBanner, 500);
+        return () => { window.removeEventListener('storage', checkBanner); clearInterval(id); };
+    }, []);
 
     const isChatPage = location.pathname.includes('/chat');
 
@@ -71,8 +85,8 @@ const AdminLayout = () => {
     }
 
     return (
-        <div className="min-h-screen bg-surface-50 text-surface-900 flex" dir={dir}>
-            <AdminSidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
+        <div className="min-h-screen bg-surface-50 text-surface-900 flex" dir={dir} style={{ paddingTop: bannerOffset }}>
+            <AdminSidebar collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} bannerOffset={bannerOffset} />
 
             <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${
                 isRTL 
@@ -80,9 +94,10 @@ const AdminLayout = () => {
                     : (sidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[240px]')
             }`}>
                 <header
-                    className={`sticky top-0 z-50 h-16 flex items-center px-4 sm:px-6 lg:px-8 gap-3 border-b border-surface-200 bg-white/90 backdrop-blur-sm ${
+                    className={`sticky z-50 h-16 flex items-center px-4 sm:px-6 lg:px-8 gap-3 border-b border-surface-200 bg-white/90 backdrop-blur-sm ${
                         isRTL ? 'flex-row-reverse justify-end' : 'flex-row justify-end'
                     }`}
+                    style={{ top: bannerOffset }}
                 >
                     <div className="flex-1"></div>
                     <ThemeToggle />
