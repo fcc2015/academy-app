@@ -159,7 +159,7 @@ const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setM
     </div>
 );
 
-const AdminSidebar = ({ collapsed, setCollapsed }) => {
+const AdminSidebar = ({ collapsed, setCollapsed, bannerOffset = 0 }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { t, isRTL, dir } = useLanguage();
@@ -261,8 +261,9 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
             {/* Mobile hamburger */}
             <button
                 onClick={() => setMobileOpen(true)}
-                className="lg:hidden fixed top-3 z-50 p-2 rounded-md bg-white border border-surface-200 text-surface-700 shadow-sm"
+                className="lg:hidden fixed z-50 p-2 rounded-md bg-white border border-surface-200 text-surface-700 shadow-sm"
                 style={{
+                    top: `calc(0.75rem + ${bannerOffset}px)`,
                     [isRTL ? 'right' : 'left']: '1rem'
                 }}
             >
@@ -276,7 +277,11 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
                     onClick={() => setMobileOpen(false)}
                 >
                     <div
-                        className={`absolute top-0 h-full w-72 flex flex-col bg-white ${isRTL ? 'right-0' : 'left-0'}`}
+                        className={`absolute w-72 flex flex-col bg-white ${isRTL ? 'right-0' : 'left-0'}`}
+                        style={{
+                            top: bannerOffset,
+                            height: `calc(100vh - ${bannerOffset}px)`
+                        }}
                         onClick={e => e.stopPropagation()}
                     >
                         <button
@@ -307,7 +312,11 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
 
             {/* Desktop Sidebar */}
             <aside
-                className={`hidden lg:flex flex-col h-screen fixed top-0 z-40 transition-all duration-300 bg-white ${isRTL ? 'right-0' : 'left-0'} ${collapsed ? 'w-[72px]' : 'w-[240px]'}`}
+                className={`hidden lg:flex flex-col fixed z-40 transition-all duration-300 bg-white ${isRTL ? 'right-0' : 'left-0'} ${collapsed ? 'w-[72px]' : 'w-[240px]'}`}
+                style={{
+                    top: bannerOffset,
+                    height: `calc(100vh - ${bannerOffset}px)`
+                }}
             >
                 <SidebarContent
                     collapsed={collapsed}
