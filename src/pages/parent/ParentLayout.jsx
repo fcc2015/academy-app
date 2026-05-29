@@ -37,6 +37,20 @@ const ParentLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
     const { t, isRTL, dir } = useLanguage();
     const [academyName, setAcademyName] = useState(isRTL ? 'أكاديمية كرة القدم' : 'Football Academy');
+    const [bannerOffset, setBannerOffset] = useState(0);
+
+    // Detect impersonation banner and push layout down to avoid overlap
+    useEffect(() => {
+        const checkBanner = () => {
+            const hasUserImpersonation = !!localStorage.getItem('impersonating_user_id');
+            const hasAcademyImpersonation = !!localStorage.getItem('impersonating_academy_id');
+            setBannerOffset((hasUserImpersonation || hasAcademyImpersonation) ? 40 : 0);
+        };
+        checkBanner();
+        window.addEventListener('storage', checkBanner);
+        const id = setInterval(checkBanner, 500);
+        return () => { window.removeEventListener('storage', checkBanner); clearInterval(id); };
+    }, []);
 
     useEffect(() => {
         const handleResize = () => {
@@ -115,7 +129,7 @@ const ParentLayout = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 relative flex overflow-hidden">
+        <div className="min-h-screen bg-slate-50 relative flex overflow-hidden" style={{ paddingTop: bannerOffset }}>
             {/* Mobile Sidebar Overlay */}
             {isSidebarOpen && (
                 <div
@@ -127,12 +141,13 @@ const ParentLayout = () => {
             {/* Sidebar */}
             <aside
                 className={`
-                    fixed lg:static inset-y-0 z-50
+                    fixed lg:static z-50
                     bg-white transition-all duration-300 ease-in-out
                     flex flex-col shrink-0 overflow-hidden
                     ${isRTL ? 'right-0 border-l border-slate-200' : 'left-0 border-r border-slate-200'}
                     ${isSidebarOpen ? 'w-72 translate-x-0' : isRTL ? 'w-0 translate-x-full lg:translate-x-0 lg:w-20' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-20'}
                 `}
+                style={{ top: bannerOffset, bottom: 0 }}
             >
                 <div className="w-72 h-full flex flex-col">
                     <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100 shrink-0">
