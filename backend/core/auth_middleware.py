@@ -78,12 +78,25 @@ async def verify_token(request: Request):
                 else:
                     # Fallback: check admins table — sous_admin admin_type maps to sous_admin role
                     a_res = await client.get(
-                        f"{settings.SUPABASE_URL}/rest/v1/admins?user_id=eq.{user_id}&select=user_id,admin_type",
+                        f"{settings.SUPABASE_URL}/rest/v1/admins?user_id=eq.{user_id}&select=user_id,admin_type,academy_id",
                         headers=supabase.admin_headers
                     )
                     if a_res.status_code == 200 and a_res.json():
                         admin_row = a_res.json()[0]
                         role = "sous_admin" if admin_row.get("admin_type") == "sous_admin" else "admin"
+                        if not academy_id and admin_row.get("academy_id"):
+                            academy_id = admin_row.get("academy_id")
+
+                # If the role is admin or sous_admin, and academy_id is still missing, lookup in admins table
+                if role in ("admin", "sous_admin") and not academy_id:
+                    a2_res = await client.get(
+                        f"{settings.SUPABASE_URL}/rest/v1/admins?user_id=eq.{user_id}&select=academy_id",
+                        headers=supabase.admin_headers
+                    )
+                    if a2_res.status_code == 200 and a2_res.json():
+                        admin_row = a2_res.json()[0]
+                        if admin_row.get("academy_id"):
+                            academy_id = admin_row.get("academy_id")
 
             # Impersonation — super_admin acting as an academy admin.
             # The header is set by the frontend after the super admin clicks "Login As".
