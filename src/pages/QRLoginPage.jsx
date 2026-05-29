@@ -22,6 +22,47 @@ const QRLoginPage = () => {
     const pollingRef = useRef(null);
     const timeoutRef = useRef(null);
 
+    const stopPolling = () => {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+
+    // Polling — فحص حالة الجلسة كل 2 ثانية
+    const startPolling = (sid) => {
+        stopPolling();
+        pollingRef.current = setInterval(async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/qr-auth/check-session/${sid}`);
+                const data = await res.json();
+                
+                if (data.status === 'authorized') {
+                    // 🎉 تم السكان! حفظ البيانات
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('role', data.role);
+                    localStorage.setItem('user_id', data.user_id);
+                    localStorage.setItem('user_name', data.user_name);
+                    if (data.academy_id) localStorage.setItem('academy_id', data.academy_id);
+                    localStorage.setItem('token_expires', String(Date.now() + 24 * 60 * 60 * 1000));
+                    
+                    setStatus('authorized');
+                    stopPolling();
+                    
+                    // توجيه حسب الدور
+                    setTimeout(() => {
+                        if (data.role === 'admin') navigate('/admin/dashboard');
+                        else if (data.role === 'coach') navigate('/coach/dashboard');
+                        else navigate('/parent/dashboard');
+                    }, 1500);
+                } else if (data.status === 'expired') {
+                    setStatus('expired');
+                    stopPolling();
+                }
+            } catch {
+                // تجاهل أخطاء الشبكة المؤقتة
+            }
+        }, 2000);
+    };
+
     // إنشاء جلسة جديدة
     const createSession = useCallback(async () => {
         try {
@@ -59,48 +100,8 @@ const QRLoginPage = () => {
             setStatus('error');
             setError(err.message);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    // Polling — فحص حالة الجلسة كل 2 ثانية
-    const startPolling = (sid) => {
-        stopPolling();
-        pollingRef.current = setInterval(async () => {
-            try {
-                const res = await fetch(`${API_URL}/api/qr-auth/check-session/${sid}`);
-                const data = await res.json();
-                
-                if (data.status === 'authorized') {
-                    // 🎉 تم السكان! حفظ البيانات
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('role', data.role);
-                    localStorage.setItem('user_id', data.user_id);
-                    localStorage.setItem('user_name', data.user_name);
-                    if (data.academy_id) localStorage.setItem('academy_id', data.academy_id);
-                    localStorage.setItem('token_expires', String(Date.now() + 24 * 60 * 60 * 1000));
-                    
-                    setStatus('authorized');
-                    stopPolling();
-                    
-                    // توجيه حسب الدور
-                    setTimeout(() => {
-                        if (data.role === 'admin') navigate('/admin/dashboard');
-                        else if (data.role === 'coach') navigate('/coach/dashboard');
-                        else navigate('/parent/dashboard');
-                    }, 1500);
-                } else if (data.status === 'expired') {
-                    setStatus('expired');
-                    stopPolling();
-                }
-            } catch (err) {
-                // تجاهل أخطاء الشبكة المؤقتة
-            }
-        }, 2000);
-    };
-
-    const stopPolling = () => {
-        if (pollingRef.current) clearInterval(pollingRef.current);
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
 
     useEffect(() => {
         createSession();

@@ -36,8 +36,6 @@ const AdminsManagement = () => {
     const [feedback, setFeedback] = useState(null);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null });
 
-    useEffect(() => { fetchAdmins(); }, []);
-
     const fetchAdmins = async () => {
         setIsLoading(true);
         try {
@@ -46,6 +44,8 @@ const AdminsManagement = () => {
         } catch (error) { console.error('Error fetching admins:', error); }
         finally { setIsLoading(false); }
     };
+
+    useEffect(() => { fetchAdmins(); }, []);
 
     const showFeedback = (message, type = 'success') => {
         setFeedback({ message, type });
