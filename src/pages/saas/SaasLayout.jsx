@@ -1,6 +1,6 @@
 import { Outlet, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import SectionErrorBoundary from '../../components/SectionErrorBoundary';
-import { Bell, Globe, CreditCard, Settings, LayoutDashboard, LogOut, Building2, Zap, BarChart3, Ticket, Mail } from 'lucide-react';
+import { Bell, Globe, CreditCard, Settings, LayoutDashboard, LogOut, Building2, Zap, BarChart3, Ticket, Mail, Megaphone } from 'lucide-react';
 import { isAuthenticated, logout } from '../../api';
 
 export default function SaasLayout() {
@@ -29,6 +29,7 @@ export default function SaasLayout() {
         { name: 'Academy Plans', href: '/saas/subscriptions', icon: CreditCard },
         { name: 'Coupons', href: '/saas/coupons', icon: Ticket },
         { name: 'Emails', href: '/saas/emails', icon: Mail },
+        { name: 'Advertisements', href: '/saas/ads', icon: Megaphone },
         { name: 'Notifications', href: '/saas/notifications', icon: Bell },
         { name: 'Settings', href: '/saas/settings', icon: Settings },
     ];

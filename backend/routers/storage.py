@@ -71,6 +71,32 @@ async def upload_document(
         raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
+@router.post("/upload")
+async def upload_generic_file(
+    file: UploadFile = File(...)
+):
+    """Upload any file (image, video, or doc) to the avatars or documents bucket."""
+    is_image = file.content_type in ALLOWED_IMAGE_TYPES
+    bucket = "avatars" if is_image else "documents"
+    folder = "general"
+
+    content = await file.read()
+    max_size = MAX_IMAGE_SIZE if is_image else MAX_DOC_SIZE
+    if len(content) > max_size:
+        raise HTTPException(status_code=400, detail=f"Fichier trop volumineux. Maximum {max_size // (1024*1024)} MB.")
+
+    ext = file.filename.split(".")[-1] if "." in file.filename else ("png" if is_image else "bin")
+    unique = uuid.uuid4().hex[:12]
+    file_path = f"{folder}/{unique}.{ext}"
+
+    try:
+        url = await supabase.upload_file(bucket, file_path, content, file.content_type)
+        return {"url": url, "path": file_path, "public_url": url, "success": True}
+    except Exception as e:
+        logger.error("Erreur generic upload: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+
+
 @router.delete("/delete")
 async def delete_file(
     bucket: str = Query(...),

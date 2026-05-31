@@ -13,10 +13,13 @@ router = APIRouter(prefix="/advertisements", tags=["Advertisements"], dependenci
 
 @router.get("/", response_model=List[AdResponse])
 async def get_active_ads(user: dict = Depends(verify_token)):
-    """Get active ads targeted at the current user's role and category."""
+    """Get active ads targeted at the current user's role and category (or all if super_admin)."""
     try:
         role = role_ctx.get(None)
-        data = await supabase.get_advertisements(role=role)
+        if role == "super_admin":
+            data = await supabase.get_advertisements(role=role, active_only=False)
+        else:
+            data = await supabase.get_advertisements(role=role, active_only=True)
         return data
     except Exception as e:
         logger.error("Error fetching advertisements: %s", e, exc_info=True)

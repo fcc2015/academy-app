@@ -57,7 +57,7 @@ async def get_all_players(user: dict = Depends(require_role("admin", "coach", "s
             detail="An internal error occurred. Please try again."
         )
 
-@router.post("/", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
+@router.post("/", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
 async def create_player(player: PlayerCreate):
     try:
         # --- Duplicate Check: Player Name (via users table with admin headers to bypass RLS) ---
@@ -285,7 +285,7 @@ async def reset_parent_password(player_id: str, current_user: dict = Depends(ver
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/{user_id}", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
+@router.put("/{user_id}", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
 async def update_player(user_id: str, player: PlayerCreate):
     try:
         # Check if the player already has a parent
@@ -364,7 +364,7 @@ async def update_player(user_id: str, player: PlayerCreate):
             detail="An internal error occurred. Please try again."
         )
 
-@router.delete("/{user_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
+@router.delete("/{user_id}", dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
 async def delete_player(user_id: str):
     try:
         await supabase.delete_player(user_id)
@@ -416,7 +416,7 @@ async def get_players_by_parent(parent_id: str):
 
 # ─── Photo Upload ──────────────────────────────────────────
 
-@router.post("/upload-photo", dependencies=[Depends(require_role("admin", "super_admin"))])
+@router.post("/upload-photo", dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
 async def upload_player_photo(file: UploadFile = File(...)):
     """
     Upload a player photo to Supabase Storage (bucket: player-photos).
@@ -512,7 +512,7 @@ class PlayerTransferCreate(BaseModel):
     departure_reason: str | None = None
     transfer_date: str | None = None
 
-@router.post("/{player_id}/transfer", dependencies=[Depends(require_role("admin", "super_admin"))])
+@router.post("/{player_id}/transfer", dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
 async def record_player_transfer(player_id: str, transfer: PlayerTransferCreate):
     """
     Log a player's transfer/departure. 
