@@ -1050,20 +1050,22 @@ class SupabaseHttpClient:
     # =========================================================
     # Advertisements Management
     # =========================================================
-    async def get_advertisements(self, role: str = None):
+    async def get_advertisements(self, role: str = None, active_only: bool = True):
         """Return active advertisements, optionally filtered by role."""
-        url = "/rest/v1/advertisements?is_active=eq.true&order=created_at.desc"
-        if role:
+        url = "/rest/v1/advertisements?order=created_at.desc"
+        if active_only:
+            url += "&is_active=eq.true"
+        data = await self._get(url)
+        if role and role != "super_admin":
             # Postgres @> operator: target_roles contains role, or target_roles is empty
             # We filter at app level for simplicity since PostgREST array ops are verbose
-            data = await self._get(url)
             filtered = []
             for ad in data:
                 target_roles = ad.get("target_roles") or []
                 if not target_roles or role in target_roles:
                     filtered.append(ad)
             return filtered
-        return await self._get(url)
+        return data
 
     async def insert_advertisement(self, data: dict):
         result = await self._post("/rest/v1/advertisements", data)

@@ -32,6 +32,7 @@ const SaasAnalytics = lazy(() => import('./pages/saas/SaasAnalytics'));
 const SaasAcademyDetail = lazy(() => import('./pages/saas/SaasAcademyDetail'));
 const SaasCoupons = lazy(() => import('./pages/saas/SaasCoupons'));
 const SaasEmails = lazy(() => import('./pages/saas/SaasEmails'));
+const SaasAds = lazy(() => import('./pages/saas/SaasAds'));
 
 // Admin
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
@@ -162,6 +163,7 @@ function App() {
             <Route path="analytics" element={<SaasAnalytics />} />
             <Route path="coupons" element={<SaasCoupons />} />
             <Route path="emails" element={<SaasEmails />} />
+            <Route path="ads" element={<SaasAds />} />
           </Route>
 
           {/* Admin */}
