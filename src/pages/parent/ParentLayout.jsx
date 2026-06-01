@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import SectionErrorBoundary from '../../components/SectionErrorBoundary';
+import AdsBanner from '../../components/AdsBanner';
 import { Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -222,6 +223,9 @@ const ParentLayout = () => {
                         </div>
                     </div>
                 </header>
+
+                {/* 📢 Ads Banner */}
+                <AdsBanner />
 
                 {location.pathname.includes('/chat') ? (
                     <div className="flex-1 overflow-hidden" dir={dir}>
