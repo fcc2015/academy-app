@@ -9,6 +9,7 @@ class AdCreate(BaseModel):
     target_roles: List[str] = []
     target_categories: List[str] = []
     is_active: bool = True
+    ad_type: str = Field("general", pattern="^(general|pro|1to1)$")
 
     @field_validator("title")
     @classmethod

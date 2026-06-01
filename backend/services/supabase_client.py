@@ -111,7 +111,7 @@ class InjectClient:
         from core.context import academy_id_ctx
         academy_id = academy_id_ctx.get(None)
         url_str = self._resolve(url)
-        if not academy_id or "/rpc/" in url_str or "/auth/v1/" in url_str or "/storage/v1/" in url_str:
+        if not academy_id or "/rpc/" in url_str or "/auth/v1/" in url_str or "/storage/v1/" in url_str or "/rest/v1/advertisements" in url_str:
             return url_str
         separator = "&" if "?" in url_str else "?"
         return f"{url_str}{separator}academy_id=eq.{academy_id}"
@@ -1051,14 +1051,41 @@ class SupabaseHttpClient:
     # Advertisements Management
     # =========================================================
     async def get_advertisements(self, role: str = None, active_only: bool = True):
-        """Return active advertisements, optionally filtered by role."""
-        url = "/rest/v1/advertisements?order=created_at.desc"
+        """Return active advertisements, filtered by role and subscription plan."""
+        # If super_admin, fetch all ads
+        if role == "super_admin":
+            url = "/rest/v1/advertisements?order=created_at.desc"
+            if active_only:
+                url += "&is_active=eq.true"
+            return await self._get(url)
+
+        # For normal users, fetch academy plan
+        from core.context import academy_id_ctx
+        academy_id = academy_id_ctx.get(None)
+        plan_id = "free"
+        if academy_id:
+            try:
+                ac_data = await self._get(f"/rest/v1/academies?id=eq.{academy_id}&select=plan_id")
+                if ac_data:
+                    plan_id = (ac_data[0].get("plan_id") or "free").lower()
+            except Exception as e:
+                logger.error("Error fetching academy plan: %s", e)
+
+        # Build url based on plan
+        if plan_id == "enterprise" and academy_id:
+            url = f"/rest/v1/advertisements?order=created_at.desc&ad_type=eq.1to1&academy_id=eq.{academy_id}"
+        elif plan_id == "pro":
+            url = "/rest/v1/advertisements?order=created_at.desc&ad_type=eq.pro"
+        else: # free plan
+            url = "/rest/v1/advertisements?order=created_at.desc&or=(ad_type.eq.general,ad_type.is.null)"
+
         if active_only:
             url += "&is_active=eq.true"
+
         data = await self._get(url)
-        if role and role != "super_admin":
-            # Postgres @> operator: target_roles contains role, or target_roles is empty
-            # We filter at app level for simplicity since PostgREST array ops are verbose
+
+        # Filter by role at application level (same as before)
+        if role:
             filtered = []
             for ad in data:
                 target_roles = ad.get("target_roles") or []
