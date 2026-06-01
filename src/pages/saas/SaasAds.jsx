@@ -51,6 +51,28 @@ export default function SaasAds() {
     const [selectedAdId, setSelectedAdId] = useState(null);
     const [creatingTemplate, setCreatingTemplate] = useState(null);
 
+    // Google AdSense settings states (simulation configuration)
+    const [adsenseSettings, setAdsenseSettings] = useState({
+        publisherId: localStorage.getItem('saas_adsense_pub_id') || 'ca-pub-7182903829103928',
+        slotId: localStorage.getItem('saas_adsense_slot_id') || '4829103829',
+        isActive: localStorage.getItem('saas_adsense_active') === 'true'
+    });
+    const [savingAdsense, setSavingAdsense] = useState(false);
+    const [showAdsenseSuccess, setShowAdsenseSuccess] = useState(false);
+
+    const handleSaveAdsense = (e) => {
+        e.preventDefault();
+        setSavingAdsense(true);
+        setTimeout(() => {
+            localStorage.setItem('saas_adsense_pub_id', adsenseSettings.publisherId);
+            localStorage.setItem('saas_adsense_slot_id', adsenseSettings.slotId);
+            localStorage.setItem('saas_adsense_active', adsenseSettings.isActive ? 'true' : 'false');
+            setSavingAdsense(false);
+            setShowAdsenseSuccess(true);
+            setTimeout(() => setShowAdsenseSuccess(false), 3000);
+        }, 800);
+    };
+
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
@@ -721,6 +743,77 @@ export default function SaasAds() {
                                 </span>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Google AdSense Integration settings (Prepared/Simulated credentials) */}
+                    <div className="bg-white dark:bg-[#18181b] border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-6">
+                        <div className="flex justify-between items-start border-b border-slate-100 dark:border-zinc-800/80 pb-4">
+                            <div>
+                                <h4 className="font-extrabold text-slate-800 dark:text-zinc-100 text-base flex items-center gap-2">
+                                    <Globe className="w-5 h-5 text-blue-500" /> Google AdSense SDK Setup (Integration Sandbox)
+                                </h4>
+                                <p className="text-xs text-slate-450 dark:text-zinc-500 mt-1">Configure your Google AdSense Publisher Credentials. Auto-script injection remains simulated until ready for production linking.</p>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-lg text-[9px] font-black bg-blue-50 dark:bg-blue-950/35 text-blue-700 dark:text-blue-400 uppercase tracking-widest border border-blue-100 dark:border-blue-900/30">
+                                Pre-Production Mode
+                            </span>
+                        </div>
+
+                        <form onSubmit={handleSaveAdsense} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-450 dark:text-zinc-500 uppercase tracking-widest mb-2">Publisher ID (AdSense Client) *</label>
+                                <input
+                                    required
+                                    type="text"
+                                    placeholder="ca-pub-7182903829103928"
+                                    value={adsenseSettings.publisherId}
+                                    onChange={e => setAdsenseSettings(prev => ({ ...prev, publisherId: e.target.value }))}
+                                    className="input w-full font-mono text-xs dark:bg-zinc-900 dark:border-zinc-800"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-450 dark:text-zinc-500 uppercase tracking-widest mb-2">Responsive Banner Slot ID *</label>
+                                <input
+                                    required
+                                    type="text"
+                                    placeholder="4829103829"
+                                    value={adsenseSettings.slotId}
+                                    onChange={e => setAdsenseSettings(prev => ({ ...prev, slotId: e.target.value }))}
+                                    className="input w-full font-mono text-xs dark:bg-zinc-900 dark:border-zinc-800"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 justify-between items-center bg-slate-50 dark:bg-zinc-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-zinc-850 h-10">
+                                <span className="text-[10px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-widest pl-1.5">Live Script Injection</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setAdsenseSettings(prev => ({ ...prev, isActive: !prev.isActive }))}
+                                    className={`w-12 h-6 rounded-full relative transition-colors duration-200 shrink-0 ${adsenseSettings.isActive ? 'bg-blue-600' : 'bg-slate-350 dark:bg-zinc-700'}`}
+                                >
+                                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${adsenseSettings.isActive ? 'translate-x-[24px]' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+
+                            <div className="md:col-span-3 flex justify-between items-center pt-2">
+                                <div className="text-xs">
+                                    {showAdsenseSuccess && (
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 animate-fade-in">
+                                            <Check className="w-4 h-4 bg-emerald-100 dark:bg-emerald-950/20 p-0.5 rounded-full" /> 
+                                            AdSense Publisher Config cached locally! Setup is prepared.
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={savingAdsense}
+                                    className="btn bg-blue-600 hover:bg-blue-500 text-white font-extrabold px-5 py-2.5 rounded-xl shadow-md transition-all text-xs flex items-center gap-1.5 min-w-[150px] justify-center"
+                                >
+                                    {savingAdsense ? <Loader2 size={13} className="animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                    Save AdSense Setup
+                                </button>
+                            </div>
+                        </form>
                     </div>
 
                     {/* Quick Template Creation */}

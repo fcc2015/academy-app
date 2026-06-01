@@ -127,6 +127,16 @@ export default function AdsBanner({ position = 'top' }) {
                 />
             )}
 
+            {/* Google AdChoices simulated floating badge */}
+            {ad.is_google && (
+                <div className="absolute top-1 right-2 flex items-center gap-1.5 bg-white/95 text-[9px] text-slate-700 font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-200 z-20 select-none scale-90 opacity-80 hover:opacity-100 transition-opacity">
+                    <span className="text-[8px] uppercase tracking-wider text-slate-500">AdChoices</span>
+                    <svg className="w-2.5 h-2.5 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                    </svg>
+                </div>
+            )}
+
             {/* Content row */}
             <div className="relative flex items-center h-14 px-3 gap-3 max-w-screen-2xl mx-auto animate-fade-in">
 
