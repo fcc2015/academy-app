@@ -219,6 +219,65 @@ class TestAdvertisementsGet:
             app.dependency_overrides.clear()
 
 
+class TestAdvertisementsPlanFiltering:
+    @pytest.mark.asyncio
+    async def test_get_ads_free_plan(self):
+        from services.supabase_client import supabase
+        from core.context import academy_id_ctx
+        academy_id_ctx.set("acad-1")
+        try:
+            with patch.object(supabase, "_get", new_callable=AsyncMock) as mock_get:
+                mock_get.side_effect = [
+                    [{"plan_id": "free"}],
+                    [{"id": "ad-1", "ad_type": "general"}]
+                ]
+                res = await supabase.get_advertisements(role="player", active_only=True)
+                assert len(res) == 1
+                calls = mock_get.call_args_list
+                assert "academies?id=eq.acad-1" in calls[0][0][0]
+                assert "advertisements" in calls[1][0][0]
+                assert "ad_type.eq.general" in calls[1][0][0] or "ad_type.is.null" in calls[1][0][0]
+        finally:
+            academy_id_ctx.set(None)
+
+    @pytest.mark.asyncio
+    async def test_get_ads_pro_plan(self):
+        from services.supabase_client import supabase
+        from core.context import academy_id_ctx
+        academy_id_ctx.set("acad-1")
+        try:
+            with patch.object(supabase, "_get", new_callable=AsyncMock) as mock_get:
+                mock_get.side_effect = [
+                    [{"plan_id": "pro"}],
+                    [{"id": "ad-1", "ad_type": "pro"}]
+                ]
+                res = await supabase.get_advertisements(role="player", active_only=True)
+                assert len(res) == 1
+                calls = mock_get.call_args_list
+                assert "ad_type=eq.pro" in calls[1][0][0]
+        finally:
+            academy_id_ctx.set(None)
+
+    @pytest.mark.asyncio
+    async def test_get_ads_enterprise_plan(self):
+        from services.supabase_client import supabase
+        from core.context import academy_id_ctx
+        academy_id_ctx.set("acad-1")
+        try:
+            with patch.object(supabase, "_get", new_callable=AsyncMock) as mock_get:
+                mock_get.side_effect = [
+                    [{"plan_id": "enterprise"}],
+                    [{"id": "ad-1", "ad_type": "1to1"}]
+                ]
+                res = await supabase.get_advertisements(role="player", active_only=True)
+                assert len(res) == 1
+                calls = mock_get.call_args_list
+                assert "ad_type=eq.1to1" in calls[1][0][0]
+                assert "academy_id=eq.acad-1" in calls[1][0][0]
+        finally:
+            academy_id_ctx.set(None)
+
+
 class TestAdvertisementsCreate:
     @pytest.mark.asyncio
     async def test_create_ad_admin_only(self):
@@ -355,6 +414,7 @@ class TestAdvertisementsSchema:
         )
         assert ad.title == "Test Ad"
         assert ad.is_active is True
+        assert ad.ad_type == "general"
 
     def test_ad_create_strips_html_from_title(self):
         from schemas.advertisements import AdCreate
@@ -370,3 +430,23 @@ class TestAdvertisementsSchema:
         from pydantic import ValidationError
         with pytest.raises(ValidationError):
             AdCreate(title="No media")
+
+    def test_ad_create_invalid_ad_type(self):
+        from schemas.advertisements import AdCreate
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            AdCreate(
+                title="Test Ad",
+                media_url="https://example.com/img.jpg",
+                ad_type="malicious_type",
+            )
+
+    def test_ad_create_valid_ad_types(self):
+        from schemas.advertisements import AdCreate
+        for t in ["general", "pro", "1to1"]:
+            ad = AdCreate(
+                title="Test Ad",
+                media_url="https://example.com/img.jpg",
+                ad_type=t,
+            )
+            assert ad.ad_type == t

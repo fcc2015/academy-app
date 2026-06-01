@@ -9,6 +9,7 @@ import {
 
 export default function SaasAds() {
     const [ads, setAds] = useState([]);
+    const [academies, setAcademies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
@@ -22,6 +23,7 @@ export default function SaasAds() {
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [adTypeFilter, setAdTypeFilter] = useState('all');
 
     // Form state
     const [form, setForm] = useState({
@@ -30,7 +32,9 @@ export default function SaasAds() {
         link_url: '',
         target_roles: [],
         target_categories: [],
-        is_active: true
+        is_active: true,
+        ad_type: 'general',
+        academy_id: ''
     });
 
     const categoryOptions = ['U9', 'U11', 'U13', 'U15', 'U17', 'U19', 'Seniors'];
@@ -53,8 +57,20 @@ export default function SaasAds() {
         }
     };
 
+    const fetchAcademies = async () => {
+        try {
+            const res = await authFetch(`${API_URL}/saas/academies`);
+            if (res.ok) {
+                setAcademies(await res.json());
+            }
+        } catch (e) {
+            console.error('Error fetching academies:', e);
+        }
+    };
+
     useEffect(() => {
         fetchAds();
+        fetchAcademies();
     }, []);
 
     // Handle single target role toggle
@@ -121,7 +137,9 @@ export default function SaasAds() {
             link_url: '',
             target_roles: [],
             target_categories: [],
-            is_active: true
+            is_active: true,
+            ad_type: 'general',
+            academy_id: ''
         });
         setShowModal(true);
     };
@@ -138,7 +156,9 @@ export default function SaasAds() {
             link_url: ad.link_url || '',
             target_roles: ad.target_roles || [],
             target_categories: ad.target_categories || [],
-            is_active: ad.is_active ?? true
+            is_active: ad.is_active ?? true,
+            ad_type: ad.ad_type || 'general',
+            academy_id: ad.academy_id || ''
         });
         setShowModal(true);
     };
@@ -155,7 +175,9 @@ export default function SaasAds() {
             link_url: form.link_url.trim() || null,
             target_roles: form.target_roles,
             target_categories: form.target_categories,
-            is_active: form.is_active
+            is_active: form.is_active,
+            ad_type: form.ad_type,
+            academy_id: form.ad_type === '1to1' && form.academy_id ? form.academy_id : null
         };
 
         try {
@@ -192,7 +214,9 @@ export default function SaasAds() {
             link_url: ad.link_url,
             target_roles: ad.target_roles || [],
             target_categories: ad.target_categories || [],
-            is_active: !ad.is_active
+            is_active: !ad.is_active,
+            ad_type: ad.ad_type || 'general',
+            academy_id: ad.academy_id || null
         };
 
         try {
@@ -239,7 +263,8 @@ export default function SaasAds() {
         const matchesStatus = statusFilter === 'all' || 
             (statusFilter === 'active' && ad.is_active) || 
             (statusFilter === 'inactive' && !ad.is_active);
-        return matchesSearch && matchesRole && matchesStatus;
+        const matchesAdType = adTypeFilter === 'all' || (ad.ad_type || 'general') === adTypeFilter;
+        return matchesSearch && matchesRole && matchesStatus && matchesAdType;
     });
 
     return (
@@ -286,7 +311,17 @@ export default function SaasAds() {
                     onChange={e => setSearchTerm(e.target.value)}
                     className="input flex-1 focus:ring-indigo-500"
                 />
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-4">
+                    <select
+                        value={adTypeFilter}
+                        onChange={e => setAdTypeFilter(e.target.value)}
+                        className="input min-w-[140px]"
+                    >
+                        <option value="all">All Tiers</option>
+                        <option value="general">General (Free)</option>
+                        <option value="pro">Pro (Medium)</option>
+                        <option value="1to1">1-to-1 (Premium)</option>
+                    </select>
                     <select
                         value={roleFilter}
                         onChange={e => setRoleFilter(e.target.value)}
@@ -371,6 +406,21 @@ export default function SaasAds() {
 
                                         {/* Target roles and categories badges */}
                                         <div className="flex flex-wrap gap-1.5">
+                                            {/* Ad Type Badge */}
+                                            {ad.ad_type === '1to1' ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">
+                                                    1to1: {academies.find(ac => ac.id === ad.academy_id)?.name || 'All Academies'}
+                                                </span>
+                                            ) : ad.ad_type === 'pro' ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                                                    Pro Tier
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                                    General / Free
+                                                </span>
+                                            )}
+
                                             {ad.target_roles?.map(role => (
                                                 <span key={role} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
                                                     <Users size={10} />
@@ -544,6 +594,41 @@ export default function SaasAds() {
                                     placeholder="e.g. https://myacademy.com/promos/kits" 
                                 />
                             </div>
+
+                            {/* Ad Type (Tier) Selection */}
+                            <div>
+                                <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Ad Tier / Type *</label>
+                                <select 
+                                    required
+                                    className="input focus:ring-indigo-500 w-full"
+                                    value={form.ad_type}
+                                    onChange={e => setForm(f => ({ ...f, ad_type: e.target.value, academy_id: e.target.value === '1to1' ? f.academy_id : '' }))}
+                                >
+                                    <option value="general">General Ad (Free Plan)</option>
+                                    <option value="pro">Pro Ad (Medium Plan)</option>
+                                    <option value="1to1">1-to-1 Ad (Premium/Enterprise Plan)</option>
+                                </select>
+                            </div>
+
+                            {/* Target Academy for 1to1 Ads */}
+                            {form.ad_type === '1to1' && (
+                                <div>
+                                    <label className="block text-xs font-bold text-surface-600 mb-1.5 uppercase tracking-wider">Target Academy *</label>
+                                    <select 
+                                        required
+                                        className="input focus:ring-indigo-500 w-full"
+                                        value={form.academy_id}
+                                        onChange={e => setForm(f => ({ ...f, academy_id: e.target.value }))}
+                                    >
+                                        <option value="">Select an Academy...</option>
+                                        {academies.map(ac => (
+                                            <option key={ac.id} value={ac.id}>
+                                                {ac.name} ({ac.subdomain})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             {/* Target Roles Checkbox Selection */}
                             <div>
