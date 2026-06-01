@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import SectionErrorBoundary from '../../components/SectionErrorBoundary';
+import AdsBanner from '../../components/AdsBanner';
 import { Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -169,6 +170,9 @@ const CoachLayout = () => {
                         </div>
                     </div>
                 </header>
+
+                {/* 📢 Ads Banner */}
+                <AdsBanner />
 
                 {location.pathname.includes('/chat') ? (
                     <div className="flex-1 overflow-hidden" dir={dir}>

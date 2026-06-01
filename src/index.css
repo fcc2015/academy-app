@@ -883,3 +883,10 @@ body.modal-open {
 }
 .attendance-toggle-btn--none:hover { background: #e4e4e7; }
 
+/* ================================================================
+   ADS BANNER PROGRESS
+   ================================================================ */
+@keyframes ads-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
