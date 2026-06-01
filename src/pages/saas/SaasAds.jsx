@@ -37,6 +37,97 @@ const GOOGLE_AD_TEMPLATES = [
     }
 ];
 
+// Live Simulator Preview Component (used in form modal)
+const AdBannerSimulator = ({ title, mediaUrl }) => {
+    const isGoogle = (title || '').toLowerCase().startsWith('sponsored:');
+    const cleanTitle = isGoogle ? title.replace(/sponsored:\s*/i, '') : title;
+    return (
+        <div className="space-y-2">
+            <span className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest block mb-1">
+                Live Real-Time Ad Banner Preview:
+            </span>
+            <div
+                className={`relative w-full overflow-hidden rounded-xl shadow-lg border border-white/10 ${
+                    isGoogle
+                        ? 'bg-gradient-to-r from-blue-950 via-blue-900 to-cyan-950 text-white'
+                        : 'bg-gradient-to-r from-indigo-950 via-indigo-900 to-violet-950 text-white'
+                }`}
+                style={{ minHeight: '56px' }}
+            >
+                {/* Background blurred cover */}
+                {mediaUrl && (
+                    <div
+                        className="absolute inset-0 opacity-20 bg-cover bg-center blur-sm scale-110"
+                        style={{ backgroundImage: `url(${mediaUrl})` }}
+                    />
+                )}
+
+                <div className="relative flex items-center h-14 px-3.5 gap-3">
+                    {/* Prev button placeholder */}
+                    <div className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-white/50">
+                        <ChevronLeft size={13} />
+                    </div>
+
+                    {/* Image preview */}
+                    {mediaUrl && (
+                        <div className="shrink-0 h-9 w-14 rounded-lg overflow-hidden border border-white/20 shadow-sm bg-black/20">
+                            <img
+                                src={mediaUrl}
+                                alt="Preview"
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                    e.target.style.display = 'none';
+                                }}
+                            />
+                        </div>
+                    )}
+
+                    {/* Text and indicators */}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                            {isGoogle && (
+                                <span className="shrink-0 px-1.5 py-0.5 bg-white/20 text-white/95 text-[8px] font-black rounded uppercase tracking-wider border border-white/30 whitespace-nowrap shadow-sm">
+                                    Google Ad
+                                </span>
+                            )}
+                            <p className="font-extrabold text-xs sm:text-sm leading-tight truncate">
+                                {cleanTitle || 'Placeholder Ad Title (Type below...)'}
+                            </p>
+                        </div>
+                        <div className="flex gap-1 mt-1">
+                            <span className="w-4 h-1 rounded-full bg-white" />
+                            <span className="w-1 h-1 rounded-full bg-white/40" />
+                            <span className="w-1 h-1 rounded-full bg-white/40" />
+                        </div>
+                    </div>
+
+                    {/* CTA button */}
+                    <div
+                        className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 font-bold text-[10px] rounded-lg shadow-sm border whitespace-nowrap ${
+                            isGoogle
+                                ? 'bg-white text-blue-800 border-transparent'
+                                : 'bg-white text-indigo-800 border-transparent'
+                        }`}
+                    >
+                        Learn More
+                        <ExternalLink size={10} />
+                    </div>
+
+                    {/* Close button placeholder */}
+                    <div className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-white/50">
+                        <X size={11} />
+                    </div>
+                </div>
+                
+                {/* Bottom Progress loader line */}
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10">
+                    <div className="h-full bg-white/40 w-1/3" />
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function SaasAds() {
     const [ads, setAds] = useState([]);
     const [academies, setAcademies] = useState([]);
@@ -247,8 +338,22 @@ export default function SaasAds() {
     };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
         setSubmitError('');
+
+        if (!form.title.trim()) {
+            setSubmitError('Ad Campaign text/title is required.');
+            return;
+        }
+        if (!form.media_url.trim()) {
+            setSubmitError('Creative banner image URL or upload is required.');
+            return;
+        }
+        if (form.ad_type === '1to1' && !form.academy_id) {
+            setSubmitError('Please select a Target Academy for 1-to-1 placement.');
+            return;
+        }
+
         setSubmitting(true);
 
         const payload = {
@@ -537,96 +642,7 @@ export default function SaasAds() {
         );
     };
 
-    // Live Simulator Preview Component (used in form modal)
-    const AdBannerSimulator = () => {
-        const isGoogle = form.title.toLowerCase().startsWith('sponsored:');
-        const cleanTitle = isGoogle ? form.title.replace(/sponsored:\s*/i, '') : form.title;
-        return (
-            <div className="space-y-2">
-                <span className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest block mb-1">
-                    Live Real-Time Ad Banner Preview:
-                </span>
-                <div
-                    className={`relative w-full overflow-hidden rounded-xl shadow-lg border border-white/10 ${
-                        isGoogle
-                            ? 'bg-gradient-to-r from-blue-950 via-blue-900 to-cyan-950 text-white'
-                            : 'bg-gradient-to-r from-indigo-950 via-indigo-900 to-violet-950 text-white'
-                    }`}
-                    style={{ minHeight: '56px' }}
-                >
-                    {/* Background blurred cover */}
-                    {form.media_url && (
-                        <div
-                            className="absolute inset-0 opacity-20 bg-cover bg-center blur-sm scale-110"
-                            style={{ backgroundImage: `url(${form.media_url})` }}
-                        />
-                    )}
-
-                    <div className="relative flex items-center h-14 px-3.5 gap-3">
-                        {/* Prev button placeholder */}
-                        <div className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-white/50">
-                            <ChevronLeft size={13} />
-                        </div>
-
-                        {/* Image preview */}
-                        {form.media_url && (
-                            <div className="shrink-0 h-9 w-14 rounded-lg overflow-hidden border border-white/20 shadow-sm bg-black/20">
-                                <img
-                                    src={form.media_url}
-                                    alt="Preview"
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                        e.target.style.display = 'none';
-                                    }}
-                                />
-                            </div>
-                        )}
-
-                        {/* Text and indicators */}
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                                {isGoogle && (
-                                    <span className="shrink-0 px-1.5 py-0.5 bg-white/20 text-white/95 text-[8px] font-black rounded uppercase tracking-wider border border-white/30 whitespace-nowrap shadow-sm">
-                                        Google Ad
-                                    </span>
-                                )}
-                                <p className="font-extrabold text-xs sm:text-sm leading-tight truncate">
-                                    {cleanTitle || 'Placeholder Ad Title (Type below...)'}
-                                </p>
-                            </div>
-                            <div className="flex gap-1 mt-1">
-                                <span className="w-4 h-1 rounded-full bg-white" />
-                                <span className="w-1 h-1 rounded-full bg-white/40" />
-                                <span className="w-1 h-1 rounded-full bg-white/40" />
-                            </div>
-                        </div>
-
-                        {/* CTA button */}
-                        <div
-                            className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 font-bold text-[10px] rounded-lg shadow-sm border whitespace-nowrap ${
-                                isGoogle
-                                    ? 'bg-white text-blue-800 border-transparent'
-                                    : 'bg-white text-indigo-800 border-transparent'
-                            }`}
-                        >
-                            Learn More
-                            <ExternalLink size={10} />
-                        </div>
-
-                        {/* Close button placeholder */}
-                        <div className="shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-white/50">
-                            <X size={11} />
-                        </div>
-                    </div>
-                    
-                    {/* Bottom Progress loader line */}
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10">
-                        <div className="h-full bg-white/40 w-1/3" />
-                    </div>
-                </div>
-            </div>
-        );
-    };
+    // Simulator preview is now declared as a top-level component to respect React best practices.
 
     return (
         <div className="space-y-8 animate-fade-in text-slate-800 dark:text-zinc-100 max-w-7xl mx-auto pb-10">
@@ -1372,7 +1388,7 @@ export default function SaasAds() {
                                     </p>
 
                                     <div className="pt-2">
-                                        <AdBannerSimulator />
+                                        <AdBannerSimulator title={form.title} mediaUrl={form.media_url} />
                                     </div>
                                 </div>
 
@@ -1380,14 +1396,25 @@ export default function SaasAds() {
                                 <div className="border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-3xl p-4 shadow-inner space-y-3">
                                     <span className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest block">Creative Image Asset Spec:</span>
                                     {form.media_url ? (
-                                        <div className="relative rounded-2xl overflow-hidden border border-slate-100 dark:border-zinc-800 h-44 bg-zinc-950 flex items-center justify-center">
-                                            <img src={form.media_url} alt="Large preview" className="max-w-full max-h-full object-contain" />
+                                        <div className="relative rounded-2xl overflow-hidden border border-slate-150 dark:border-zinc-800 h-44 bg-zinc-950 flex items-center justify-center group/preview">
+                                            <img src={form.media_url} alt="Large preview" className="max-w-full max-h-full object-contain group-hover/preview:opacity-40 transition-opacity" />
+                                            <label className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover/preview:opacity-100 bg-black/60 text-white cursor-pointer transition-all gap-1">
+                                                <Upload className="w-6 h-6" />
+                                                <span className="text-xs font-bold">Replace Image</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+                                            </label>
                                         </div>
                                     ) : (
-                                        <div className="rounded-2xl border border-dashed border-slate-300 dark:border-zinc-800 h-44 flex flex-col items-center justify-center text-slate-450 dark:text-zinc-500 gap-2">
-                                            <Upload className="w-8 h-8 opacity-40" />
-                                            <span className="text-xs font-semibold">Image Asset Preview Area</span>
-                                        </div>
+                                        <label className="rounded-2xl border border-dashed border-slate-300 dark:border-zinc-800 hover:border-indigo-500 dark:hover:border-indigo-500 hover:bg-slate-55/30 dark:hover:bg-zinc-850/20 transition-all h-44 flex flex-col items-center justify-center text-slate-450 dark:text-zinc-550 gap-2 cursor-pointer relative">
+                                            {uploading ? (
+                                                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                                            ) : (
+                                                <Upload className="w-8 h-8 opacity-45 hover:opacity-100 transition-opacity" />
+                                            )}
+                                            <span className="text-xs font-black text-slate-700 dark:text-zinc-300">Click to Upload Image</span>
+                                            <span className="text-[9px] text-slate-400 dark:text-zinc-500">Supports JPG, PNG, WEBP</span>
+                                            <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+                                        </label>
                                     )}
                                 </div>
 
