@@ -77,7 +77,7 @@ export default function SubscriptionsTable({
                                 <th className="p-4 font-bold">Current Plan</th>
                                 <th className="p-4 font-bold">Limits</th>
                                 <th className="p-4 font-bold">Status</th>
-                                <th className="p-4 font-bold">Last Payment</th>
+                                <th className="p-4 font-bold">Renewal / Cycle</th>
                                 <th className="p-4 font-bold text-right">Actions</th>
                             </tr>
                         </thead>
@@ -134,9 +134,12 @@ export default function SubscriptionsTable({
                                                 )}
                                             </td>
                                             <td className="p-4">
-                                                <span className="text-xs text-surface-500 font-medium">
-                                                    {acc.last_payment_at ? new Date(acc.last_payment_at).toLocaleDateString() : '—'}
-                                                </span>
+                                                <div className="text-xs font-bold text-surface-700 uppercase tracking-wide">
+                                                    {acc.billing_cycle_type || 'monthly'}
+                                                </div>
+                                                <div className="text-[10px] text-surface-400 font-semibold mt-0.5">
+                                                    End: {acc.billing_cycle_end ? new Date(acc.billing_cycle_end).toLocaleDateString() : '—'}
+                                                </div>
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="flex items-center gap-2 justify-end">

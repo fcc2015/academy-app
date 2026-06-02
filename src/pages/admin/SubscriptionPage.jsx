@@ -74,6 +74,7 @@ const SubscriptionPage = () => {
     const [loading, setLoading] = useState(true);
     const [upgradingPlan, setUpgradingPlan] = useState(null);
     const [paymentResult, setPaymentResult] = useState(null);
+    const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'yearly'
 
     const lang = language === 'ar' ? 'ar' : language === 'fr' ? 'fr' : 'en';
     const formatLimit = (v) => v === -1 ? '∞' : v;
@@ -134,6 +135,8 @@ const SubscriptionPage = () => {
             return;
         }
         setUpgradingPlan(plan.id);
+        const yearlyPrice = plan.price * 10;
+        const amount = billingCycle === 'yearly' ? yearlyPrice : plan.priceUSD;
         try {
             const res = await authFetch(`${API_URL}/payments/gateway/create-order`, {
                 method: 'POST',
@@ -141,9 +144,10 @@ const SubscriptionPage = () => {
                 body: JSON.stringify({
                     academy_id: planInfo.academy_id,
                     plan_id: plan.id,
-                    amount: plan.priceUSD,
+                    billing_cycle_type: billingCycle,
+                    amount,
                     currency: 'USD',
-                    description: `${plan.nameEn} Plan — Academy SaaS (${plan.price} MAD/mo)`,
+                    description: `${plan.nameEn} Plan — ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} (${billingCycle === 'yearly' ? yearlyPrice : plan.price} MAD)`,
                 }),
             });
             if (res.ok) {
@@ -174,6 +178,7 @@ const SubscriptionPage = () => {
             currentPlan: 'خطتك الحالية',
             popular: 'الأكثر شعبية',
             month: '/ شهر',
+            year: '/ سنة',
             upgrade: 'ترقية الآن',
             current: 'الخطة الحالية',
             contactSupport: 'تواصل مع الدعم',
@@ -194,6 +199,7 @@ const SubscriptionPage = () => {
             currentPlan: 'Plan actuel',
             popular: 'Le plus populaire',
             month: '/ mois',
+            year: '/ an',
             upgrade: 'Passer au supérieur',
             current: 'Plan actuel',
             contactSupport: 'Contacter le support',
@@ -214,6 +220,7 @@ const SubscriptionPage = () => {
             currentPlan: 'Current Plan',
             popular: 'Most Popular',
             month: '/ month',
+            year: '/ year',
             upgrade: 'Upgrade Now',
             current: 'Current Plan',
             contactSupport: 'Contact Support',
@@ -239,6 +246,21 @@ const SubscriptionPage = () => {
                 </h1>
                 <p className="text-slate-500 mt-2">{t.subtitle}</p>
             </div>
+
+            {/* Suspended Banner */}
+            {planInfo?.status === 'suspended' && (
+                <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-2xl flex items-center gap-3">
+                    <AlertCircle className="text-red-600 shrink-0" size={24} />
+                    <div>
+                        <p className="font-black text-red-900 text-sm">
+                            {lang === 'ar' ? '⛔ أكاديميتك موقوفة' : lang === 'fr' ? '⛔ Votre académie est suspendue' : '⛔ Your academy is suspended'}
+                        </p>
+                        <p className="text-xs text-red-700 mt-0.5">
+                            {lang === 'ar' ? 'تجديد اشتراكك لاستعادة الوصول الكامل.' : lang === 'fr' ? 'Renouvelez votre abonnement pour restaurer l\'accès complet.' : 'Renew your subscription to restore full access.'}
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Warning: this is NOT player plans */}
             <div className={`mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 ${isRTL ? 'flex-row-reverse text-right' : ''}`}>
@@ -271,11 +293,19 @@ const SubscriptionPage = () => {
                             <div className="text-[10px] font-bold uppercase tracking-widest text-white/60">{t.currentPlan}</div>
                             <div className="text-2xl font-black">{currentPlan[`name${lang.charAt(0).toUpperCase() + lang.slice(1)}`]}</div>
                         </div>
-                        <div className={`${isRTL ? 'mr-auto' : 'ml-auto'}`}>
+                        <div className={`${isRTL ? 'mr-auto' : 'ml-auto'} text-right`}>
                             <div className="text-3xl font-black">
                                 {currentPlan.price === 0 ? t.free : `${currentPlan.price} MAD`}
                             </div>
                             {currentPlan.price > 0 && <div className="text-xs text-white/60">{t.month}</div>}
+                            {/* Show subscription end date if available */}
+                            {planInfo?.billing_cycle_end && currentPlan.price > 0 && (
+                                <div className="mt-1 text-[10px] font-bold text-white/70 flex items-center gap-1 justify-end">
+                                    <Calendar size={10} />
+                                    {lang === 'ar' ? 'ينتهي:' : lang === 'fr' ? 'Expire:' : 'Renews:'}{' '}
+                                    {new Date(planInfo.billing_cycle_end).toLocaleDateString()}
+                                </div>
+                            )}
                         </div>
                     </div>
                     {/* Limits */}
@@ -304,13 +334,47 @@ const SubscriptionPage = () => {
                     <Loader2 className="animate-spin text-violet-600" size={40} />
                 </div>
             ) : (
-                <div className="grid gap-6 md:grid-cols-3">
+                <>
+                    {/* Billing Cycle Toggle */}
+                    <div className="flex justify-center mb-8">
+                        <div className="flex items-center gap-1 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 shadow-inner">
+                            <button
+                                onClick={() => setBillingCycle('monthly')}
+                                className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${
+                                    billingCycle === 'monthly'
+                                        ? 'bg-white text-slate-900 shadow-md border border-slate-200'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                            >
+                                {lang === 'ar' ? 'شهري' : lang === 'fr' ? 'Mensuel' : 'Monthly'}
+                            </button>
+                            <button
+                                onClick={() => setBillingCycle('yearly')}
+                                className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all flex items-center gap-2 ${
+                                    billingCycle === 'yearly'
+                                        ? 'bg-white text-slate-900 shadow-md border border-slate-200'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                            >
+                                {lang === 'ar' ? 'سنوي' : lang === 'fr' ? 'Annuel' : 'Yearly'}
+                                <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">
+                                    {lang === 'ar' ? 'وفر 17%' : lang === 'fr' ? '-17%' : 'Save 17%'}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-3">
                     {SAAS_PLANS.map(plan => {
                         const Icon = plan.icon;
                         const isCurrent = plan.id === currentPlanId;
                         const isLoadingThis = upgradingPlan === plan.id;
                         const planName = plan[`name${lang.charAt(0).toUpperCase() + lang.slice(1)}`];
                         const features = plan.features[lang] || plan.features.en;
+                        const monthlyMAD = plan.price;
+                        const yearlyMAD = plan.price * 10;
+                        const displayMAD = billingCycle === 'yearly' ? yearlyMAD : monthlyMAD;
+                        const displayUSD = billingCycle === 'yearly' ? plan.priceUSD * 10 : plan.priceUSD;
 
                         return (
                             <div
@@ -343,9 +407,14 @@ const SubscriptionPage = () => {
                                         <span className="text-3xl font-black text-slate-900">{t.free}</span>
                                     ) : (
                                         <>
-                                            <span className="text-3xl font-black text-slate-900">{plan.price}</span>
-                                            <span className="text-slate-500 mr-1"> MAD {t.month}</span>
-                                            <div className="text-xs text-slate-400 mt-0.5">≈ ${plan.priceUSD} USD</div>
+                                            <span className="text-3xl font-black text-slate-900">{displayMAD}</span>
+                                            <span className="text-slate-500 mr-1"> MAD{billingCycle === 'yearly' ? t.year : t.month}</span>
+                                            <div className="text-xs text-slate-400 mt-0.5">≈ ${displayUSD} USD</div>
+                                            {billingCycle === 'yearly' && plan.price > 0 && (
+                                                <div className="mt-1 text-[10px] font-black text-emerald-600">
+                                                    {lang === 'ar' ? '🎁 شهرين مجاناً!' : lang === 'fr' ? '🎁 2 mois offerts !' : '🎁 2 months free!'}
+                                                </div>
+                                            )}
                                         </>
                                     )}
                                 </div>
@@ -404,6 +473,7 @@ const SubscriptionPage = () => {
                         );
                     })}
                 </div>
+                </>
             )}
 
             <div className={`mt-8 p-5 bg-slate-50 rounded-2xl border border-slate-100 ${isRTL ? 'text-right' : ''}`}>

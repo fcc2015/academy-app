@@ -49,6 +49,7 @@ class PlanAssignment(BaseModel):
     pro_rata_amount: float | None = None
     pro_rata_credit: float | None = None
     upgrade_type: str | None = None  # "upgrade"
+    billing_cycle_type: str | None = "monthly"  # "monthly" or "yearly"
 
 class NotificationTriggerRequest(BaseModel):
     thresholds: list[int] = [50, 75, 90, 100]
@@ -703,14 +704,26 @@ async def verify_domain(academy_id: str):
 @router.patch("/academies/{academy_id}/plan")
 async def assign_plan(academy_id: str, data: PlanAssignment):
     """Assign or upgrade a subscription plan — records billing_cycle_start and pro-rata info."""
-    now_iso = datetime.now(timezone.utc).isoformat()
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+
+    cycle_type = data.billing_cycle_type or "monthly"
+    if cycle_type == "yearly":
+        end_dt = now + timedelta(days=365)
+    else:
+        end_dt = now + timedelta(days=30)
+    grace_dt = end_dt + timedelta(days=7)
 
     async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
-        # Try with all new fields first; fall back to plan_id only if columns don't exist yet
         patch_data = {
             "plan_id": data.plan_id,
             "subscription_status": "active",
             "billing_cycle_start": now_iso,
+            "billing_cycle_end": end_dt.isoformat(),
+            "billing_cycle_type": cycle_type,
+            "grace_period_end": grace_dt.isoformat(),
+            "status": "active",
         }
         res = await client.patch(
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
@@ -745,6 +758,92 @@ async def assign_plan(academy_id: str, data: PlanAssignment):
                 logger.warning(f"Payment record (non-critical): {e}")
 
         return {"success": True, "plan_id": data.plan_id, "billing_cycle_start": now_iso}
+
+
+# ── Expiry Check (called by background scheduler in main.py) ──
+
+async def run_saas_expiry_check() -> dict:
+    """
+    Background job: suspend academies whose grace period has ended,
+    warn academies in grace period (past billing_cycle_end but within grace_period_end),
+    and return a summary dict.
+    """
+    from datetime import datetime, timezone
+    try:
+        now = datetime.now(timezone.utc)
+        suspended = []
+        warned = []
+
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            # Fetch all non-free, non-already-suspended paid academies
+            res = await client.get(
+                f"{supabase.url}/rest/v1/academies"
+                f"?select=id,name,plan_id,subscription_status,billing_cycle_end,grace_period_end,email,status"
+                f"&plan_id=neq.free"
+                f"&status=neq.suspended",
+                headers=supabase.admin_headers,
+            )
+            if res.status_code != 200:
+                logger.error("Expiry check — fetch failed: %s", res.text)
+                return {"suspended": 0, "warned": 0, "error": res.text}
+
+            academies = res.json()
+
+            for academy in academies:
+                grace_end_str = academy.get("grace_period_end")
+                cycle_end_str = academy.get("billing_cycle_end")
+                academy_id = academy["id"]
+                name = academy.get("name", academy_id)
+
+                # ── 1. Hard suspend: grace period has expired ──
+                if grace_end_str:
+                    try:
+                        grace_end = datetime.fromisoformat(grace_end_str.replace("Z", "+00:00"))
+                        if now > grace_end:
+                            await client.patch(
+                                f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+                                json={"status": "suspended", "subscription_status": "suspended"},
+                                headers=supabase.admin_headers,
+                            )
+                            suspended.append(name)
+                            # Send suspension email (non-critical)
+                            academy_email = academy.get("email")
+                            if academy_email:
+                                try:
+                                    from services.email_service import send_suspension_notice
+                                    await send_suspension_notice(academy_email, name)
+                                except Exception as email_err:
+                                    logger.warning("Suspension email failed for %s: %s", name, email_err)
+                            continue  # Already suspended, skip grace warning
+                    except ValueError:
+                        logger.warning("Bad grace_period_end for academy %s: %s", name, grace_end_str)
+
+                # ── 2. Warn: billing cycle ended but still in grace period ──
+                if cycle_end_str:
+                    try:
+                        cycle_end = datetime.fromisoformat(cycle_end_str.replace("Z", "+00:00"))
+                        if now > cycle_end:
+                            warned.append(name)
+                            logger.info(
+                                "Academy '%s' is in grace period (billing ended %s)", name, cycle_end_str
+                            )
+                    except ValueError:
+                        logger.warning("Bad billing_cycle_end for academy %s: %s", name, cycle_end_str)
+
+        logger.info(
+            "Expiry check complete — suspended: %d, in grace period: %d",
+            len(suspended), len(warned)
+        )
+        return {
+            "suspended": len(suspended),
+            "warned": len(warned),
+            "suspended_names": suspended,
+            "warned_names": warned,
+        }
+
+    except Exception as e:
+        logger.error("run_saas_expiry_check failed: %s", e, exc_info=True)
+        return {"suspended": 0, "warned": 0, "error": str(e)}
 
 
 # ── Platform Stats ──
@@ -1066,7 +1165,7 @@ async def trigger_renewal_reminders(req: RenewalReminderRequest):
 
     async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.get(
-            f"{supabase.url}/rest/v1/academies?select=id,name,plan_id,billing_cycle_start,status&status=neq.suspended",
+            f"{supabase.url}/rest/v1/academies?select=id,name,plan_id,billing_cycle_start,billing_cycle_end,status&status=neq.suspended",
             headers=supabase.admin_headers
         )
         academies = res.json() if res.status_code == 200 else []
@@ -1075,12 +1174,21 @@ async def trigger_renewal_reminders(req: RenewalReminderRequest):
     for acc in academies:
         if acc.get("plan_id", "free") == "free":
             continue
-        billing_start = acc.get("billing_cycle_start")
-        if not billing_start:
-            continue
-        renewal = _next_renewal_date(billing_start)
+        
+        # Prefer billing_cycle_end from DB, fallback to _next_renewal_date if not set
+        billing_end_str = acc.get("billing_cycle_end")
+        if billing_end_str:
+            try:
+                renewal = datetime.fromisoformat(billing_end_str.replace("Z", "+00:00")).date()
+            except Exception:
+                renewal = None
+        else:
+            billing_start = acc.get("billing_cycle_start")
+            renewal = _next_renewal_date(billing_start) if billing_start else None
+
         if renewal is None:
             continue
+            
         days_until = (renewal - today).days
         if 0 <= days_until <= req.days_ahead:
             due_soon.append({

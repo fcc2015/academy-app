@@ -319,6 +319,19 @@ async def _daily_alert_scheduler():
                 f"{result.get('players_suspended', 0)} suspended, "
                 f"{result.get('players_reactivated', 0)} reactivated"
             )
+
+            # Run the SaaS expiry check (academies)
+            try:
+                logger.info("🔔 Running daily SaaS expiry check...")
+                from routers.saas_admin import run_saas_expiry_check
+                saas_result = await run_saas_expiry_check()
+                logger.info(
+                    f"✅ SaaS expiry check complete: {saas_result.get('checked_academies', 0)} checked, "
+                    f"suspended: {saas_result.get('suspended', [])}, "
+                    f"warned: {saas_result.get('warned', [])}"
+                )
+            except Exception as saas_err:
+                logger.error(f"❌ Daily SaaS expiry check error: {saas_err}", exc_info=True)
         except asyncio.CancelledError:
             logger.info("Daily alert scheduler cancelled")
             break

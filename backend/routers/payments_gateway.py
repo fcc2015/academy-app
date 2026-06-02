@@ -32,6 +32,7 @@ class CreateOrderRequest(BaseModel):
     currency: str = Field("USD", pattern=r"^[A-Z]{3}$")
     description: str = Field("Academy SaaS Subscription", max_length=500)
     source: Optional[str] = Field(None, max_length=50)
+    billing_cycle_type: Optional[str] = "monthly"  # "monthly" or "yearly"
 
 
 class CaptureOrderRequest(BaseModel):
@@ -100,7 +101,7 @@ async def create_paypal_order(req: CreateOrderRequest):
         cancel_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=cancelled"
 
     # Set custom_id and reference_id properly
-    custom_id = f"parent|{req.academy_id}" if req.source == 'parent_checkout' else f"{effective_academy_id}|{req.plan_id}"
+    custom_id = f"parent|{req.academy_id}" if req.source == 'parent_checkout' else f"{effective_academy_id}|{req.plan_id}|{req.billing_cycle_type or 'monthly'}"
     ref_id = f"parent_{req.academy_id}" if req.source == 'parent_checkout' else f"academy_{effective_academy_id}"
 
     order_payload = {
@@ -152,7 +153,8 @@ async def create_paypal_order(req: CreateOrderRequest):
                             "amount": req.amount,
                             "currency": req.currency,
                             "status": "pending",
-                            "created_at": datetime.now(timezone.utc).isoformat()
+                            "created_at": datetime.now(timezone.utc).isoformat(),
+                            "billing_cycle_type": req.billing_cycle_type or "monthly"
                         },
                         headers=supabase.admin_headers
                     )
@@ -224,24 +226,22 @@ async def capture_paypal_order(req: CaptureOrderRequest):
         # If successful, update academy subscription status + send receipt email
         if capture_status == "COMPLETED":
             try:
-                update_data = {
-                    "subscription_status": "active",
-                    "last_payment_at": datetime.now(timezone.utc).isoformat()
-                }
-                # Also assign the plan if provided
-                if req.plan_id:
-                    update_data["plan_id"] = req.plan_id
-
                 async with httpx.AsyncClient(trust_env=False, timeout=30.0) as db_client:
                     # check if this is a parent payment by checking if academy_id starts with parent|
                     is_parent = False
                     user_id = req.academy_id # defaults to academy_id from capture payload
+                    plan_id = req.plan_id
+                    billing_cycle_type = "monthly"
                     try:
-                        # try to get custom_id
                         custom_id = capture_data.get("purchase_units", [])[0].get("custom_id", "")
                         if custom_id.startswith("parent|"):
                             is_parent = True
                             user_id = custom_id.split("|")[1]
+                        elif "|" in custom_id:
+                            parts = custom_id.split("|")
+                            user_id = parts[0]
+                            plan_id = parts[1] if len(parts) > 1 else None
+                            billing_cycle_type = parts[2] if len(parts) > 2 else "monthly"
                     except Exception:
                         pass
                     
@@ -252,6 +252,29 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                             headers=supabase.admin_headers
                         )
                     else:
+                        from datetime import datetime, timedelta, timezone
+                        now = datetime.now(timezone.utc)
+                        now_iso = now.isoformat()
+                        
+                        cycle_type = billing_cycle_type or "monthly"
+                        if cycle_type == "yearly":
+                            end_dt = now + timedelta(days=365)
+                        else:
+                            end_dt = now + timedelta(days=30)
+                        grace_dt = end_dt + timedelta(days=7)
+                        
+                        update_data = {
+                            "subscription_status": "active",
+                            "status": "active",
+                            "last_payment_at": now_iso,
+                            "billing_cycle_start": now_iso,
+                            "billing_cycle_end": end_dt.isoformat(),
+                            "billing_cycle_type": cycle_type,
+                            "grace_period_end": grace_dt.isoformat()
+                        }
+                        if plan_id:
+                            update_data["plan_id"] = plan_id
+
                         await db_client.patch(
                             f"{supabase.url}/rest/v1/academies?id=eq.{req.academy_id}",
                             json=update_data,
@@ -380,14 +403,37 @@ async def verify_paypal_order(paypal_order_id: str):
 
             # 4. Update academy subscription if custom_id has academy_id|plan_id
             if custom_id and "|" in custom_id:
-                academy_id, plan_id = custom_id.split("|", 1)
+                parts = custom_id.split("|")
+                academy_id = parts[0]
+                plan_id = parts[1] if len(parts) > 1 else None
+                billing_cycle_type = parts[2] if len(parts) > 2 else "monthly"
+
+                from datetime import datetime, timedelta, timezone
+                now = datetime.now(timezone.utc)
+                now_iso = now.isoformat()
+
+                cycle_type = billing_cycle_type or "monthly"
+                if cycle_type == "yearly":
+                    end_dt = now + timedelta(days=365)
+                else:
+                    end_dt = now + timedelta(days=30)
+                grace_dt = end_dt + timedelta(days=7)
+
+                update_data = {
+                    "subscription_status": "active",
+                    "status": "active",
+                    "last_payment_at": now_iso,
+                    "billing_cycle_start": now_iso,
+                    "billing_cycle_end": end_dt.isoformat(),
+                    "billing_cycle_type": cycle_type,
+                    "grace_period_end": grace_dt.isoformat()
+                }
+                if plan_id:
+                    update_data["plan_id"] = plan_id
+
                 await db.patch(
                     f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
-                    json={
-                        "subscription_status": "active",
-                        "plan_id": plan_id,
-                        "last_payment_at": datetime.now(timezone.utc).isoformat(),
-                    },
+                    json=update_data,
                     headers=supabase.admin_headers,
                 )
 
@@ -548,6 +594,7 @@ class CreateStripeSessionRequest(BaseModel):
     amount: float
     currency: str = "mad"
     description: str = "Academy SaaS Subscription"
+    billing_cycle_type: Optional[str] = "monthly"  # "monthly" or "yearly"
 
 class StripeWebhookRequest(BaseModel):
     pass
@@ -579,7 +626,7 @@ async def create_stripe_checkout_session(req: CreateStripeSessionRequest):
             mode="payment",
             success_url=success_url,
             cancel_url=cancel_url,
-            client_reference_id=f"{req.academy_id}|{req.plan_id}",
+            client_reference_id=f"{req.academy_id}|{req.plan_id}|{req.billing_cycle_type or 'monthly'}",
             metadata={
                 "academy_id": req.academy_id,
                 "plan_id": req.plan_id,
@@ -598,7 +645,8 @@ async def create_stripe_checkout_session(req: CreateStripeSessionRequest):
                         "amount": req.amount,
                         "currency": req.currency,
                         "status": "pending",
-                        "created_at": datetime.now(timezone.utc).isoformat()
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "billing_cycle_type": req.billing_cycle_type or "monthly"
                     },
                     headers=supabase.admin_headers
                 )
@@ -635,15 +683,29 @@ async def stripe_webhook(request: Request):
             client_ref = session.get("client_reference_id")
             session_id = session.get("id") or getattr(session, "id", "")
             if client_ref and "|" in client_ref:
-                academy_id, plan_id = client_ref.split("|", 1)
+                parts = client_ref.split("|")
+                academy_id = parts[0]
+                plan_id = parts[1] if len(parts) > 1 else None
+                billing_cycle_type = parts[2] if len(parts) > 2 else "monthly"
                 
+                from datetime import datetime, timedelta, timezone
+                now = datetime.now(timezone.utc)
+                now_iso = now.isoformat()
+                
+                cycle_type = billing_cycle_type or "monthly"
+                if cycle_type == "yearly":
+                    end_dt = now + timedelta(days=365)
+                else:
+                    end_dt = now + timedelta(days=30)
+                grace_dt = end_dt + timedelta(days=7)
+
                 # Update transaction in DB
                 async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
                     await client.patch(
                         f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.stripe_{session_id[:20]}",
                         json={
                             "status": "completed",
-                            "completed_at": datetime.now(timezone.utc).isoformat()
+                            "completed_at": now_iso
                         },
                         headers=supabase.admin_headers
                     )
@@ -653,8 +715,13 @@ async def stripe_webhook(request: Request):
                         f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
                         json={
                             "subscription_status": "active",
+                            "status": "active",
                             "plan_id": plan_id,
-                            "last_payment_at": datetime.now(timezone.utc).isoformat()
+                            "last_payment_at": now_iso,
+                            "billing_cycle_start": now_iso,
+                            "billing_cycle_end": end_dt.isoformat(),
+                            "billing_cycle_type": cycle_type,
+                            "grace_period_end": grace_dt.isoformat()
                         },
                         headers=supabase.admin_headers
                     )
@@ -675,6 +742,7 @@ class CashPaymentRequest(BaseModel):
     plan_id: str
     amount: float
     provider: str  # "wafacash" or "cashplus"
+    billing_cycle_type: Optional[str] = "monthly"  # "monthly" or "yearly"
 
 class CashConfirmRequest(BaseModel):
     transaction_id: str
@@ -698,7 +766,8 @@ async def generate_cash_payment_code(req: CashPaymentRequest):
         "currency": "MAD",
         "status": "waiting_deposit",
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "paypal_capture_id": req.provider.upper() # Store provider type in capture_id column
+        "paypal_capture_id": req.provider.upper(), # Store provider type in capture_id column
+        "billing_cycle_type": req.billing_cycle_type or "monthly"
     }
 
     try:
@@ -748,13 +817,25 @@ async def confirm_cash_deposit(req: CashConfirmRequest):
             
         academy_id = tx.get("academy_id")
         plan_id = tx.get("plan_id")
+        billing_cycle_type = tx.get("billing_cycle_type", "monthly")
         
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        
+        cycle_type = billing_cycle_type or "monthly"
+        if cycle_type == "yearly":
+            end_dt = now + timedelta(days=365)
+        else:
+            end_dt = now + timedelta(days=30)
+        grace_dt = end_dt + timedelta(days=7)
+
         # 2. Update transaction status
         await client.patch(
             f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{quote(req.transaction_id)}",
             json={
                 "status": "completed",
-                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "completed_at": now_iso,
                 "paypal_capture_id": f"{tx.get('paypal_capture_id', 'CASH')}|PROOF:{req.deposit_proof_reference}"
             },
             headers=supabase.admin_headers
@@ -765,8 +846,13 @@ async def confirm_cash_deposit(req: CashConfirmRequest):
             f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
             json={
                 "subscription_status": "active",
+                "status": "active",
                 "plan_id": plan_id,
-                "last_payment_at": datetime.now(timezone.utc).isoformat()
+                "last_payment_at": now_iso,
+                "billing_cycle_start": now_iso,
+                "billing_cycle_end": end_dt.isoformat(),
+                "billing_cycle_type": cycle_type,
+                "grace_period_end": grace_dt.isoformat()
             },
             headers=supabase.admin_headers
         )

@@ -27,6 +27,8 @@ export default function SubscriptionDetailModal({
     loadingTx,
     verifyingOrder,
     handleVerifyOrder,
+    billingCycle = 'monthly',
+    setBillingCycle,
 }) {
     const [stripeProcessing, setStripeProcessing] = useState(null);   // plan id
     const [cashProcessing, setCashProcessing] = useState(null);       // plan id
@@ -42,8 +44,9 @@ export default function SubscriptionDetailModal({
         const newPlan = PLANS.find(p => p.id === planId);
         const currentPlan = PLANS.find(p => p.id === academy.plan_id);
         if (!newPlan) return;
+        const basePrice = billingCycle === 'yearly' ? newPlan.price * 10 : newPlan.price;
         const proRata = calculateProRata(currentPlan, newPlan, academy.billing_cycle_start);
-        const chargeAmount = currentPlan ? proRata.amount : newPlan.price;
+        const chargeAmount = currentPlan ? proRata.amount : basePrice;
 
         try {
             const res = await authFetch(`${API_URL}/payments/gateway/stripe/create-checkout-session`, {
@@ -52,11 +55,12 @@ export default function SubscriptionDetailModal({
                 body: JSON.stringify({
                     academy_id: academy.id,
                     plan_id: planId,
+                    billing_cycle_type: billingCycle,
                     amount: chargeAmount || newPlan.price,
                     currency: 'MAD',
                     description: currentPlan
                         ? `Upgrade ${currentPlan.name} → ${newPlan.name} (Pro-Rata: ${chargeAmount} MAD)`
-                        : `${newPlan.name} Plan - ${academy.name}`
+                        : `${newPlan.name} Plan — ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} — ${academy.name}`
                 })
             });
             const data = await res.json();
@@ -75,8 +79,9 @@ export default function SubscriptionDetailModal({
         const newPlan = PLANS.find(p => p.id === planId);
         const currentPlan = PLANS.find(p => p.id === academy.plan_id);
         if (!newPlan) return;
+        const basePrice = billingCycle === 'yearly' ? newPlan.price * 10 : newPlan.price;
         const proRata = calculateProRata(currentPlan, newPlan, academy.billing_cycle_start);
-        const chargeAmount = currentPlan ? proRata.amount : newPlan.price;
+        const chargeAmount = currentPlan ? proRata.amount : basePrice;
 
         try {
             const res = await authFetch(`${API_URL}/payments/gateway/cash/generate-code`, {
@@ -85,6 +90,7 @@ export default function SubscriptionDetailModal({
                 body: JSON.stringify({
                     academy_id: academy.id,
                     plan_id: planId,
+                    billing_cycle_type: billingCycle,
                     amount: chargeAmount || newPlan.price,
                     provider
                 })
@@ -163,6 +169,32 @@ export default function SubscriptionDetailModal({
                                     )}
                                 </p>
                             </div>
+                            {/* Billing Cycle Toggle */}
+                            {setBillingCycle && (
+                                <div className="flex items-center gap-1 p-1 bg-surface-100 rounded-xl border border-surface-200">
+                                    <button
+                                        onClick={() => setBillingCycle('monthly')}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                                            billingCycle === 'monthly'
+                                                ? 'bg-white text-indigo-700 shadow-sm border border-surface-200'
+                                                : 'text-surface-500 hover:text-surface-700'
+                                        }`}
+                                    >
+                                        Monthly
+                                    </button>
+                                    <button
+                                        onClick={() => setBillingCycle('yearly')}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1 ${
+                                            billingCycle === 'yearly'
+                                                ? 'bg-white text-indigo-700 shadow-sm border border-surface-200'
+                                                : 'text-surface-500 hover:text-surface-700'
+                                        }`}
+                                    >
+                                        Yearly
+                                        <span className="text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-black">-17%</span>
+                                    </button>
+                                </div>
+                            )}
                             <button
                                 onClick={() => { setShowPlanModal(false); setSelectedAcademy(null); setShowProRata(null); setCashCodes({}); setActiveCashProvider({}); }}
                                 className="text-surface-400 hover:text-surface-900 transition-colors"
@@ -177,6 +209,7 @@ export default function SubscriptionDetailModal({
                                 const isCurrentPlan = selectedAcademy.plan_id === plan.id;
                                 const currentPlan = PLANS.find(p => p.id === selectedAcademy.plan_id);
                                 const isUpgrade = currentPlan && plan.price > currentPlan.price;
+                                const displayPrice = billingCycle === 'yearly' ? plan.price * 10 : plan.price;
                                 const proRata = !isCurrentPlan && currentPlan
                                     ? calculateProRata(currentPlan, plan, selectedAcademy.billing_cycle_start)
                                     : null;
@@ -199,10 +232,15 @@ export default function SubscriptionDetailModal({
                                                 {isUpgrade && <ArrowUpRight className="w-4 h-4 text-emerald-600 ml-auto" />}
                                             </div>
                                             <p className="text-2xl font-bold text-surface-900 mb-1">
-                                                {plan.price === 0 ? 'FREE' : plan.price}{' '}
+                                                {plan.price === 0 ? 'FREE' : displayPrice}{' '}
                                                 <span className="text-sm font-medium text-surface-500">
-                                                    {plan.price > 0 ? `${plan.currency}/mo` : ''}
+                                                    {plan.price > 0 ? `${plan.currency}/${billingCycle === 'yearly' ? 'yr' : 'mo'}` : ''}
                                                 </span>
+                                                {plan.price > 0 && billingCycle === 'yearly' && (
+                                                    <span className="ml-1 text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                                                        2 months free!
+                                                    </span>
+                                                )}
                                             </p>
 
                                             {/* Resource Limits */}
@@ -303,11 +341,11 @@ export default function SubscriptionDetailModal({
                                                     {/* Admin instant override */}
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleAssignPlan(selectedAcademy, plan.id)}
+                                                        onClick={() => handleAssignPlan(selectedAcademy, plan.id, billingCycle)}
                                                         disabled={assigningPlan}
                                                         className="w-full py-2 rounded-lg text-xs font-bold bg-surface-900 text-white hover:bg-surface-800 transition-colors"
                                                     >
-                                                        {assigningPlan ? 'Applying...' : 'Instant Override (No Charge)'}
+                                                        {assigningPlan ? 'Applying...' : `Instant Override · ${billingCycle === 'yearly' ? '12 months' : '1 month'}`}
                                                     </button>
 
                                                     {plan.price > 0 && (
@@ -315,7 +353,7 @@ export default function SubscriptionDetailModal({
                                                             {/* PayPal */}
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handlePayPalCheckout(selectedAcademy, plan.id)}
+                                                                onClick={() => handlePayPalCheckout(selectedAcademy, plan.id, billingCycle)}
                                                                 disabled={paymentProcessing === selectedAcademy.id}
                                                                 className="w-full py-2 rounded-lg text-xs font-black border-0 shadow-sm transition-colors flex items-center justify-center gap-1.5 text-white"
                                                                 style={{ background: 'linear-gradient(135deg, #0070ba, #1546a0)' }}

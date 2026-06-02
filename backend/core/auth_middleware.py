@@ -152,6 +152,28 @@ async def verify_token(request: Request):
             user_id_ctx.set(user_id)
             role_ctx.set(role)
 
+            # Check if academy is suspended (only for non-super-admins)
+            if academy_id and role != "super_admin":
+                path = request.url.path
+                bypass_prefixes = (
+                    "/api/v1/payments/gateway/", "/payments/gateway/",
+                    "/api/v1/settings/plan", "/settings/plan",
+                    "/api/v1/auth/logout", "/auth/logout",
+                    "/api/v1/auth/user", "/auth/user"
+                )
+                if not any(path.startswith(prefix) for prefix in bypass_prefixes):
+                    acad_res = await client.get(
+                        f"{settings.SUPABASE_URL}/rest/v1/academies?id=eq.{academy_id}&select=status,subscription_status",
+                        headers=supabase.admin_headers
+                    )
+                    if acad_res.status_code == 200 and acad_res.json():
+                        acad = acad_res.json()[0]
+                        if acad.get("status") == "suspended" or acad.get("subscription_status") == "suspended":
+                            raise HTTPException(
+                                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                                detail="Your academy subscription is suspended. Please renew your plan f-settings/plan to restore access."
+                            )
+
             return {
                 "user_id": user_id,
                 "email": user.get("email"),

@@ -296,3 +296,24 @@ def send_monthly_academy_report(to: str, academy_name: str, player_count: int, r
     </div>
     """
     return _send_email(to, f"Rapport Mensuel ({month_name}) — {academy_name}", html)
+
+
+def send_suspension_notice(to: str, academy_name: str, reason: str = "non-payment"):
+    """Send an academy suspension notice email to an academy admin."""
+    dashboard_url = f"{_frontend_url()}/admin/subscription"
+    html = f"""
+    <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+        <div style="background: linear-gradient(135deg, #ef4444, #b91c1c); border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 24px;">
+            <h1 style="color: white; font-size: 24px; margin: 0;">⚠️ Compte Suspendu</h1>
+        </div>
+        <p style="font-size: 16px; color: #374151;">Bonjour,</p>
+        <p style="color: #6b7280;">L'abonnement de votre académie <strong>{academy_name}</strong> a été suspendu pour la raison suivante : <strong>{reason}</strong>.</p>
+        <p style="color: #6b7280; font-size: 14px;">L'accès à l'application a été limité. Pour réactiver votre compte et restaurer l'accès complet, veuillez régulariser votre paiement.</p>
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="{dashboard_url}" style="background: linear-gradient(135deg, #ef4444, #b91c1c); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 900; font-size: 14px;">Mettre à jour le paiement</a>
+        </div>
+        <p style="font-size: 12px; color: #9ca3af; text-align: center;">{ACADEMY_NAME}</p>
+    </div>
+    """
+    return _send_email(to, f"⚠️ Suspension de votre académie — {academy_name}", html)
+

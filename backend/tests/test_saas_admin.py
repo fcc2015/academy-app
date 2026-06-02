@@ -401,3 +401,74 @@ def test_admin_cannot_trigger_renewals(admin_client):
     """Renewals trigger is super_admin only — admin gets 403."""
     res = admin_client.post("/api/v1/saas/renewals/trigger", json={"days_ahead": 7})
     assert res.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_run_saas_expiry_check_suspends_and_warns(respx_mock, mocker):
+    """Verifies that run_saas_expiry_check correctly identifies past grace period academies for suspension and warns academies in grace period."""
+    from routers.saas_admin import run_saas_expiry_check
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    expired_grace_time = (now - timedelta(days=1)).isoformat()
+    active_grace_time = (now + timedelta(days=5)).isoformat()
+    ended_billing_time = (now - timedelta(hours=1)).isoformat()
+    future_billing_time = (now + timedelta(days=15)).isoformat()
+
+    mock_academies = [
+        # 1. Past grace period -> should suspend
+        {
+            "id": "acad-expired",
+            "name": "Expired FC",
+            "plan_id": "pro",
+            "subscription_status": "active",
+            "billing_cycle_end": ended_billing_time,
+            "grace_period_end": expired_grace_time,
+            "email": "expired@test.com",
+            "status": "active"
+        },
+        # 2. Past billing cycle end, but still in grace period -> should warn
+        {
+            "id": "acad-grace",
+            "name": "Grace FC",
+            "plan_id": "pro",
+            "subscription_status": "active",
+            "billing_cycle_end": ended_billing_time,
+            "grace_period_end": active_grace_time,
+            "email": "grace@test.com",
+            "status": "active"
+        },
+        # 3. Fully active and paid -> should do nothing
+        {
+            "id": "acad-active",
+            "name": "Active FC",
+            "plan_id": "pro",
+            "subscription_status": "active",
+            "billing_cycle_end": future_billing_time,
+            "grace_period_end": active_grace_time,
+            "email": "active@test.com",
+            "status": "active"
+        }
+    ]
+
+    respx_mock.get(url__regex=r".*/rest/v1/academies.*").mock(
+        return_value=Response(200, json=mock_academies)
+    )
+
+    # Mock the PATCH call for suspension
+    patch_route = respx_mock.patch(url__regex=r".*/rest/v1/academies\?id=eq\.acad-expired").mock(
+        return_value=Response(204)
+    )
+
+    # Mock email sending
+    email_spy = mocker.patch("services.email_service.send_suspension_notice", return_value=True)
+
+    result = await run_saas_expiry_check()
+
+    assert result["suspended"] == 1
+    assert result["warned"] == 1
+    assert "Expired FC" in result["suspended_names"]
+    assert "Grace FC" in result["warned_names"]
+    assert patch_route.called
+    email_spy.assert_called_once_with("expired@test.com", "Expired FC")
+

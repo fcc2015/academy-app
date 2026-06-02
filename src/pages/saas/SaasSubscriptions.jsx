@@ -89,6 +89,7 @@ export default function SaasSubscriptions() {
     const [daysAhead, setDaysAhead] = useState(7);
     const [sendingReminders, setSendingReminders] = useState(false);
     const [reminderResult, setReminderResult] = useState(null);
+    const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'yearly'
 
     useEffect(() => {
         fetchData();
@@ -149,7 +150,7 @@ export default function SaasSubscriptions() {
         }
     }
 
-    const handleAssignPlan = async (academy, planId) => {
+    const handleAssignPlan = async (academy, planId, cycleType) => {
         setAssigningPlan(true);
         try {
             const currentPlan = PLANS.find(p => p.id === academy.plan_id);
@@ -161,32 +162,40 @@ export default function SaasSubscriptions() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     plan_id: planId,
+                    billing_cycle_type: cycleType || billingCycle,
                     pro_rata_amount: proRata.amount,
                     pro_rata_credit: proRata.credit,
                     upgrade_type: 'upgrade'
                 })
             });
             if (res.ok) {
+                toast.success(`Plan updated to ${planId} (${cycleType || billingCycle})`);
                 fetchData();
                 setShowPlanModal(false);
                 setSelectedAcademy(null);
                 setShowProRata(null);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast.error(err.detail || 'Failed to assign plan');
             }
         } catch (err) {
             console.error("Failed to assign plan:", err);
+            toast.error('Connection error');
         } finally {
             setAssigningPlan(false);
         }
     };
 
-    const handlePayPalCheckout = async (academy, planId) => {
+    const handlePayPalCheckout = async (academy, planId, cycleType) => {
         setPaymentProcessing(academy.id);
         const currentPlan = PLANS.find(p => p.id === academy.plan_id);
         const newPlan = PLANS.find(p => p.id === planId);
         if (!newPlan) return;
         
+        const cycle = cycleType || billingCycle;
+        const basePrice = cycle === 'yearly' ? newPlan.price * 10 : newPlan.price;
         const proRata = calculateProRata(currentPlan, newPlan, academy.billing_cycle_start);
-        const chargeAmount = currentPlan ? proRata.amount : newPlan.price;
+        const chargeAmount = currentPlan ? proRata.amount : basePrice;
         
         try {
             const res = await authFetch(`${API_URL}/payments/gateway/create-order`, {
@@ -195,11 +204,12 @@ export default function SaasSubscriptions() {
                 body: JSON.stringify({
                     academy_id: academy.id,
                     plan_id: planId,
+                    billing_cycle_type: cycle,
                     amount: chargeAmount,
                     currency: 'USD',
                     description: currentPlan 
                         ? `Upgrade ${currentPlan.name} → ${newPlan.name} (Pro-Rata: ${chargeAmount} MAD)`
-                        : `${newPlan.name} Plan - ${academy.name}`
+                        : `${newPlan.name} Plan — ${cycle === 'yearly' ? 'Yearly' : 'Monthly'} — ${academy.name}`
                 })
             });
             if (res.ok) {
@@ -213,6 +223,7 @@ export default function SaasSubscriptions() {
             }
         } catch (err) {
             console.error("PayPal checkout error:", err);
+            toast.error('Connection error');
         } finally {
             setPaymentProcessing(null);
         }
@@ -494,6 +505,8 @@ export default function SaasSubscriptions() {
                 loadingTx={loadingTx}
                 verifyingOrder={verifyingOrder}
                 handleVerifyOrder={handleVerifyOrder}
+                billingCycle={billingCycle}
+                setBillingCycle={setBillingCycle}
             />
         </div>
     );
