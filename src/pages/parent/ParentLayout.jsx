@@ -19,6 +19,7 @@ import {
 import NotificationsDropdown from '../../components/NotificationsDropdown';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { useBranding } from '../../components/BrandingContext';
 
 function checkParentAuth() {
     const token = localStorage.getItem('token');
@@ -37,7 +38,7 @@ const ParentLayout = () => {
     const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024);
     const { t, isRTL, dir } = useLanguage();
-    const [academyName, setAcademyName] = useState(isRTL ? 'أكاديمية كرة القدم' : 'Football Academy');
+    const { logoUrl, academyName, primaryColor } = useBranding();
     const [bannerOffset, setBannerOffset] = useState(0);
 
     // Detect impersonation banner and push layout down to avoid overlap
@@ -65,16 +66,7 @@ const ParentLayout = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    useEffect(() => {
-        authFetch(`${API_URL}/settings/`)
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
-                if (data && data.academy_name) {
-                    setAcademyName(data.academy_name);
-                }
-            })
-            .catch(() => {});
-    }, []);
+
 
     // Re-evaluate on every render so that impersonation state changes are picked up
     const isValid = checkParentAuth();
@@ -153,13 +145,17 @@ const ParentLayout = () => {
                 <div className="w-72 h-full flex flex-col">
                     <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100 shrink-0">
                         <div className="flex items-center gap-3">
-                            <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                            {logoUrl ? (
+                                <img src={logoUrl} alt="Logo" className="w-10 h-10 rounded object-contain shrink-0 border border-slate-100 bg-white p-0.5" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                            ) : (
+                                <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                            )}
                             <div className="hidden w-10 h-10 bg-gradient-to-tr from-sky-500 to-blue-600 rounded-xl items-center justify-center shadow-lg transform rotate-3">
                                 <GraduationCap className="text-white -rotate-3" size={22} />
                             </div>
-                            <div>
-                                <span className="text-xl font-extrabold text-slate-800 tracking-tight block leading-tight">{isRTL ? 'ولي الأمر' : 'Parent'}</span>
-                                <span className="text-[11px] font-bold text-sky-600 tracking-wider uppercase">{isRTL ? 'بوابة' : 'Portal'}</span>
+                            <div className="min-w-0">
+                                <span className="text-sm font-semibold text-slate-800 tracking-tight block leading-tight truncate max-w-[150px]">{academyName || (isRTL ? 'ولي الأمر' : 'Parent')}</span>
+                                <span className="text-[10px] font-bold tracking-wider uppercase" style={{ color: primaryColor || '#0ea5e9' }}>{isRTL ? 'بوابة' : 'Portal'}</span>
                             </div>
                         </div>
                         <button
@@ -215,7 +211,7 @@ const ParentLayout = () => {
                         <NotificationsDropdown />
                         <div className="h-8 w-px bg-slate-200 mx-2 block"></div>
                         <div className="flex flex-col items-end">
-                            <span className="text-sm md:text-base font-black text-indigo-700 uppercase tracking-wide truncate max-w-[150px] md:max-w-[250px]">{academyName}</span>
+                            <span className="text-sm md:text-base font-black uppercase tracking-wide truncate max-w-[150px] md:max-w-[250px]" style={{ color: primaryColor || '#4f46e5' }}>{academyName}</span>
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{isRTL ? 'حساب ولي الأمر' : 'Parent Account'}</span>
                         </div>
                         <div className="w-11 h-11 bg-slate-100 rounded-full border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
+import { useBranding } from '../../components/BrandingContext';
 
 import GeneralBrandingSection from './components/GeneralBrandingSection';
 import FinancialPolicySection from './components/FinancialPolicySection';
@@ -41,6 +42,7 @@ import CouponsSection from './components/CouponsSection';
 import SecuritySection from './components/SecuritySection';
 
 const SettingsManagement = () => {
+    const { refreshBranding } = useBranding();
     const [settings, setSettings] = useState(null);
     const [coupons, setCoupons] = useState([]);
     const [newCoupon, setNewCoupon] = useState({ code: '', discount_type: 'percentage', discount_value: '' });
@@ -316,6 +318,7 @@ const SettingsManagement = () => {
             const { url } = await res.json();
             setSettings(prev => ({ ...prev, logo_url: url }));
             showBanner('تم رفع الشعار بنجاح!', 'success');
+            refreshBranding();
         } catch (err) {
             showBanner('فشل رفع الشعار: ' + err.message, 'error');
         } finally {
@@ -486,6 +489,7 @@ const SettingsManagement = () => {
                 // Re-parse the response to keep state clean
                 setSettings(updated);
                 showBanner('تم حفظ الإعدادات بنجاح!', 'success');
+                refreshBranding();
                 setTimeout(() => setSaveSuccess(false), 3000);
             } else {
                 const err = await res.json().catch(() => ({}));

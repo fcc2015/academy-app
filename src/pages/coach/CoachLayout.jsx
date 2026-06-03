@@ -20,6 +20,7 @@ import { useLanguage } from '../../i18n/LanguageContext';
 import { useIdleTimer } from '../../hooks/useIdleTimer';
 import SessionWarning from '../../components/SessionWarning';
 import PWAInstallPrompt from '../../components/PWAInstallPrompt';
+import { useBranding } from '../../components/BrandingContext';
 
 function checkCoachAuth() {
     const token = localStorage.getItem('token');
@@ -35,6 +36,7 @@ const CoachLayout = () => {
     const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const { t, isRTL, dir } = useLanguage();
+    const { logoUrl, academyName, primaryColor } = useBranding();
     const coachName = localStorage.getItem('user_name') || localStorage.getItem('email') || 'Coach';
     const [bannerOffset, setBannerOffset] = useState(0);
 
@@ -106,13 +108,17 @@ const CoachLayout = () => {
                 <div className="w-72 h-full flex flex-col">
                     <div className="h-20 flex items-center px-6 border-b border-slate-100 shrink-0">
                     <div className="flex items-center gap-3">
-                        <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                        {logoUrl ? (
+                            <img src={logoUrl} alt="Logo" className="w-10 h-10 rounded object-contain shrink-0 border border-slate-100 bg-white p-0.5" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                        ) : (
+                            <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-md" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                        )}
                         <div className="hidden w-10 h-10 bg-gradient-to-tr from-green-500 to-emerald-600 rounded-xl items-center justify-center shadow-lg transform rotate-3">
                             <span className="text-white font-black text-xl tracking-tighter -rotate-3">CA</span>
                         </div>
-                        <div>
-                            <span className="text-xl font-extrabold text-slate-800 tracking-tight block leading-tight">Coach</span>
-                            <span className="text-[11px] font-bold text-emerald-600 tracking-wider uppercase">Portal</span>
+                        <div className="min-w-0">
+                            <span className="text-sm font-semibold text-slate-800 tracking-tight block leading-tight truncate max-w-[150px]">{academyName || 'Coach'}</span>
+                            <span className="text-[10px] font-bold tracking-wider uppercase" style={{ color: primaryColor || '#10b981' }}>Portal</span>
                         </div>
                     </div>
                 </div>

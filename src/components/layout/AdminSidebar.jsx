@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { usePlan } from '../../hooks/usePlan';
+import { useBranding } from '../BrandingContext';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 
@@ -59,13 +60,26 @@ const mapNotifToRoute = (notif) => {
     return '/admin/dashboard';
 };
 
-const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setMobileOpen, navGroups, handleLogout, CollapseIcon, academyName, role, branchesAssigned, routeBadges = {} }) => (
+const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setMobileOpen, navGroups, handleLogout, CollapseIcon, academyName, role, branchesAssigned, routeBadges = {} }) => {
+    const { logoUrl, primaryColor } = useBranding();
+    return (
     <div className="flex flex-col h-full bg-white border-r border-surface-200 overflow-hidden" dir={dir}>
         {/* Brand Header */}
         <div className={`flex items-center px-5 py-5 border-b border-surface-200 ${collapsed ? 'justify-center' : 'justify-between'}`}>
             {!collapsed && (
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded shrink-0 bg-surface-900 flex items-center justify-center text-white">
+                    {logoUrl ? (
+                        <img
+                            src={logoUrl}
+                            alt="logo"
+                            className="w-8 h-8 rounded object-contain shrink-0 border border-slate-100 bg-white p-0.5"
+                            onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                        />
+                    ) : null}
+                    <div
+                        className="w-8 h-8 rounded shrink-0 flex items-center justify-center text-white"
+                        style={{ background: primaryColor || '#1e293b', display: logoUrl ? 'none' : 'flex' }}
+                    >
                         <Trophy size={16} />
                     </div>
                     <div className={`min-w-0 ${isRTL ? 'text-right' : 'text-left'}`}>
@@ -85,9 +99,21 @@ const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setM
                 </div>
             )}
             {collapsed && (
-                <div className="w-8 h-8 rounded bg-surface-900 flex items-center justify-center text-white">
-                    <Trophy size={16} />
-                </div>
+                logoUrl ? (
+                    <img
+                        src={logoUrl}
+                        alt="logo"
+                        className="w-8 h-8 rounded object-contain border border-slate-100 bg-white p-0.5"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                ) : (
+                    <div
+                        className="w-8 h-8 rounded flex items-center justify-center text-white"
+                        style={{ background: primaryColor || '#1e293b' }}
+                    >
+                        <Trophy size={16} />
+                    </div>
+                )
             )}
             <button
                 onClick={() => setCollapsed(!collapsed)}

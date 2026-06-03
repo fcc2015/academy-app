@@ -471,6 +471,12 @@ class SupabaseHttpClient:
         res.raise_for_status()
         return res.json()
 
+    async def update_academy(self, academy_id, academy_data):
+        res = await self.client.patch(f"{self.url}/rest/v1/academies?id=eq.{academy_id}", json=academy_data)
+        res.raise_for_status()
+        return res.json()
+
+
     # Squads Management
     async def get_squads(self):
         return await self._get("/rest/v1/squads?select=*,coaches(full_name)")

@@ -106,7 +106,30 @@ async def update_settings(settings_id: str, settings: AcademySettingsUpdate):
         settings_dict = settings.model_dump(exclude_unset=True)
         
         response = await supabase.update_academy_settings(settings_id, settings_dict)
-        return response[0]
+        if response and isinstance(response, list) and len(response) > 0:
+            updated_row = response[0]
+            academy_id = updated_row.get("academy_id")
+            if academy_id:
+                academy_update = {}
+                if "logo_url" in settings_dict:
+                    academy_update["logo_url"] = settings_dict["logo_url"]
+                if "academy_name" in settings_dict:
+                    academy_update["name"] = settings_dict["academy_name"]
+                
+                about_text = settings_dict.get("about_text")
+                if about_text and about_text.startswith("{"):
+                    import json
+                    try:
+                        parsed = json.loads(about_text)
+                        if "primary_color" in parsed:
+                            academy_update["primary_color"] = parsed["primary_color"]
+                    except Exception:
+                        pass
+                
+                if academy_update:
+                    await supabase.update_academy(academy_id, academy_update)
+            return updated_row
+        return response
     except Exception as e:
         logger.error("Error updating settings: %s", e, exc_info=True)
         raise HTTPException(

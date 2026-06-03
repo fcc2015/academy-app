@@ -1,9 +1,11 @@
+import asyncio
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from core.auth_middleware import verify_token
 from typing import List, Optional
 from pydantic import BaseModel
 from services.supabase_client import supabase
+from services.push_service import trigger_push_for_notification
 
 from core.config import settings
 
@@ -56,13 +58,19 @@ async def get_notifications(user_id: Optional[str] = None, role: Optional[str] =
         )
 
 @router.post("/", response_model=NotificationResponse)
-async def create_notification(notification: NotificationCreate):
+async def create_notification(notification: NotificationCreate, user: dict = Depends(verify_token)):
     try:
         data = notification.model_dump()
         if data.get("target_role") == "":
             data["target_role"] = None
+        # Inject academy_id from the authenticated user so push service can find subscribers
+        academy_id = user.get("academy_id")
         response = await supabase.insert_notification(data)
-        return response[0]
+        created = response[0]
+        # Fire push notifications in background (non-blocking)
+        push_payload = {**data, "academy_id": academy_id, "id": created.get("id")}
+        asyncio.create_task(trigger_push_for_notification(supabase, push_payload))
+        return created
     except Exception as e:
         logger.error("Error creating notification: %s", e, exc_info=True)
         raise HTTPException(

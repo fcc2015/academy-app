@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { ThemeProvider } from './components/ThemeContext';
+import { BrandingProvider } from './components/BrandingContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import ImpersonationBanner from './components/ImpersonationBanner';
@@ -134,6 +135,7 @@ function App() {
     <ThemeProvider>
     <LanguageProvider>
     <ToastProvider>
+      <BrandingProvider>
       <Router>
         <ImpersonationExitHandler />
         <ImpersonationBanner />
@@ -231,6 +233,7 @@ function App() {
         </Routes>
         </Suspense>
       </Router>
+    </BrandingProvider>
     </ToastProvider>
     </LanguageProvider>
     </ThemeProvider>
