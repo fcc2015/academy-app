@@ -183,7 +183,8 @@ const SidebarContent = ({ collapsed, setCollapsed, isRTL, dir, t, location, setM
             </button>
         </div>
     </div>
-);
+    );
+};
 
 const AdminSidebar = ({ collapsed, setCollapsed, bannerOffset = 0 }) => {
     const navigate = useNavigate();
