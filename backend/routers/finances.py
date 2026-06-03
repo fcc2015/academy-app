@@ -404,6 +404,50 @@ async def create_subscription(sub: SubscriptionCreate):
             except Exception as e:
                 logger.warning(f"Prorata payment creation error: {e}")
 
+        # Auto-create invoice for registration fee (seasonal plans)
+        if sub.registration_fee and sub.registration_fee > 0:
+            try:
+                reg_seq = supabase.get_next_invoice_sequence()
+                reg_invoice = generate_invoice_number(reg_seq if isinstance(reg_seq, int) else 9001)
+                await supabase.insert_payment({
+                    "player_id": sub.player_id,
+                    "user_id": sub.user_id,
+                    "amount": sub.registration_fee,
+                    "amount_due": sub.registration_fee,
+                    "billing_type": "monthly",
+                    "status": "Pending",
+                    "payment_method": "Cash",
+                    "due_date": start.isoformat(),
+                    "period_start": start.isoformat(),
+                    "period_end": start.isoformat(),
+                    "invoice_number": reg_invoice,
+                    "notes": "رسوم التسجيل (Registration Fee)"
+                })
+            except Exception as e:
+                logger.warning(f"Registration fee payment creation error: {e}")
+
+        # Auto-create invoice for one-time setup/material fee (seasonal plans)
+        if sub.one_time_fee and sub.one_time_fee > 0:
+            try:
+                ot_seq = supabase.get_next_invoice_sequence()
+                ot_invoice = generate_invoice_number(ot_seq if isinstance(ot_seq, int) else 9002)
+                await supabase.insert_payment({
+                    "player_id": sub.player_id,
+                    "user_id": sub.user_id,
+                    "amount": sub.one_time_fee,
+                    "amount_due": sub.one_time_fee,
+                    "billing_type": "monthly",
+                    "status": "Pending",
+                    "payment_method": "Cash",
+                    "due_date": start.isoformat(),
+                    "period_start": start.isoformat(),
+                    "period_end": start.isoformat(),
+                    "invoice_number": ot_invoice,
+                    "notes": "رسوم إضافية (One-time Fee)"
+                })
+            except Exception as e:
+                logger.warning(f"One-time fee payment creation error: {e}")
+
         # Notify admin
         try:
             await supabase.insert_notification({

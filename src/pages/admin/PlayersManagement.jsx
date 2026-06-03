@@ -464,6 +464,33 @@ const PlayersManagement = () => {
                     });
                 }
 
+                // ─── Auto-create subscription with seasonal fees if a paid plan was selected ───
+                if (data.subscription_type && data.subscription_type !== 'Free') {
+                    try {
+                        const selectedPlan = subscriptionPlans.find(p => p.name === data.subscription_type);
+                        if (selectedPlan && selectedPlan.monthly_price > 0 && responseData.user_id) {
+                            const subPayload = {
+                                player_id: responseData.user_id,
+                                user_id: responseData.user_id,
+                                billing_type: 'monthly',
+                                start_date: new Date().toISOString().split('T')[0],
+                                monthly_amount: selectedPlan.monthly_price,
+                                annual_amount: selectedPlan.annual_price || null,
+                                notes: `Auto-enrollment: ${selectedPlan.name}`,
+                                registration_fee: selectedPlan.registration_fee || null,
+                                one_time_fee: selectedPlan.one_time_fee || null,
+                            };
+                            await authFetch(`${API_URL}/finances/subscriptions`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(subPayload)
+                            });
+                        }
+                    } catch (subErr) {
+                        console.warn('Auto-subscription creation failed:', subErr);
+                    }
+                }
+
                 if (resolvingRequestId) {
                     try {
                         await authFetch(`${API_URL}/public/admin/requests/${resolvingRequestId}`,

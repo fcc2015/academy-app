@@ -40,6 +40,9 @@ class SubscriptionCreate(BaseModel):
     monthly_amount: float = Field(..., gt=0)
     annual_amount: Optional[float] = Field(None, gt=0)
     notes: Optional[str] = Field(None, max_length=1000)
+    # Seasonal / one-time fees (auto-generate separate payment invoices)
+    registration_fee: Optional[float] = Field(None, ge=0, description="One-time registration fee")
+    one_time_fee: Optional[float] = Field(None, ge=0, description="Optional one-time setup/material fee")
 
 
 class SubscriptionResponse(BaseModel):

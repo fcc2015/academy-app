@@ -13,6 +13,12 @@ class SubscriptionPlanBase(BaseModel):
     is_active: Optional[bool] = True
     color: Optional[str] = Field('gold', max_length=50)
     sort_order: Optional[int] = Field(0, ge=0)
+    # Seasonal pricing fields
+    is_seasonal: Optional[bool] = Field(False, description="Whether this plan is only available during a specific season")
+    season_start: Optional[str] = Field(None, max_length=5, description="Season start date in MM-DD format (e.g. 09-01)")
+    season_end: Optional[str] = Field(None, max_length=5, description="Season end date in MM-DD format (e.g. 06-30)")
+    registration_fee: Optional[float] = Field(None, ge=0, description="One-time registration fee charged at enrollment")
+    one_time_fee: Optional[float] = Field(None, ge=0, description="Optional one-time setup/material fee")
 
 
 class SubscriptionPlanCreate(SubscriptionPlanBase):
@@ -29,6 +35,12 @@ class SubscriptionPlanUpdate(BaseModel):
     is_active: Optional[bool] = None
     color: Optional[str] = Field(None, max_length=50)
     sort_order: Optional[int] = Field(None, ge=0)
+    # Seasonal pricing fields
+    is_seasonal: Optional[bool] = None
+    season_start: Optional[str] = Field(None, max_length=5)
+    season_end: Optional[str] = Field(None, max_length=5)
+    registration_fee: Optional[float] = Field(None, ge=0)
+    one_time_fee: Optional[float] = Field(None, ge=0)
 
 
 class SubscriptionPlanOut(SubscriptionPlanBase):

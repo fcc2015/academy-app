@@ -285,14 +285,35 @@ const PlayerModal = ({
                                     <span className="text-lg font-black text-emerald-600">0 {t('common.currency')}</span>
                                 </label>
                                 {subscriptionPlans.filter(p => !p.billing_cycles?.includes('free')).map(plan => (
-                                    <label key={plan.id} className={`flex items-center gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all ${isRTL ? 'flex-row-reverse' : ''} ${currentSubscriptionType === plan.name ? 'border-indigo-500 bg-indigo-50/50 shadow-sm' : 'border-slate-100'}`}>
-                                        <input type="radio" value={plan.name} {...register('subscription_type')} className="accent-indigo-600" />
-                                        <div className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-                                            <div className="font-extrabold text-slate-800 text-sm">{plan.name}</div>
+                                    <label key={plan.id} className={`flex flex-col gap-2 p-5 rounded-2xl border-2 cursor-pointer transition-all ${currentSubscriptionType === plan.name ? 'border-indigo-500 bg-indigo-50/50 shadow-sm' : 'border-slate-100'}`}>
+                                        <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                            <input type="radio" value={plan.name} {...register('subscription_type')} className="accent-indigo-600" />
+                                            <div className={`flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+                                                <div className="font-extrabold text-slate-800 text-sm">{plan.name}</div>
+                                                {plan.is_seasonal && plan.season_start && plan.season_end && (
+                                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full mt-0.5">
+                                                        🗓 موسمي: {plan.season_start} ← {plan.season_end}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className={`${isRTL ? 'text-left' : 'text-right'} font-black text-indigo-700 text-sm`}>
+                                                {plan.monthly_price} {t('common.currency')}/{isRTL ? 'شهر' : 'mo'}
+                                            </div>
                                         </div>
-                                        <div className={`${isRTL ? 'text-left' : 'text-right'} font-black text-indigo-700 text-sm`}>
-                                            {plan.monthly_price} {t('common.currency')}/{isRTL ? 'شهر' : 'mo'}
-                                        </div>
+                                        {(plan.registration_fee > 0 || plan.one_time_fee > 0) && (
+                                            <div className={`flex gap-2 flex-wrap ${isRTL ? 'justify-end' : 'justify-start'} pl-8`}>
+                                                {plan.registration_fee > 0 && (
+                                                    <span className="text-[9px] font-black text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
+                                                        + {plan.registration_fee} {t('common.currency')} رسوم تسجيل
+                                                    </span>
+                                                )}
+                                                {plan.one_time_fee > 0 && (
+                                                    <span className="text-[9px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                                                        + {plan.one_time_fee} {t('common.currency')} رسوم إضافية
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                     </label>
                                 ))}
                             </div>
@@ -301,6 +322,18 @@ const PlayerModal = ({
                                 <div className="space-y-3">
                                     <div className={`flex justify-between text-sm font-bold ${isRTL ? 'flex-row-reverse' : ''}`}><span className="text-slate-400">{isRTL ? 'اللاعب:' : 'Player:'}</span><span className="text-slate-900">{watch('full_name')}</span></div>
                                     <div className={`flex justify-between text-sm font-bold border-t border-slate-200 pt-3 mt-1 ${isRTL ? 'flex-row-reverse' : ''}`}><span className="text-slate-400">{t('players.totalMonthly')}:</span><span className="text-lg font-black text-slate-900">{currentSubscriptionType === 'Free' ? `0 ${t('common.currency')}` : `${selectedPlanObj?.monthly_price || 0} ${t('common.currency')}`}</span></div>
+                                    {selectedPlanObj?.registration_fee > 0 && (
+                                        <div className={`flex justify-between text-sm font-bold border-t border-slate-200 pt-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                            <span className="text-purple-600">رسوم التسجيل (مرة واحدة):</span>
+                                            <span className="font-black text-purple-700">{selectedPlanObj.registration_fee} {t('common.currency')}</span>
+                                        </div>
+                                    )}
+                                    {selectedPlanObj?.one_time_fee > 0 && (
+                                        <div className={`flex justify-between text-sm font-bold border-t border-slate-200 pt-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                            <span className="text-rose-600">رسوم إضافية (مرة واحدة):</span>
+                                            <span className="font-black text-rose-700">{selectedPlanObj.one_time_fee} {t('common.currency')}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

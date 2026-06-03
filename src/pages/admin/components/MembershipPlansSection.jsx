@@ -5,7 +5,9 @@ import {
     X,
     Check,
     Edit2,
-    Trash2
+    Trash2,
+    Calendar,
+    DollarSign
 } from 'lucide-react';
 import { API_URL } from '../../../config';
 import { authFetch } from '../../../api';
@@ -32,7 +34,12 @@ const MembershipPlansSection = ({
         billing_cycles: ['monthly'],
         features: [],
         color: 'gold',
-        sort_order: 0
+        sort_order: 0,
+        is_seasonal: false,
+        season_start: '',
+        season_end: '',
+        registration_fee: '',
+        one_time_fee: ''
     });
     const [newFeatureInput, setNewFeatureInput] = useState('');
     const [editFeatureInput, setEditFeatureInput] = useState('');
@@ -45,6 +52,10 @@ const MembershipPlansSection = ({
                 ...newPlanData,
                 monthly_price: newPlanData.monthly_price ? parseFloat(newPlanData.monthly_price) : null,
                 annual_price: newPlanData.annual_price ? parseFloat(newPlanData.annual_price) : null,
+                registration_fee: newPlanData.registration_fee ? parseFloat(newPlanData.registration_fee) : null,
+                one_time_fee: newPlanData.one_time_fee ? parseFloat(newPlanData.one_time_fee) : null,
+                season_start: newPlanData.is_seasonal ? (newPlanData.season_start || null) : null,
+                season_end: newPlanData.is_seasonal ? (newPlanData.season_end || null) : null,
             };
             const res = await authFetch(`${API_URL}/plans/`, {
                 method: 'POST',
@@ -60,7 +71,12 @@ const MembershipPlansSection = ({
                     billing_cycles: ['monthly'],
                     features: [],
                     color: 'gold',
-                    sort_order: 0
+                    sort_order: 0,
+                    is_seasonal: false,
+                    season_start: '',
+                    season_end: '',
+                    registration_fee: '',
+                    one_time_fee: ''
                 });
                 setIsCreatePlanOpen(false);
                 fetchPlans();
@@ -76,6 +92,10 @@ const MembershipPlansSection = ({
                 ...editingPlan,
                 monthly_price: editingPlan.monthly_price !== '' ? parseFloat(editingPlan.monthly_price) || null : null,
                 annual_price: editingPlan.annual_price !== '' ? parseFloat(editingPlan.annual_price) || null : null,
+                registration_fee: editingPlan.registration_fee !== '' ? parseFloat(editingPlan.registration_fee) || null : null,
+                one_time_fee: editingPlan.one_time_fee !== '' ? parseFloat(editingPlan.one_time_fee) || null : null,
+                season_start: editingPlan.is_seasonal ? (editingPlan.season_start || null) : null,
+                season_end: editingPlan.is_seasonal ? (editingPlan.season_end || null) : null,
             };
             const res = await authFetch(`${API_URL}/plans/${editingPlan.id}`, {
                 method: 'PATCH',
@@ -281,6 +301,89 @@ const MembershipPlansSection = ({
                                 ))}
                             </div>
                         </div>
+                        {/* Seasonal Pricing */}
+                        <div className="border border-amber-200 rounded-2xl overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => setNewPlanData(prev => ({ ...prev, is_seasonal: !prev.is_seasonal }))}
+                                className={`w-full flex items-center justify-between px-4 py-3 text-sm font-bold transition-colors ${
+                                    newPlanData.is_seasonal ? 'bg-amber-100 text-amber-800' : 'bg-amber-50 text-slate-600'
+                                }`}
+                            >
+                                <span className="flex items-center gap-2">
+                                    <Calendar size={15} />
+                                    التسعير الموسمي (Seasonal Pricing)
+                                </span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-black ${
+                                    newPlanData.is_seasonal ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-500'
+                                }`}>
+                                    {newPlanData.is_seasonal ? 'مفعّل' : 'معطّل'}
+                                </span>
+                            </button>
+                            {newPlanData.is_seasonal && (
+                                <div className="px-4 py-4 bg-amber-50/50 space-y-3">
+                                    <p className="text-xs text-amber-700 font-semibold">حدد الموسم بصيغة MM-DD (مثال: 09-01 لبداية سبتمبر)</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">بداية الموسم (MM-DD)</label>
+                                            <input
+                                                type="text"
+                                                pattern="\d{2}-\d{2}"
+                                                placeholder="09-01"
+                                                maxLength={5}
+                                                className="w-full px-4 py-2.5 border border-amber-200 rounded-xl text-sm font-bold bg-white text-left"
+                                                value={newPlanData.season_start}
+                                                onChange={e => setNewPlanData({ ...newPlanData, season_start: e.target.value })}
+                                                dir="ltr"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">نهاية الموسم (MM-DD)</label>
+                                            <input
+                                                type="text"
+                                                pattern="\d{2}-\d{2}"
+                                                placeholder="06-30"
+                                                maxLength={5}
+                                                className="w-full px-4 py-2.5 border border-amber-200 rounded-xl text-sm font-bold bg-white text-left"
+                                                value={newPlanData.season_end}
+                                                onChange={e => setNewPlanData({ ...newPlanData, season_end: e.target.value })}
+                                                dir="ltr"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">
+                                                <span className="flex items-center gap-1"><DollarSign size={11} /> رسوم التسجيل (MAD)</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                placeholder="0"
+                                                className="w-full px-4 py-2.5 border border-amber-200 rounded-xl text-sm font-bold bg-white text-left"
+                                                value={newPlanData.registration_fee}
+                                                onChange={e => setNewPlanData({ ...newPlanData, registration_fee: e.target.value })}
+                                                dir="ltr"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">
+                                                <span className="flex items-center gap-1"><DollarSign size={11} /> رسوم إضافية (MAD)</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                placeholder="0"
+                                                className="w-full px-4 py-2.5 border border-amber-200 rounded-xl text-sm font-bold bg-white text-left"
+                                                value={newPlanData.one_time_fee}
+                                                onChange={e => setNewPlanData({ ...newPlanData, one_time_fee: e.target.value })}
+                                                dir="ltr"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         <div className="flex justify-end gap-3">
                             <button
                                 type="button"
@@ -333,6 +436,17 @@ const MembershipPlansSection = ({
                                                 {plan.billing_cycles?.includes('annual') && plan.annual_price && (
                                                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.badge}`}>
                                                         {plan.annual_price} MAD/سنويا
+                                                    </span>
+                                                )}
+                                                {plan.is_seasonal && (
+                                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                                                        <Calendar size={10} />
+                                                        موسمي {plan.season_start && plan.season_end ? `(${plan.season_start} → ${plan.season_end})` : ''}
+                                                    </span>
+                                                )}
+                                                {plan.registration_fee > 0 && (
+                                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                                                        + {plan.registration_fee} تسجيل
                                                     </span>
                                                 )}
                                                 {!plan.is_active && (
@@ -529,6 +643,76 @@ const MembershipPlansSection = ({
                                                 <option value="bronze">برونزى (Bronze)</option>
                                                 <option value="blue">أزرق (Blue)</option>
                                             </select>
+                                        </div>
+                                        {/* Seasonal Pricing Edit */}
+                                        <div className="md:col-span-2 border border-amber-200 rounded-2xl overflow-hidden">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingPlan(prev => ({ ...prev, is_seasonal: !prev.is_seasonal }))}
+                                                className={`w-full flex items-center justify-between px-4 py-3 text-sm font-bold transition-colors ${
+                                                    editingPlan.is_seasonal ? 'bg-amber-100 text-amber-800' : 'bg-amber-50 text-slate-600'
+                                                }`}
+                                            >
+                                                <span className="flex items-center gap-2"><Calendar size={15} /> التسعير الموسمي</span>
+                                                <span className={`text-xs px-2 py-0.5 rounded-full font-black ${
+                                                    editingPlan.is_seasonal ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-500'
+                                                }`}>
+                                                    {editingPlan.is_seasonal ? 'مفعّل' : 'معطّل'}
+                                                </span>
+                                            </button>
+                                            {editingPlan.is_seasonal && (
+                                                <div className="px-4 py-4 bg-amber-50/50 space-y-3">
+                                                    <p className="text-xs text-amber-700 font-semibold">صيغة MM-DD (مثال: 09-01)</p>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">بداية الموسم</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="09-01"
+                                                                maxLength={5}
+                                                                className="w-full px-4 py-2 border border-amber-200 rounded-xl text-sm font-bold bg-white text-left"
+                                                                value={editingPlan.season_start || ''}
+                                                                onChange={e => setEditingPlan({ ...editingPlan, season_start: e.target.value })}
+                                                                dir="ltr"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">نهاية الموسم</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="06-30"
+                                                                maxLength={5}
+                                                                className="w-full px-4 py-2 border border-amber-200 rounded-xl text-sm font-bold bg-white text-left"
+                                                                value={editingPlan.season_end || ''}
+                                                                onChange={e => setEditingPlan({ ...editingPlan, season_end: e.target.value })}
+                                                                dir="ltr"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">رسوم التسجيل (MAD)</label>
+                                                            <input
+                                                                type="number" min="0" placeholder="0"
+                                                                className="w-full px-4 py-2 border border-amber-200 rounded-xl text-sm font-bold bg-white text-left"
+                                                                value={editingPlan.registration_fee || ''}
+                                                                onChange={e => setEditingPlan({ ...editingPlan, registration_fee: e.target.value })}
+                                                                dir="ltr"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-1">رسوم إضافية (MAD)</label>
+                                                            <input
+                                                                type="number" min="0" placeholder="0"
+                                                                className="w-full px-4 py-2 border border-amber-200 rounded-xl text-sm font-bold bg-white text-left"
+                                                                value={editingPlan.one_time_fee || ''}
+                                                                onChange={e => setEditingPlan({ ...editingPlan, one_time_fee: e.target.value })}
+                                                                dir="ltr"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
