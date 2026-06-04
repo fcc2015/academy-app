@@ -22,6 +22,7 @@ export default function SubscriptionDetailModal({
     handleAssignPlan,
     paymentProcessing,
     handlePayPalCheckout,
+    handleLemonSqueezyCheckout,
     transactions,
     setTransactions,
     loadingTx,
@@ -350,6 +351,22 @@ export default function SubscriptionDetailModal({
 
                                                     {plan.price > 0 && (
                                                         <>
+                                                            {/* Lemon Squeezy */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleLemonSqueezyCheckout(selectedAcademy, plan.id, billingCycle)}
+                                                                disabled={paymentProcessing === selectedAcademy.id}
+                                                                className="w-full py-2 rounded-lg text-xs font-black border-0 shadow-sm transition-colors flex items-center justify-center gap-1.5 text-white"
+                                                                style={{ background: 'linear-gradient(135deg, #febb12, #ff5e3a)' }}
+                                                            >
+                                                                {paymentProcessing === selectedAcademy.id ? (
+                                                                    <Loader2 size={14} className="animate-spin" />
+                                                                ) : (
+                                                                    <CreditCard size={13} />
+                                                                )}
+                                                                Pay via Lemon Squeezy
+                                                            </button>
+
                                                             {/* PayPal */}
                                                             <button
                                                                 type="button"

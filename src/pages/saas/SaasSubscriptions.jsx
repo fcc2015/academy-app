@@ -207,6 +207,7 @@ export default function SaasSubscriptions() {
                     billing_cycle_type: cycle,
                     amount: chargeAmount,
                     currency: 'USD',
+                    source: 'saas_dashboard_paypal',
                     description: currentPlan 
                         ? `Upgrade ${currentPlan.name} → ${newPlan.name} (Pro-Rata: ${chargeAmount} MAD)`
                         : `${newPlan.name} Plan — ${cycle === 'yearly' ? 'Yearly' : 'Monthly'} — ${academy.name}`
@@ -228,6 +229,47 @@ export default function SaasSubscriptions() {
             setPaymentProcessing(null);
         }
     };
+
+    // SaaS subscriptions ONLY — routes to Lemon Squeezy via source='saas_dashboard'
+    const handleLemonSqueezyCheckout = async (academy, planId, cycleType) => {
+        setPaymentProcessing(academy.id);
+        const newPlan = PLANS.find(p => p.id === planId);
+        if (!newPlan) return;
+
+        const cycle = cycleType || billingCycle;
+        const basePrice = cycle === 'yearly' ? newPlan.price * 10 : newPlan.price;
+
+        try {
+            const res = await authFetch(`${API_URL}/payments/gateway/create-order`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    academy_id: academy.id,
+                    plan_id: planId,
+                    billing_cycle_type: cycle,
+                    amount: basePrice,
+                    currency: 'USD',
+                    source: 'saas_dashboard',   // ← Lemon Squeezy path (SaaS → Academy)
+                    description: `${newPlan.name} Plan — ${cycle === 'yearly' ? 'Yearly' : 'Monthly'} — ${academy.name}`
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.approve_url) {
+                    window.open(data.approve_url, '_blank');
+                }
+            } else {
+                const err = await res.json();
+                toast.error(err.detail || 'Payment failed');
+            }
+        } catch (err) {
+            console.error("Lemon Squeezy checkout error:", err);
+            toast.error('Connection error');
+        } finally {
+            setPaymentProcessing(null);
+        }
+    };
+
 
     const handleVerifyOrder = async (paypalOrderId) => {
         setVerifyingOrder(paypalOrderId);
@@ -500,6 +542,7 @@ export default function SaasSubscriptions() {
                 handleAssignPlan={handleAssignPlan}
                 paymentProcessing={paymentProcessing}
                 handlePayPalCheckout={handlePayPalCheckout}
+                handleLemonSqueezyCheckout={handleLemonSqueezyCheckout}
                 transactions={transactions}
                 setTransactions={setTransactions}
                 loadingTx={loadingTx}

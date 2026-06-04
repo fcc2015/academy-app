@@ -310,7 +310,8 @@ export default function SaasLanding() {
                     amount: amountUSD,
                     currency: 'USD',
                     description: `${plan.name} Plan — Academy SaaS (${amountMAD} MAD)`,
-                    source: 'saas_landing'
+                    source: 'saas_landing',
+                    billing_cycle_type: yearlyMode ? 'yearly' : 'monthly'
                 })
             });
             if (res.ok) {

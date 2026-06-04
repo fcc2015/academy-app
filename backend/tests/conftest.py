@@ -25,6 +25,10 @@ os.environ.setdefault("DEV_MODE", "true")
 os.environ.setdefault("PAYPAL_CLIENT_ID", "test-paypal-client")
 os.environ.setdefault("PAYPAL_CLIENT_SECRET", "test-paypal-secret")
 os.environ.setdefault("PAYPAL_SANDBOX", "true")
+# Force PayPal path in existing gateway tests — the real .env has LS key set,
+# which would divert PayPal tests to the Lemon Squeezy branch.
+os.environ["LEMON_SQUEEZY_API_KEY"] = ""
+os.environ["LEMON_SQUEEZY_SIGNING_SECRET"] = ""
 
 # ── 2. Imports (after env is set) ──
 import pytest

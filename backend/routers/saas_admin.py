@@ -846,6 +846,98 @@ async def run_saas_expiry_check() -> dict:
         return {"suspended": 0, "warned": 0, "error": str(e)}
 
 
+# ── Manual Expiry Trigger (super_admin) ──
+
+@router.post("/expiry/run")
+async def trigger_expiry_check_now():
+    """
+    Manually trigger the subscription expiry check right now.
+    Suspends academies past grace_period_end, warns those in grace period.
+    """
+    result = await run_saas_expiry_check()
+    return {"success": True, **result}
+
+
+@router.post("/expiry/fix-data")
+async def fix_expired_subscriptions():
+    """
+    Fix academies whose billing_cycle_end has passed but subscription_status
+    is still 'active'. Extends their billing cycle by 30 days from today
+    so they don't get auto-suspended, and sets plan_id = 'basic' where NULL.
+    USE WITH CARE — only for dev/sandbox data correction.
+    """
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    fixed = []
+    skipped = []
+
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+        # Fetch all academies with expired billing or NULL plan_id
+        res = await client.get(
+            f"{supabase.url}/rest/v1/academies"
+            f"?select=id,name,plan_id,subscription_status,billing_cycle_end,billing_cycle_type"
+            f"&subscription_status=eq.active",
+            headers=supabase.admin_headers,
+        )
+        if res.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Failed to fetch academies: {res.text}")
+
+        academies = res.json()
+
+        for academy in academies:
+            aid = academy["id"]
+            name = academy.get("name", aid)
+            cycle_end_str = academy.get("billing_cycle_end")
+            plan_id = academy.get("plan_id")
+            cycle_type = academy.get("billing_cycle_type") or "monthly"
+
+            needs_fix = False
+
+            # Check if billing_cycle_end is in the past
+            if cycle_end_str:
+                try:
+                    cycle_end = datetime.fromisoformat(cycle_end_str.replace("Z", "+00:00"))
+                    if now > cycle_end:
+                        needs_fix = True
+                except ValueError:
+                    needs_fix = True
+            else:
+                needs_fix = True  # No date set at all
+
+            # Also fix NULL plan_id
+            patch = {}
+            if needs_fix:
+                days = 365 if cycle_type == "yearly" else 30
+                new_end = now + timedelta(days=days)
+                new_grace = new_end + timedelta(days=7)
+                patch["billing_cycle_start"] = now.isoformat()
+                patch["billing_cycle_end"] = new_end.isoformat()
+                patch["grace_period_end"] = new_grace.isoformat()
+
+            if not plan_id:
+                patch["plan_id"] = "basic"
+
+            if patch:
+                r = await client.patch(
+                    f"{supabase.url}/rest/v1/academies?id=eq.{aid}",
+                    json=patch,
+                    headers=supabase.admin_headers,
+                )
+                if r.status_code < 400:
+                    fixed.append({"name": name, "patch": list(patch.keys())})
+                else:
+                    skipped.append({"name": name, "error": r.text[:100]})
+            else:
+                skipped.append({"name": name, "reason": "already up to date"})
+
+    return {
+        "success": True,
+        "fixed": len(fixed),
+        "skipped": len(skipped),
+        "details": fixed,
+    }
+
+
 # ── Platform Stats ──
 
 @router.get("/stats")

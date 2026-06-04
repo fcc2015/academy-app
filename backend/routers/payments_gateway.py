@@ -76,114 +76,390 @@ def get_paypal_base_url() -> str:
     return "https://api-m.sandbox.paypal.com" if settings.PAYPAL_SANDBOX else "https://api-m.paypal.com"
 
 
-# ── Create PayPal Order ──
+# ── Lemon Squeezy Sandbox Configuration ──
+
+LEMON_SQUEEZY_VARIANTS = {
+    "basic": {
+        "monthly": "1748453",
+        "yearly": "1748330"
+    },
+    "pro": {
+        "monthly": "1748483",
+        "yearly": "1748646"
+    },
+    "enterprise": {
+        "monthly": "1116761",
+        "yearly": "1116761"
+    }
+}
+
+async def get_lemonsqueezy_store_id() -> str:
+    """Retrieve the Lemon Squeezy store ID dynamically, falling back to 397704."""
+    api_key = settings.LEMON_SQUEEZY_API_KEY
+    if not api_key:
+        return "397704"
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            res = await client.get(
+                "https://api.lemonsqueezy.com/v1/stores",
+                headers={
+                    "Accept": "application/vnd.api+json",
+                    "Content-Type": "application/vnd.api+json",
+                    "Authorization": f"Bearer {api_key}"
+                }
+            )
+            if res.status_code == 200:
+                data = res.json()
+                if data.get("data") and len(data["data"]) > 0:
+                    return str(data["data"][0]["id"])
+    except Exception as e:
+        logger.error(f"Failed to fetch Lemon Squeezy store ID dynamically: {e}")
+    return "397704"
+
+
+# ── Sources routing map ──
+# SaaS → Academy subscriptions  : source in ('saas_landing', 'saas_dashboard') → Lemon Squeezy
+# Academy → Player/Parent payments: all other sources                          → PayPal
+
+_SAAS_SOURCES = {"saas_landing", "saas_dashboard", "academy_subscription"}  # ONLY these go to Lemon Squeezy
+
+
+# ── Create Payment Order ──
 
 @router.post("/create-order", dependencies=[])
 async def create_paypal_order(req: CreateOrderRequest):
-    """Create a PayPal order for academy subscription payment."""
-    token = await get_paypal_access_token()
-    base_url = get_paypal_base_url()
-
-    # Use a temp UUID if no academy_id (public landing page flow)
+    """Route payment to the correct gateway:
+    - Lemon Squeezy → SaaS platform subscriptions (academy owners paying US)
+    - PayPal         → Academy-internal payments (parents/players paying the academy)
+    """
     effective_academy_id = req.academy_id or f"temp_{uuid.uuid4().hex[:12]}"
 
-    # Determine return URLs based on source
-    if req.source == 'saas_landing':
-        return_url = f"{settings.FRONTEND_URL}/saas-platform?payment=success"
-        cancel_url = f"{settings.FRONTEND_URL}/saas-platform?payment=cancelled"
-    elif req.source == 'parent_checkout':
-        return_url = f"{settings.FRONTEND_URL}/parent/checkout?payment=success"
-        cancel_url = f"{settings.FRONTEND_URL}/parent/checkout?payment=cancelled"
-    else:
-        aid = req.academy_id or ""
-        pid = req.plan_id or ""
-        return_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success&academy_id={aid}&plan_id={pid}"
-        cancel_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=cancelled"
+    # ══ GATE: Is this a SaaS subscription purchase? ══
+    is_saas_purchase = (
+        req.source in _SAAS_SOURCES
+        and bool(settings.LEMON_SQUEEZY_API_KEY)
+    )
 
-    # Set custom_id and reference_id properly
-    custom_id = f"parent|{req.academy_id}" if req.source == 'parent_checkout' else f"{effective_academy_id}|{req.plan_id}|{req.billing_cycle_type or 'monthly'}"
-    ref_id = f"parent_{req.academy_id}" if req.source == 'parent_checkout' else f"academy_{effective_academy_id}"
-
-    order_payload = {
-        "intent": "CAPTURE",
-        "purchase_units": [{
-            "reference_id": ref_id,
-            "description": req.description,
-            "amount": {
-                "currency_code": req.currency,
-                "value": f"{req.amount:.2f}"
-            },
-            "custom_id": custom_id
-        }],
-        "application_context": {
-            "brand_name": "Academy SaaS Platform",
-            "landing_page": "NO_PREFERENCE",
-            "user_action": "PAY_NOW",
-            "return_url": return_url,
-            "cancel_url": cancel_url,
-        }
-    }
-
-    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
-        res = await client.post(
-            f"{base_url}/v2/checkout/orders",
-            json=order_payload,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
+    # ── PayPal Path — Academy internal payments (parents / players) ──
+    if not is_saas_purchase:
+        token = await get_paypal_access_token()
+        base_url = get_paypal_base_url()
+        
+        if req.source in ('saas_dashboard', 'saas_dashboard_paypal'):
+            return_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success&academy_id={req.academy_id}&plan_id={req.plan_id or ''}"
+            cancel_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=cancelled"
+            custom_id = f"saas|{req.academy_id}|{req.plan_id or ''}|{req.billing_cycle_type or 'monthly'}"
+            ref_id = f"saas_{req.academy_id}"
+        elif req.source in ('saas_landing', 'saas_landing_paypal'):
+            return_url = f"{settings.FRONTEND_URL}/saas-platform?payment=success&academy_id={req.academy_id}&plan_id={req.plan_id or ''}"
+            cancel_url = f"{settings.FRONTEND_URL}/saas-platform?payment=cancelled"
+            custom_id = f"saas_signup|{req.academy_id}|{req.plan_id or ''}|{req.billing_cycle_type or 'monthly'}"
+            ref_id = f"saas_signup_{req.academy_id}"
+        elif req.source in ('academy_subscription', 'academy_subscription_paypal'):
+            return_url = f"{settings.FRONTEND_URL}/admin/subscription?payment=success&academy_id={req.academy_id}&plan_id={req.plan_id or ''}"
+            cancel_url = f"{settings.FRONTEND_URL}/admin/subscription?payment=cancelled"
+            custom_id = f"academy|{req.academy_id}|{req.plan_id or ''}|{req.billing_cycle_type or 'monthly'}"
+            ref_id = f"academy_{req.academy_id}"
+        else:
+            return_url = f"{settings.FRONTEND_URL}/parent/checkout?payment=success"
+            cancel_url = f"{settings.FRONTEND_URL}/parent/checkout?payment=cancelled"
+            custom_id = f"parent|{req.academy_id}"
+            ref_id = f"parent_{req.academy_id}"
+        
+        order_payload = {
+            "intent": "CAPTURE",
+            "purchase_units": [{
+                "reference_id": ref_id,
+                "description": req.description,
+                "amount": {
+                    "currency_code": req.currency,
+                    "value": f"{req.amount:.2f}"
+                },
+                "custom_id": custom_id
+            }],
+            "application_context": {
+                "brand_name": "Academy SaaS Platform",
+                "landing_page": "NO_PREFERENCE",
+                "user_action": "PAY_NOW",
+                "return_url": return_url,
+                "cancel_url": cancel_url,
             }
-        )
+        }
+        
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            res = await client.post(
+                f"{base_url}/v2/checkout/orders",
+                json=order_payload,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                }
+            )
+            if res.status_code not in [200, 201]:
+                logger.error(f"PayPal order creation failed: {res.status_code} - {res.text}")
+                raise HTTPException(status_code=502, detail=f"PayPal order creation failed: {res.text}")
+                
+            order = res.json()
+            
+            if req.academy_id:
+                try:
+                    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as db_client:
+                        await db_client.post(
+                            f"{supabase.url}/rest/v1/payment_transactions",
+                            json={
+                                "paypal_order_id": order["id"],
+                                "academy_id": req.academy_id,
+                                "plan_id": req.plan_id,
+                                "amount": req.amount,
+                                "currency": req.currency,
+                                "status": "pending",
+                                "created_at": datetime.now(timezone.utc).isoformat(),
+                                "billing_cycle_type": req.billing_cycle_type or "monthly"
+                            },
+                            headers=supabase.admin_headers
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to save transaction record: {e}")
+                    
+            approve_link = next(
+                (link["href"] for link in order.get("links", []) if link["rel"] == "approve"),
+                None
+            )
+            return {
+                "order_id": order["id"],
+                "status": order["status"],
+                "approve_url": approve_link
+            }
 
-        if res.status_code not in [200, 201]:
-            logger.error(f"PayPal order creation failed: {res.status_code} - {res.text}")
-            raise HTTPException(status_code=502, detail=f"PayPal order creation failed: {res.text}")
-
-        order = res.json()
-
-        # Save pending payment record in DB — only if we have a real academy_id
-        if req.academy_id:
-            try:
-                async with httpx.AsyncClient(trust_env=False, timeout=30.0) as db_client:
-                    save_res = await db_client.post(
+    # ── Lemon Squeezy Path — SaaS subscriptions ONLY (academy owners paying US) ──
+    else:
+        api_key = settings.LEMON_SQUEEZY_API_KEY
+        if not api_key:
+            raise HTTPException(
+                status_code=500,
+                detail="Lemon Squeezy API Key not configured. Only SaaS subscription purchases use this path."
+            )
+            
+        store_id = await get_lemonsqueezy_store_id()
+        plan_id_lower = (req.plan_id or "pro").lower()
+        billing_cycle_lower = (req.billing_cycle_type or "monthly").lower()
+        
+        mapped_plan = "pro"
+        if "basic" in plan_id_lower:
+            mapped_plan = "basic"
+        elif "enterprise" in plan_id_lower:
+            mapped_plan = "enterprise"
+            
+        variant_map = LEMON_SQUEEZY_VARIANTS.get(mapped_plan) or LEMON_SQUEEZY_VARIANTS["pro"]
+        variant_id = variant_map.get(billing_cycle_lower) or variant_map["monthly"]
+        
+        # Determine success URL
+        if req.source == 'saas_landing':
+            return_url = f"{settings.FRONTEND_URL}/saas-platform?payment=success&academy_id={effective_academy_id}&plan_id={mapped_plan}"
+        elif req.source == 'academy_subscription':
+            return_url = f"{settings.FRONTEND_URL}/admin/subscription?payment=success&academy_id={effective_academy_id}&plan_id={mapped_plan}"
+        else:
+            return_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success&academy_id={effective_academy_id}&plan_id={mapped_plan}"
+            
+        checkout_payload = {
+            "data": {
+                "type": "checkouts",
+                "attributes": {
+                    "checkout_data": {
+                        "custom": {
+                            "academy_id": effective_academy_id,
+                            "plan_id": mapped_plan,
+                            "billing_cycle_type": billing_cycle_lower
+                        }
+                    },
+                    "product_options": {
+                        "redirect_url": return_url
+                    }
+                },
+                "relationships": {
+                    "store": {
+                        "data": {
+                            "type": "stores",
+                            "id": store_id
+                        }
+                    },
+                    "variant": {
+                        "data": {
+                            "type": "variants",
+                            "id": variant_id
+                        }
+                    }
+                }
+            }
+        }
+        
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            res = await client.post(
+                "https://api.lemonsqueezy.com/v1/checkouts",
+                json=checkout_payload,
+                headers={
+                    "Accept": "application/vnd.api+json",
+                    "Content-Type": "application/vnd.api+json",
+                    "Authorization": f"Bearer {api_key}"
+                }
+            )
+            if res.status_code not in [200, 201]:
+                logger.error(f"Lemon Squeezy checkout failed: {res.status_code} - {res.text}")
+                raise HTTPException(status_code=502, detail=f"Lemon Squeezy checkout generation failed: {res.text}")
+                
+            checkout_data = res.json()
+            checkout_id = checkout_data["data"]["id"]
+            checkout_url = checkout_data["data"]["attributes"]["url"]
+            
+            # Pass return_url with token={checkout_id} so the frontend redirect handles success properly
+            success_redirect_url = f"{return_url}&token={checkout_id}"
+            
+            # Re-request checkout link with updated redirect url to pass token
+            checkout_payload["data"]["attributes"]["product_options"]["redirect_url"] = success_redirect_url
+            
+            res_retry = await client.post(
+                "https://api.lemonsqueezy.com/v1/checkouts",
+                json=checkout_payload,
+                headers={
+                    "Accept": "application/vnd.api+json",
+                    "Content-Type": "application/vnd.api+json",
+                    "Authorization": f"Bearer {api_key}"
+                }
+            )
+            if res_retry.status_code in [200, 201]:
+                checkout_data = res_retry.json()
+                checkout_id = checkout_data["data"]["id"]
+                checkout_url = checkout_data["data"]["attributes"]["url"]
+                
+            # Create a pending payment transaction in Supabase
+            if req.academy_id:
+                try:
+                    await client.post(
                         f"{supabase.url}/rest/v1/payment_transactions",
                         json={
-                            "paypal_order_id": order["id"],
+                            "paypal_order_id": f"lemonsqueezy_{checkout_id}",
                             "academy_id": req.academy_id,
-                            "plan_id": req.plan_id,
+                            "plan_id": mapped_plan,
                             "amount": req.amount,
                             "currency": req.currency,
                             "status": "pending",
                             "created_at": datetime.now(timezone.utc).isoformat(),
-                            "billing_cycle_type": req.billing_cycle_type or "monthly"
+                            "billing_cycle_type": billing_cycle_lower
                         },
                         headers=supabase.admin_headers
                     )
-                    if save_res.status_code not in [200, 201]:
-                        logger.warning(f"DB save response: {save_res.status_code} - {save_res.text}")
-            except Exception as e:
-                logger.warning(f"Failed to save transaction record: {e}")
-
-        # Return the approval URL for frontend redirect
-        approve_link = next(
-            (link["href"] for link in order.get("links", []) if link["rel"] == "approve"),
-            None
-        )
-
-        return {
-            "order_id": order["id"],
-            "status": order["status"],
-            "approve_url": approve_link
-        }
+                except Exception as e:
+                    logger.warning(f"Failed to save Lemon Squeezy transaction: {e}")
+                    
+            return {
+                "order_id": checkout_id,
+                "status": "APPROVED",
+                "approve_url": checkout_url
+            }
 
 
-# ── Capture PayPal Order (after user approves) ──
+# ── Capture Payment Order ──
 
 @router.post("/capture-order")
 async def capture_paypal_order(req: CaptureOrderRequest):
-    """Capture a PayPal order after the user has approved it."""
+    """Capture PayPal or Lemon Squeezy order."""
+    
+    # ── Lemon Squeezy Order Verification ──
+    is_lemonsqueezy = False
+    if settings.LEMON_SQUEEZY_API_KEY:
+        import re
+        if re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", req.order_id.lower()):
+            is_lemonsqueezy = True
+            
+    if is_lemonsqueezy:
+        api_key = settings.LEMON_SQUEEZY_API_KEY
+        async with httpx.AsyncClient(trust_env=False, timeout=20.0) as ls_client:
+            res = await ls_client.get(
+                f"https://api.lemonsqueezy.com/v1/checkouts/{req.order_id}",
+                headers={
+                    "Accept": "application/vnd.api+json",
+                    "Authorization": f"Bearer {api_key}"
+                }
+            )
+            if res.status_code != 200:
+                logger.error(f"Lemon Squeezy verification failed for {req.order_id}: {res.text}")
+                raise HTTPException(status_code=400, detail="Invalid checkout session.")
+                
+            checkout_data = res.json()
+            custom_data = checkout_data.get("data", {}).get("attributes", {}).get("checkout_data", {}).get("custom", {})
+            
+            academy_id = custom_data.get("academy_id")
+            plan_id = custom_data.get("plan_id", "pro")
+            billing_cycle_type = custom_data.get("billing_cycle_type", "monthly")
+            
+            now_iso = datetime.now(timezone.utc).isoformat()
+            tx_ref = f"lemonsqueezy_{req.order_id}"
+            
+            async with httpx.AsyncClient(trust_env=False, timeout=20.0) as db_client:
+                # Update transaction
+                tx_check = await db_client.get(
+                    f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{tx_ref}",
+                    headers=supabase.admin_headers
+                )
+                if tx_check.status_code == 200 and tx_check.json():
+                    await db_client.patch(
+                        f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{tx_ref}",
+                        json={
+                            "status": "completed",
+                            "completed_at": now_iso
+                        },
+                        headers=supabase.admin_headers
+                    )
+                else:
+                    await db_client.post(
+                        f"{supabase.url}/rest/v1/payment_transactions",
+                        json={
+                            "paypal_order_id": tx_ref,
+                            "academy_id": req.academy_id or academy_id or "pending",
+                            "plan_id": plan_id,
+                            "amount": 499.0,
+                            "currency": "MAD",
+                            "status": "completed",
+                            "created_at": now_iso,
+                            "completed_at": now_iso,
+                            "billing_cycle_type": billing_cycle_type
+                        },
+                        headers=supabase.admin_headers
+                    )
+                    
+                # Activate academy subscription
+                target_academy_id = req.academy_id or academy_id
+                if target_academy_id and not target_academy_id.startswith("temp_") and not target_academy_id.startswith("pending_"):
+                    cycle_days = 365 if billing_cycle_type == "yearly" else 30
+                    from datetime import timedelta
+                    end_dt = datetime.now(timezone.utc) + timedelta(days=cycle_days)
+                    grace_dt = end_dt + timedelta(days=7)
+                    
+                    await db_client.patch(
+                        f"{supabase.url}/rest/v1/academies?id=eq.{target_academy_id}",
+                        json={
+                            "subscription_status": "active",
+                            "status": "active",
+                            "plan_id": plan_id,
+                            "last_payment_at": now_iso,
+                            "billing_cycle_start": now_iso,
+                            "billing_cycle_end": end_dt.isoformat(),
+                            "billing_cycle_type": billing_cycle_type,
+                            "grace_period_end": grace_dt.isoformat()
+                        },
+                        headers=supabase.admin_headers
+                    )
+                    
+            return {
+                "success": True,
+                "status": "COMPLETED",
+                "order_id": req.order_id,
+                "details": checkout_data
+            }
+
+    # ── PayPal Order Capture Flow ──
     token = await get_paypal_access_token()
     base_url = get_paypal_base_url()
-
     async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
         res = await client.post(
             f"{base_url}/v2/checkout/orders/{req.order_id}/capture",
@@ -192,15 +468,13 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                 "Content-Type": "application/json",
             }
         )
-
         if res.status_code not in [200, 201]:
             logger.error(f"PayPal capture failed: {res.status_code} - {res.text}")
             raise HTTPException(status_code=502, detail=f"PayPal capture failed: {res.text}")
-
+            
         capture_data = res.json()
         capture_status = capture_data.get("status", "UNKNOWN")
-
-        # Update transaction in DB
+        
         try:
             capture_id = ""
             purchase_units = capture_data.get("purchase_units", [])
@@ -209,7 +483,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                 captures = payments.get("captures", [])
                 if captures:
                     capture_id = captures[0].get("id", "")
-
+                    
             async with httpx.AsyncClient(trust_env=False, timeout=30.0) as db_client:
                 await db_client.patch(
                     f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{req.order_id}",
@@ -221,15 +495,13 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                     headers=supabase.admin_headers
                 )
         except Exception as e:
-            logger.warning(f"Failed to update transaction: {e}")
-
-        # If successful, update academy subscription status + send receipt email
+            logger.warning(f"Failed to update PayPal transaction: {e}")
+            
         if capture_status == "COMPLETED":
             try:
                 async with httpx.AsyncClient(trust_env=False, timeout=30.0) as db_client:
-                    # check if this is a parent payment by checking if academy_id starts with parent|
                     is_parent = False
-                    user_id = req.academy_id # defaults to academy_id from capture payload
+                    user_id = req.academy_id
                     plan_id = req.plan_id
                     billing_cycle_type = "monthly"
                     try:
@@ -244,7 +516,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                             billing_cycle_type = parts[2] if len(parts) > 2 else "monthly"
                     except Exception:
                         pass
-                    
+                        
                     if is_parent:
                         await db_client.patch(
                             f"{supabase.url}/rest/v1/users?id=eq.{user_id}",
@@ -252,7 +524,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                             headers=supabase.admin_headers
                         )
                     else:
-                        from datetime import datetime, timedelta, timezone
+                        from datetime import timedelta
                         now = datetime.now(timezone.utc)
                         now_iso = now.isoformat()
                         
@@ -274,16 +546,15 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                         }
                         if plan_id:
                             update_data["plan_id"] = plan_id
-
+                            
                         await db_client.patch(
                             f"{supabase.url}/rest/v1/academies?id=eq.{req.academy_id}",
                             json=update_data,
                             headers=supabase.admin_headers
                         )
             except Exception as e:
-                logger.warning(f"Failed to update subscription/account status: {e}")
-
-            # Receipt email — non-blocking: capture must succeed even if email fails
+                logger.warning(f"Failed to update PayPal subscription status: {e}")
+                
             try:
                 payer_email = ""
                 payer_name = ""
@@ -293,9 +564,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                     payer = capture_data.get("payer", {})
                     payer_email = payer.get("email_address", "") or ""
                     payer_name_obj = payer.get("name", {}) or {}
-                    payer_name = (
-                        f"{payer_name_obj.get('given_name', '')} {payer_name_obj.get('surname', '')}"
-                    ).strip() or payer_email.split("@")[0]
+                    payer_name = (f"{payer_name_obj.get('given_name', '')} {payer_name_obj.get('surname', '')}").strip() or payer_email.split("@")[0]
                     units = capture_data.get("purchase_units") or []
                     if units:
                         captures = (units[0].get("payments") or {}).get("captures") or []
@@ -304,8 +573,8 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                             amount_value = float(amt.get("value") or 0)
                             currency = amt.get("currency_code") or currency
                 except Exception as parse_err:
-                    logger.warning(f"Failed to parse capture payload for receipt: {parse_err}")
-
+                    logger.warning(f"Failed to parse PayPal receipt payload: {parse_err}")
+                    
                 if payer_email:
                     send_payment_receipt(
                         to=payer_email,
@@ -317,8 +586,8 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                         paid_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
                     )
             except Exception as mail_err:
-                logger.warning(f"Receipt email failed for order {req.order_id}: {mail_err}")
-
+                logger.warning(f"PayPal receipt email failed: {mail_err}")
+                
         return {
             "success": capture_status == "COMPLETED",
             "status": capture_status,
@@ -564,6 +833,152 @@ async def paypal_webhook(request: Request):
                     )
             except Exception as e:
                 logger.error(f"Webhook handler error: {e}")
+
+    return {"status": "ok"}
+
+
+# ── Lemon Squeezy Webhook Signature Verification ──
+
+async def verify_lemonsqueezy_webhook_signature(request: Request, raw_body: bytes) -> bool:
+    """Verify Lemon Squeezy webhook signature using HMAC-SHA256."""
+    signing_secret = settings.LEMON_SQUEEZY_SIGNING_SECRET
+    if not signing_secret:
+        logger.warning("LEMON_SQUEEZY_SIGNING_SECRET not set — skipping signature verification (set it in .env for production)")
+        return True
+
+    signature = request.headers.get("x-signature") or request.headers.get("X-Signature")
+    if not signature:
+        logger.warning("Lemon Squeezy webhook missing x-signature header — rejecting")
+        return False
+
+    try:
+        import hmac
+        import hashlib
+        digest = hmac.new(
+            signing_secret.encode(),
+            msg=raw_body,
+            digestmod=hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(digest, signature)
+    except Exception as e:
+        logger.error(f"Error validating Lemon Squeezy signature: {e}")
+        return False
+
+
+# ── Lemon Squeezy Webhook (for subscription lifecycle) ──
+
+@router.post("/lemonsqueezy/webhook")
+async def lemonsqueezy_webhook(request: Request):
+    """Handle Lemon Squeezy webhook events — verifies signature before processing."""
+    raw_body = await request.body()
+
+    if not await verify_lemonsqueezy_webhook_signature(request, raw_body):
+        logger.warning("Rejected Lemon Squeezy webhook with invalid signature")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    try:
+        import json
+        body = json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    event_name = body.get("meta", {}).get("event_name", "")
+    custom_data = body.get("meta", {}).get("custom_data", {})
+
+    if not custom_data:
+        custom_data = body.get("data", {}).get("attributes", {}).get("custom", {})
+
+    if not custom_data:
+        logger.warning(f"Lemon Squeezy webhook event {event_name} missing custom metadata — ignoring")
+        return {"status": "ignored", "reason": "missing_custom_data"}
+
+    academy_id = custom_data.get("academy_id")
+    plan_id = custom_data.get("plan_id", "pro")
+    billing_cycle_type = custom_data.get("billing_cycle_type", "monthly")
+
+    target_events = ["subscription_created", "subscription_payment_success", "order_created"]
+
+    if event_name in target_events and academy_id:
+        data_obj = body.get("data", {})
+        resource_id = data_obj.get("id")
+        attributes = data_obj.get("attributes", {})
+        renews_at_str = attributes.get("renews_at")
+
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+
+        if renews_at_str:
+            try:
+                end_dt = datetime.fromisoformat(renews_at_str.replace("Z", "+00:00"))
+            except Exception:
+                cycle_days = 365 if billing_cycle_type == "yearly" else 30
+                end_dt = now + timedelta(days=cycle_days)
+        else:
+            cycle_days = 365 if billing_cycle_type == "yearly" else 30
+            end_dt = now + timedelta(days=cycle_days)
+
+        grace_dt = end_dt + timedelta(days=7)
+
+        try:
+            async with httpx.AsyncClient(trust_env=False, timeout=20.0) as client:
+                checkout_id = body.get("meta", {}).get("checkout_id") or resource_id
+                tx_ref = f"lemonsqueezy_{checkout_id}"
+
+                tx_check = await client.get(
+                    f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{tx_ref}",
+                    headers=supabase.admin_headers
+                )
+
+                txn_payload = {
+                    "status": "completed",
+                    "completed_at": now_iso,
+                    "paypal_capture_id": str(resource_id)
+                }
+
+                if tx_check.status_code == 200 and tx_check.json():
+                    await client.patch(
+                        f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{tx_ref}",
+                        json=txn_payload,
+                        headers=supabase.admin_headers
+                    )
+                else:
+                    await client.post(
+                        f"{supabase.url}/rest/v1/payment_transactions",
+                        json={
+                            "paypal_order_id": tx_ref,
+                            "academy_id": academy_id,
+                            "plan_id": plan_id,
+                            "amount": float(attributes.get("total_usd") or attributes.get("total") or 0) / 100.0 or 499.0,
+                            "currency": attributes.get("currency", "MAD"),
+                            "status": "completed",
+                            "created_at": now_iso,
+                            "completed_at": now_iso,
+                            "paypal_capture_id": str(resource_id),
+                            "billing_cycle_type": billing_cycle_type
+                        },
+                        headers=supabase.admin_headers
+                    )
+
+                if academy_id and not academy_id.startswith("temp_") and not academy_id.startswith("pending_"):
+                    await client.patch(
+                        f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+                        json={
+                            "subscription_status": "active",
+                            "status": "active",
+                            "plan_id": plan_id,
+                            "last_payment_at": now_iso,
+                            "billing_cycle_start": now_iso,
+                            "billing_cycle_end": end_dt.isoformat(),
+                            "billing_cycle_type": billing_cycle_type,
+                            "grace_period_end": grace_dt.isoformat()
+                        },
+                        headers=supabase.admin_headers
+                    )
+                    logger.info(f"Lemon Squeezy subscription activated successfully for {academy_id} - {plan_id}")
+        except Exception as e:
+            logger.error(f"Error handling Lemon Squeezy webhook event {event_name}: {e}")
+            raise HTTPException(status_code=500, detail="Internal processing error")
 
     return {"status": "ok"}
 

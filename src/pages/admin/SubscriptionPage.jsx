@@ -147,6 +147,7 @@ const SubscriptionPage = () => {
                     billing_cycle_type: billingCycle,
                     amount,
                     currency: 'USD',
+                    source: 'academy_subscription',
                     description: `${plan.nameEn} Plan — ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} (${billingCycle === 'yearly' ? yearlyPrice : plan.price} MAD)`,
                 }),
             });

@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     VAPID_PUBLIC_KEY: Optional[str] = None
     VAPID_CLAIMS_EMAIL: str = "mailto:admin@academy.com"
 
+    # Lemon Squeezy Sandbox
+    LEMON_SQUEEZY_API_KEY: Optional[str] = None
+    LEMON_SQUEEZY_SIGNING_SECRET: Optional[str] = None
+
     # DEV_MODE=true في .env يفعّل الـ bypass للتطوير المحلي فقط
     # في الإنتاج يجب أن يكون DEV_MODE=false أو غير موجود
     DEV_MODE: bool = False
