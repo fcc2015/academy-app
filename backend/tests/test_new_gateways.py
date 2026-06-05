@@ -1,82 +1,8 @@
 """
-Tests for new payment gateways (Stripe, Wafacash, CashPlus) and Advanced Player Features.
+Tests for payment gateways (Wafacash, CashPlus) and Advanced Player Features.
 """
 import pytest
 from httpx import Response
-import stripe
-
-# ─── Stripe Gateway Tests ──────────────────────────────────────────
-
-def test_create_stripe_checkout_session_success(admin_client, mocker, respx_mock):
-    """Successfully create a Stripe checkout session."""
-    # Mock Stripe Checkout Session creation
-    class MockSession:
-        id = "cs_test_123"
-        url = "https://checkout.stripe.com/pay/cs_test_123"
-    
-    mocker.patch("stripe.checkout.Session.create", return_value=MockSession())
-    
-    # Mock DB save
-    db_route = respx_mock.post(url__regex=r".*/rest/v1/payment_transactions").mock(
-        return_value=Response(201, json={})
-    )
-
-    res = admin_client.post(
-        "/api/v1/payments/gateway/stripe/create-checkout-session",
-        json={
-            "academy_id": "academy-1",
-            "plan_id": "premium",
-            "amount": 100.0,
-            "currency": "MAD",
-            "description": "Premium Academy Plan"
-        }
-    )
-    assert res.status_code == 200
-    body = res.json()
-    assert body["session_id"] == "cs_test_123"
-    assert body["checkout_url"] == "https://checkout.stripe.com/pay/cs_test_123"
-    assert db_route.called
-
-def test_stripe_webhook_completed_success(client, mocker, respx_mock):
-    """Handle Stripe checkout.session.completed webhook successfully."""
-    # Mock Stripe Webhook signature verification to return a mock event
-    class MockEvent:
-        type = "checkout.session.completed"
-        class data:
-            object = {
-                "id": "cs_test_123",
-                "client_reference_id": "academy-1|premium",
-                "metadata": {
-                    "academy_id": "academy-1",
-                    "plan_id": "premium"
-                }
-            }
-    
-    mocker.patch("stripe.Webhook.construct_event", return_value=MockEvent())
-    # Mock construct_from fallback in case signature isn't verified (dev mode)
-    mocker.patch("stripe.Event.construct_from", return_value=MockEvent())
-
-    # Mock DB patch for transaction
-    db_tx_route = respx_mock.patch(url__regex=r".*/rest/v1/payment_transactions\?paypal_order_id=eq\.stripe_cs_test_123.*").mock(
-        return_value=Response(200, json=[{}])
-    )
-    # Mock DB patch for academy subscription
-    db_academy_route = respx_mock.patch(url__regex=r".*/rest/v1/academies\?id=eq\.academy-1.*").mock(
-        return_value=Response(200, json=[{}])
-    )
-
-    res = client.post(
-        "/api/v1/payments/gateway/stripe/webhook",
-        json={
-            "id": "evt_test_123",
-            "type": "checkout.session.completed"
-        },
-        headers={"Stripe-Signature": "t=123,v1=abc"}
-    )
-    assert res.status_code == 200
-    assert res.json() == {"status": "ok"}
-    assert db_tx_route.called
-    assert db_academy_route.called
 
 # ─── Moroccan Cash Gateway Tests ────────────────────────────────────
 

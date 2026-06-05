@@ -23,6 +23,16 @@ router = APIRouter(
 )
 
 
+def is_valid_uuid(val: str | None) -> bool:
+    if not val:
+        return False
+    try:
+        uuid.UUID(str(val))
+        return True
+    except ValueError:
+        return False
+
+
 # ── Schemas ──
 
 class CreateOrderRequest(BaseModel):
@@ -214,7 +224,7 @@ async def create_paypal_order(req: CreateOrderRequest):
                             json={
                                 "paypal_order_id": order["id"],
                                 "academy_id": req.academy_id,
-                                "plan_id": req.plan_id,
+                                "plan_id": req.plan_id if is_valid_uuid(req.plan_id) else None,
                                 "amount": req.amount,
                                 "currency": req.currency,
                                 "status": "pending",
@@ -355,7 +365,7 @@ async def create_paypal_order(req: CreateOrderRequest):
                         json={
                             "paypal_order_id": f"lemonsqueezy_{checkout_id}",
                             "academy_id": req.academy_id,
-                            "plan_id": mapped_plan,
+                            "plan_id": mapped_plan if is_valid_uuid(mapped_plan) else None,
                             "amount": req.amount,
                             "currency": req.currency,
                             "status": "pending",
@@ -373,8 +383,6 @@ async def create_paypal_order(req: CreateOrderRequest):
                 "approve_url": checkout_url
             }
 
-
-# ── Capture Payment Order ──
 
 @router.post("/capture-order")
 async def capture_paypal_order(req: CaptureOrderRequest):
@@ -432,7 +440,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
                         json={
                             "paypal_order_id": tx_ref,
                             "academy_id": req.academy_id or academy_id or "pending",
-                            "plan_id": plan_id,
+                            "plan_id": plan_id if is_valid_uuid(plan_id) else None,
                             "amount": 499.0,
                             "currency": "MAD",
                             "status": "completed",
@@ -964,7 +972,7 @@ async def lemonsqueezy_webhook(request: Request):
                         json={
                             "paypal_order_id": tx_ref,
                             "academy_id": academy_id,
-                            "plan_id": plan_id,
+                            "plan_id": plan_id if is_valid_uuid(plan_id) else None,
                             "amount": float(attributes.get("total_usd") or attributes.get("total") or 0) / 100.0 or 499.0,
                             "currency": attributes.get("currency", "MAD"),
                             "status": "completed",
@@ -1012,156 +1020,7 @@ def payment_status():
     }
 
 
-# =========================================================
-# STRIPE GATEWAY
-# =========================================================
 
-import stripe
-import os
-
-class CreateStripeSessionRequest(BaseModel):
-    academy_id: str
-    plan_id: str
-    amount: float
-    currency: str = "mad"
-    description: str = "Academy SaaS Subscription"
-    billing_cycle_type: Optional[str] = "monthly"  # "monthly" or "yearly"
-
-class StripeWebhookRequest(BaseModel):
-    pass
-
-@router.post("/stripe/create-checkout-session")
-async def create_stripe_checkout_session(req: CreateStripeSessionRequest):
-    """Create a Stripe Checkout Session for subscription payment."""
-    stripe_key = os.getenv("STRIPE_SECRET_KEY") or "mock_stripe_key_for_testing"
-    stripe.api_key = stripe_key
-
-    # URLs for redirection after payment
-    success_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=success&provider=stripe&academy_id={req.academy_id}&plan_id={req.plan_id}"
-    cancel_url = f"{settings.FRONTEND_URL}/saas/subscriptions?payment=cancelled"
-
-    try:
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[{
-                "price_data": {
-                    "currency": req.currency.lower(),
-                    "product_data": {
-                        "name": req.plan_id.upper(),
-                        "description": req.description,
-                    },
-                    "unit_amount": int(req.amount * 100), # Stripe expects amount in cents
-                },
-                "quantity": 1,
-            }],
-            mode="payment",
-            success_url=success_url,
-            cancel_url=cancel_url,
-            client_reference_id=f"{req.academy_id}|{req.plan_id}|{req.billing_cycle_type or 'monthly'}",
-            metadata={
-                "academy_id": req.academy_id,
-                "plan_id": req.plan_id,
-            }
-        )
-
-        # Save pending transaction to DB
-        try:
-            async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
-                await client.post(
-                    f"{supabase.url}/rest/v1/payment_transactions",
-                    json={
-                        "paypal_order_id": f"stripe_{session.id[:20]}", # reuse order_id column for Stripe session reference
-                        "academy_id": req.academy_id,
-                        "plan_id": req.plan_id,
-                        "amount": req.amount,
-                        "currency": req.currency,
-                        "status": "pending",
-                        "created_at": datetime.now(timezone.utc).isoformat(),
-                        "billing_cycle_type": req.billing_cycle_type or "monthly"
-                    },
-                    headers=supabase.admin_headers
-                )
-        except Exception as db_err:
-            logger.warning(f"Failed to record pending Stripe session: {db_err}")
-
-        return {
-            "session_id": session.id,
-            "checkout_url": session.url
-        }
-    except Exception as e:
-        logger.error(f"Stripe session creation failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Stripe integration failed: {str(e)}")
-
-
-@router.post("/stripe/webhook")
-async def stripe_webhook(request: Request):
-    """Handle Stripe Webhook events."""
-    payload = await request.body()
-    sig_header = request.headers.get("Stripe-Signature")
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET") or "mock_webhook_secret"
-
-    try:
-        # Verify webhook signature in production, fallback to generic parsing in dev
-        if webhook_secret and not webhook_secret.startswith("mock"):
-            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-        else:
-            import json
-            event_data = json.loads(payload.decode("utf-8"))
-            event = stripe.Event.construct_from(event_data, stripe.api_key)
-
-        if event.type == "checkout.session.completed":
-            session = event.data.object
-            client_ref = session.get("client_reference_id")
-            session_id = session.get("id") or getattr(session, "id", "")
-            if client_ref and "|" in client_ref:
-                parts = client_ref.split("|")
-                academy_id = parts[0]
-                plan_id = parts[1] if len(parts) > 1 else None
-                billing_cycle_type = parts[2] if len(parts) > 2 else "monthly"
-                
-                from datetime import datetime, timedelta, timezone
-                now = datetime.now(timezone.utc)
-                now_iso = now.isoformat()
-                
-                cycle_type = billing_cycle_type or "monthly"
-                if cycle_type == "yearly":
-                    end_dt = now + timedelta(days=365)
-                else:
-                    end_dt = now + timedelta(days=30)
-                grace_dt = end_dt + timedelta(days=7)
-
-                # Update transaction in DB
-                async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
-                    await client.patch(
-                        f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.stripe_{session_id[:20]}",
-                        json={
-                            "status": "completed",
-                            "completed_at": now_iso
-                        },
-                        headers=supabase.admin_headers
-                    )
-                    
-                    # Update academy subscription status
-                    await client.patch(
-                        f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
-                        json={
-                            "subscription_status": "active",
-                            "status": "active",
-                            "plan_id": plan_id,
-                            "last_payment_at": now_iso,
-                            "billing_cycle_start": now_iso,
-                            "billing_cycle_end": end_dt.isoformat(),
-                            "billing_cycle_type": cycle_type,
-                            "grace_period_end": grace_dt.isoformat()
-                        },
-                        headers=supabase.admin_headers
-                    )
-                    logger.info(f"Stripe subscription activated successfully for {academy_id} - {plan_id}")
-
-        return {"status": "ok"}
-    except Exception as e:
-        logger.error(f"Stripe Webhook error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 # =========================================================
@@ -1192,7 +1051,7 @@ async def generate_cash_payment_code(req: CashPaymentRequest):
     transaction_data = {
         "paypal_order_id": random_code, # Reuse order_id column for cash reference code
         "academy_id": req.academy_id,
-        "plan_id": req.plan_id,
+        "plan_id": req.plan_id if is_valid_uuid(req.plan_id) else None,
         "amount": req.amount,
         "currency": "MAD",
         "status": "waiting_deposit",
