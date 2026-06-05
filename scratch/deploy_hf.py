@@ -60,7 +60,12 @@ def deploy(token):
         "PAYPAL_SANDBOX": "true",
         "DEV_MODE": "false",
         "ENCRYPTION_KEY": "ZvtLzFP5EhtfdwW-wlSFx22TONj5l4bSz2gt6FB5aRs=",
-        "FRONTEND_URL": "https://academy-app-mu.vercel.app"
+        "FRONTEND_URL": "https://academy-app-mu.vercel.app",
+        "LEMON_SQUEEZY_API_KEY": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI5NGQ1OWNlZi1kYmI4LTRlYTUtYjE3OC1kMjU0MGZjZDY5MTkiLCJqdGkiOiI1NDU0ZjkxZTE1MTcwOTkxNjcxMWQ1OTEzOTUyN2M1OWI3YjY3NjgyZDZmOGIyMjMyYTk1Yzg0YzU2MzNiNjNiNWUxZmNhNzAyYjMyZThlYiIsImlhdCI6MTc4MDYwNTI1OS43NjY1NjcsIm5iZiI6MTc4MDYwNTI1OS43NjY1NjksImV4cCI6MTc5NjM0MjQwMC4wMzk4MTIsInN1YiI6IjczMjgxNTciLCJzY29wZXMiOltdfQ.6qZyWVOSAOMKTJ-HyvdX6OhgL-OK6RXRojKGXQZznIOYu859IqqXps1xDn1N1WUNqDJvCrBRCcpTbUZRny-gnph-ko9m2vynvh1zpuLeGxAGHWMKm8OmVkcq85ncX98Vsz5cUSRJUTwCL2zblcR-9Q-qsVYbIZ15xowEFOe48R4S0fJ86x7culSaoV0sEZT79ajoeyMuIQCy9QuJg6J5gy5PxalcOLmFkTvafHHq0ketkTGV08AptELT2ctecr_jCPN5-HkfJKmNpnFv0Ec-sGonI4VRXoP3rqj57nCgn6jsf0kPohrfa7YdD2MNlsXubjsexAD6-gW3mdl3BhT5rtkEiWlzW3EeYrgwkt-J9cXdKmfnDJ-_0YBFA0lMZNlf8Z1Hs_wqy8ibrU-qeuJrLuxiBT6qF6l1D8HKTI3bWh6vgYi63yt2LsPZof_hCznsKdBSRyCK0Ti3KRPADVX658xqn7BUTSTxXm-61urAlA6t6fBfdSz7mSnnlqodgcpH47-4xu4SWxEc-WMvvlzo6nLgOY6rXwS7sHVBqZEYl1i80aQzUeyu4-TPBiDSBJyL4AfD0vAwtFy6tjwtgIl9U03l_RfRvNCIrB0zjTqTWrYQtIs7vGcSczLLzoNv2iD_MibblSx2pLey432adht97YIDvmSxP4Tmux573Mg66P0",
+        "LEMON_SQUEEZY_SIGNING_SECRET": "Amdh@963852741",
+        "VAPID_PUBLIC_KEY": "BI04-ovK5PuGyPwVPTuTg3hqpAGgYpFxxrn-vAzUM3_v5_S1o07TDRErrhDh2MGkzkkUfYGFYcxx1WRLkWXLopY",
+        "VAPID_PRIVATE_KEY": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgQgO1EQuE3s8Uj5Gykx6_EHD4TUudbIKYi1NAr2k-9NShRANCAASNOPqLyuT7hsj8FT07k4N4aqQBoGKRcca5_rwM1DN_7-f0taNO0w0RK64Q4djBpM5JFH2BhWHMcdVkS5Fly6KW",
+        "VAPID_CLAIMS_EMAIL": "mailto:admin@academy.com"
     }
 
     print("\nSetting environment secrets...")
@@ -86,6 +91,22 @@ def deploy(token):
                 print(f"  [OK] {f}")
             else:
                 print(f"  [FAIL] {f} (not found)")
+
+        # Create README.md with HF space metadata configuration
+        readme_content = """---
+title: Academy Backend
+emoji: ⚽
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+# Academy Backend
+"""
+        with open(os.path.join(tmp_dir, "README.md"), "w", encoding="utf-8") as f_readme:
+            f_readme.write(readme_content)
+        print("  [OK] Created README.md with Space metadata")
 
         # Copy directories
         for d in INCLUDE_DIRS:
