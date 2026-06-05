@@ -1,0 +1,461 @@
+import logging
+from fastapi import APIRouter, HTTPException, status, Depends
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional
+import re
+from services.supabase_client import supabase
+from core.auth_middleware import require_role
+
+logger = logging.getLogger("public_api")
+from urllib.parse import quote
+import httpx
+
+router = APIRouter(prefix="/public", tags=["Public"])
+
+
+@router.get("/saas-landing")
+async def get_public_saas_landing():
+    """Public read of the single saas_landing_settings row — used by /saas-platform."""
+    from core.config import settings as _s
+    async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+        res = await client.get(
+            f"{_s.SUPABASE_URL}/rest/v1/saas_landing_settings?id=eq.1",
+            headers=supabase.admin_headers,
+        )
+        if res.status_code != 200 or not res.json():
+            return {}
+        return res.json()[0]
+
+
+@router.get("/academy/{subdomain}")
+async def get_public_academy(subdomain: str):
+    """
+    Public read of an academy by subdomain — used by the per-academy
+    landing page. Returns minimal info + branches (only if the academy
+    is on the enterprise plan).
+    """
+    from core.config import settings as _s
+    async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+        ac = await client.get(
+            f"{_s.SUPABASE_URL}/rest/v1/academies"
+            f"?subdomain=eq.{quote(subdomain)}"
+            "&select=id,name,city,plan_id,custom_domain,logo_url,primary_color,status",
+            headers=supabase.admin_headers,
+        )
+        if ac.status_code != 200 or not ac.json():
+            raise HTTPException(status_code=404, detail="Academy not found")
+        row = ac.json()[0]
+        if (row.get("status") or "active") == "suspended":
+            raise HTTPException(status_code=403, detail="Academy is suspended")
+
+        plan_id = (row.get("plan_id") or "free").lower()
+        branches = []
+        if plan_id == "enterprise":
+            br = await client.get(
+                f"{_s.SUPABASE_URL}/rest/v1/branches"
+                f"?academy_id=eq.{row['id']}&is_active=eq.true"
+                "&select=id,name,city,address,phone&order=created_at.asc",
+                headers=supabase.admin_headers,
+            )
+            if br.status_code == 200:
+                branches = br.json()
+
+        # Public landing content from academy_settings
+        st = await client.get(
+            f"{_s.SUPABASE_URL}/rest/v1/academy_settings"
+            f"?academy_id=eq.{row['id']}"
+            "&select=hero_title,hero_subtitle,about_text,facebook_url,instagram_url,youtube_url,whatsapp_number,contact_email,contact_phone,address,logo_url",
+            headers=supabase.admin_headers,
+        )
+        landing = (st.json()[0] if st.status_code == 200 and st.json() else {})
+
+        about_val = landing.get("about_text") or ""
+        primary_color = row.get("primary_color") or "#4f46e5"
+        secondary_color = "#7c3aed"
+
+        if about_val.startswith("{"):
+            try:
+                import json
+                parsed = json.loads(about_val)
+                if isinstance(parsed, dict):
+                    primary_color = parsed.get("primary_color") or primary_color
+                    secondary_color = parsed.get("secondary_color") or secondary_color
+                    about_val = parsed.get("about_text") or ""
+            except Exception:
+                pass
+
+        return {
+            "id": row["id"],
+            "name": row.get("name"),
+            "city": row.get("city"),
+            "plan_id": plan_id,
+            "logo_url": row.get("logo_url") or landing.get("logo_url"),
+            "primary_color": primary_color,
+            "secondary_color": secondary_color,
+            "has_branches_feature": plan_id == "enterprise",
+            "branches": branches,
+            "hero_title": landing.get("hero_title"),
+            "hero_subtitle": landing.get("hero_subtitle"),
+            "about_text": about_val,
+            "facebook_url": landing.get("facebook_url"),
+            "instagram_url": landing.get("instagram_url"),
+            "youtube_url": landing.get("youtube_url"),
+            "whatsapp_number": landing.get("whatsapp_number"),
+            "contact_email": landing.get("contact_email"),
+            "contact_phone": landing.get("contact_phone"),
+            "address": landing.get("address"),
+        }
+
+
+class SetupAcademyRequest(BaseModel):
+    academy_name: str = Field(..., min_length=2, max_length=100)
+    country: Optional[str] = Field(None, max_length=100)
+    city: Optional[str] = Field(None, max_length=100)
+
+@router.post("/setup-academy")
+async def setup_academy_for_google_user(req: SetupAcademyRequest, user: dict = Depends(require_role("player", "parent", "admin", "coach", "super_admin"))):
+    """
+    Called after Google OAuth — creates academy and adds the authenticated user as admin.
+    The user already exists in Supabase Auth, we just need to create the academy + admin record.
+    """
+    from core.auth_middleware import verify_token
+    user_id = user.get("user_id")
+    user_email = user.get("email")
+
+    academy_name = req.academy_name
+    if req.city:
+        academy_name = f"{req.academy_name} — {req.city}"
+
+    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+        # 1. Create academy
+        academy_payload = {"name": academy_name, "status": "active", "subscription_status": "free"}
+        if req.country:
+            academy_payload["country"] = req.country
+        if req.city:
+            academy_payload["city"] = req.city
+            
+        res = await client.post(
+            f"{supabase.url}/rest/v1/academies?select=id",
+            json=academy_payload,
+            headers=supabase.admin_headers
+        )
+        if res.status_code not in [200, 201]:
+            raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+        academy_row = res.json()
+        if isinstance(academy_row, list):
+            academy_row = academy_row[0]
+        new_academy_id = academy_row["id"]
+
+        # 2. Create/update users record
+        await client.post(
+            f"{supabase.url}/rest/v1/users",
+            json={"id": user_id, "full_name": user_email, "role": "admin", "academy_id": new_academy_id},
+            headers={**supabase.admin_headers, "Prefer": "resolution=merge-duplicates,return=minimal"}
+        )
+
+        # 3. Add to admins table
+        await client.post(
+            f"{supabase.url}/rest/v1/admins",
+            json={"user_id": user_id, "email": user_email, "full_name": user_email, "status": "active", "academy_id": new_academy_id},
+            headers={**supabase.admin_headers, "Prefer": "resolution=merge-duplicates,return=minimal"}
+        )
+
+    return {"success": True, "academy_id": new_academy_id}
+
+
+# ── Self-Service Academy Registration (Free Plan) ──
+
+class RegisterAcademyRequest(BaseModel):
+    academy_name: str = Field(..., min_length=2, max_length=100)
+    country: Optional[str] = Field(None, max_length=100)
+    city: Optional[str] = Field(None, max_length=100)
+    admin_name: str = Field(..., min_length=2, max_length=100)
+    admin_email: EmailStr
+    admin_password: str = Field(..., min_length=6, max_length=128)
+
+    @field_validator("academy_name", "admin_name")
+    @classmethod
+    def strip_html(cls, v: str) -> str:
+        return re.sub(r"<[^>]+>", "", v).strip()
+
+
+@router.post("/register-academy")
+async def register_academy(req: RegisterAcademyRequest):
+    """
+    Public endpoint: Create a free academy and provision its admin user.
+    No authentication required — this is the self-service signup flow.
+    """
+    # Validate password length
+    if len(req.admin_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le mot de passe doit contenir au moins 6 caractères."
+        )
+
+    # --- Duplicate Check: Academy Name ---
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            check_name = await client.get(
+                f"{supabase.url}/rest/v1/academies?name=eq.{quote(req.academy_name)}&select=id",
+                headers=supabase.admin_headers
+            )
+            if check_name.status_code == 200 and check_name.json():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Une académie avec ce nom existe déjà."
+                )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("Academy name duplicate check failed (non-critical): %s", e)
+
+    # --- Duplicate Check: Admin Email ---
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            check_email = await client.get(
+                f"{supabase.url}/rest/v1/admins?email=eq.{quote(str(req.admin_email))}&select=id",
+                headers=supabase.admin_headers
+            )
+            if check_email.status_code == 200 and check_email.json():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Cet email est déjà utilisé."
+                )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("Admin email duplicate check failed (non-critical): %s", e)
+
+    # 1. Create the Academy record with free plan
+    subdomain = re.sub(r'[^a-z0-9-]', '', req.academy_name.lower().replace(' ', '-')).strip('-')
+    if not subdomain:
+        subdomain = f"academy-{int(__import__('time').time())}"
+    academy_data = {
+        "name": req.academy_name,
+        "subdomain": subdomain,
+        "status": "active",
+        "subscription_status": "free",
+        "country": req.country,
+        "city": req.city
+    }
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=90.0) as client:
+            res = await client.post(
+                f"{supabase.url}/rest/v1/academies?select=id",
+                json=academy_data,
+                headers=supabase.admin_headers
+            )
+            if res.status_code not in [200, 201]:
+                raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+            academy_row = res.json()
+            if isinstance(academy_row, list):
+                academy_row = academy_row[0]
+            new_academy_id = academy_row["id"]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Erreur création académie: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+
+    # 2. Provision the Admin User via Supabase Auth Admin API
+    try:
+        auth_res = await supabase.admin_create_user(
+            email=req.admin_email,
+            password=req.admin_password,
+            role="admin",
+            full_name=req.admin_name,
+            academy_id=new_academy_id
+        )
+        admin_user_id = auth_res.get("id")
+    except Exception as e:
+        # Rollback: delete the academy if user creation fails
+        try:
+            async with httpx.AsyncClient(trust_env=False, timeout=90.0) as client:
+                await client.delete(
+                    f"{supabase.url}/rest/v1/academies?id=eq.{new_academy_id}",
+                    headers=supabase.admin_headers
+                )
+        except Exception as rollback_err:
+            logger.warning("Academy rollback failed: %s", rollback_err)
+        error_msg = str(e)
+        logger.error("Admin user creation failed: %s", e, exc_info=True)
+        if "already been registered" in error_msg.lower() or "duplicate" in error_msg.lower():
+            raise HTTPException(status_code=409, detail="Cet email est déjà enregistré.")
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+
+    # 3. Create public.users record
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=90.0) as client:
+            await client.post(
+                f"{supabase.url}/rest/v1/users",
+                json={
+                    "id": admin_user_id,
+                    "full_name": req.admin_name,
+                    "role": "admin",
+                    "academy_id": new_academy_id
+                },
+                headers=supabase.admin_headers
+            )
+    except Exception as e:
+        logger.warning(f"[register-academy] Users record (non-critical): {e}")
+
+    # 4. Create public.admins record
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=90.0) as client:
+            await client.post(
+                f"{supabase.url}/rest/v1/admins",
+                json={
+                    "user_id": admin_user_id,
+                    "email": req.admin_email,
+                    "full_name": req.admin_name,
+                    "status": "active",
+                    "academy_id": new_academy_id
+                },
+                headers=supabase.admin_headers
+            )
+    except Exception as e:
+        logger.warning(f"[register-academy] Admins record (non-critical): {e}")
+
+    # 5. Create default academy_settings
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            await client.post(
+                f"{supabase.url}/rest/v1/academy_settings",
+                json={
+                    "academy_id": new_academy_id,
+                    "academy_name": req.academy_name,
+                    "language": "fr",
+                    "currency": "MAD"
+                },
+                headers=supabase.admin_headers
+            )
+    except Exception as e:
+        logger.warning(f"[register-academy] Settings record (non-critical): {e}")
+
+    return {
+        "success": True,
+        "academy_id": new_academy_id,
+        "admin_email": req.admin_email,
+        "message": "Académie créée avec succès ! Connectez-vous avec vos identifiants."
+    }
+
+class PublicRequest(BaseModel):
+    type: str = Field(..., pattern=r"^(contact|registration|saas_inquiry|payment_method)$")
+    name: str = Field(..., min_length=2, max_length=100)
+    email: Optional[EmailStr] = None
+    player_name: Optional[str] = Field(None, max_length=100)
+    birth_date: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    address: Optional[str] = Field(None, max_length=300)
+    plan_name: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
+    message: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator("name", "player_name", "address", "message")
+    @classmethod
+    def strip_html(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            return re.sub(r"<[^>]+>", "", v).strip()
+        return v
+
+@router.post("/requests")
+async def create_public_request(request: PublicRequest):
+    try:
+        response = await supabase.insert_public_request(request.model_dump())
+        
+        # Optional: trigger notification to admins
+        try:
+            subject = request.player_name if request.player_name else request.name
+            msg = f"طلب جديد ({'تسجيل لاعب' if request.type == 'registration' else 'اتصال'}) من طرف {request.name}. "
+            if request.player_name:
+                msg += f"اللاعب: {request.player_name}. "
+            if request.plan_name:
+                msg += f"الباقة: {request.plan_name}. "
+            if request.birth_date:
+                msg += f"تاريخ الميلاد: {request.birth_date}. "
+            if request.email:
+                msg += f"({request.email})"
+                
+            await supabase.insert_notification({
+                "title": f"طلب {'تسجيل' if request.type == 'registration' else 'تواصل'} جديد",
+                "message": msg,
+                "type": "admin_alert",
+                "target_role": "Admin"
+            })
+        except Exception as e:
+            err_details = getattr(e, "response", None)
+            logger.warning(f"Failed to insert notification from public API: {e}")
+            if err_details:
+                logger.warning(f"Notification error details: {err_details.text}")
+            pass # ignore notification failure
+            
+        return {"success": True, "message": "Request received successfully."}
+    except Exception as e:
+        logger.error("Error saving request: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
+
+@router.get("/admin/requests", dependencies=[Depends(require_role("admin", "super_admin", "staff"))])
+async def fetch_public_requests(request_status: str = "active"):
+    try:
+        data = await supabase.get_public_requests(status=request_status)
+        return data
+    except Exception as e:
+        logger.error("Error fetching requests: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
+
+class RequestUpdate(BaseModel):
+    status: str
+
+@router.patch("/admin/requests/{request_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
+async def update_request_status(request_id: str, update: RequestUpdate):
+    try:
+        data = await supabase.update_public_request_status(request_id, update.status)
+        return data
+    except Exception as e:
+        logger.error("Error updating request: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
+
+@router.delete("/admin/requests/{request_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
+async def delete_public_request(request_id: str):
+    try:
+        data = await supabase.delete_public_request(request_id)
+        return data
+    except Exception as e:
+        logger.error("Error deleting request: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
+
+@router.get("/academies")
+async def get_public_academies_directory(country: Optional[str] = None, city: Optional[str] = None):
+    """
+    Public directory of active academies.
+    Parents use this to find and register to academies by country/city.
+    """
+    try:
+        query = f"{supabase.url}/rest/v1/academies?select=id,name,city,country,logo_url,primary_color,plan_id&status=eq.active&order=name.asc"
+        
+        if country:
+            query += f"&country=ilike.*{quote(country)}*"
+        if city:
+            query += f"&city=ilike.*{quote(city)}*"
+            
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            res = await client.get(query, headers=supabase.admin_headers)
+            if res.status_code == 200:
+                return res.json()
+            return []
+    except Exception as e:
+        logger.error(f"Error fetching public academies directory: {e}", exc_info=True)
+        return []
+

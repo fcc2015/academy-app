@@ -1,0 +1,962 @@
+import logging
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File, Form, WebSocket, WebSocketDisconnect
+from core.auth_middleware import verify_token
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Literal
+import re as _re
+from services.supabase_client import supabase
+from datetime import datetime, timedelta
+from urllib.parse import quote
+
+logger = logging.getLogger("chat")
+router = APIRouter(prefix="/chat", tags=["Chat"], dependencies=[Depends(verify_token)])
+
+
+# ─────────────────────────────────────────────
+# WebSocket Connection Manager
+# ─────────────────────────────────────────────
+
+class ConnectionManager:
+    """Tracks active WebSocket connections per chat group."""
+    def __init__(self):
+        self.rooms: dict[str, set] = {}
+
+    async def connect(self, group_id: str, websocket: WebSocket):
+        await websocket.accept()
+        if group_id not in self.rooms:
+            self.rooms[group_id] = set()
+        self.rooms[group_id].add(websocket)
+        logger.debug(f"WS connect: group={group_id} total={len(self.rooms[group_id])}")
+
+    def disconnect(self, group_id: str, websocket: WebSocket):
+        if group_id in self.rooms:
+            self.rooms[group_id].discard(websocket)
+            if not self.rooms[group_id]:
+                del self.rooms[group_id]
+
+    async def broadcast(self, group_id: str, data: dict):
+        """Send JSON to all connected clients in the group, drop dead connections."""
+        if group_id not in self.rooms:
+            return
+        dead = set()
+        for ws in list(self.rooms[group_id]):
+            try:
+                await ws.send_json(data)
+            except Exception:
+                dead.add(ws)
+        for ws in dead:
+            self.rooms[group_id].discard(ws)
+
+manager = ConnectionManager()
+
+# WS router — no global auth dependency (verified manually inside handler)
+ws_router = APIRouter(prefix="/chat", tags=["Chat WS"])
+
+
+async def _verify_ws_token(websocket: WebSocket) -> dict | None:
+    """Read access_token from httpOnly cookie or query param and verify with Supabase."""
+    from core.config import settings
+    token = websocket.cookies.get("access_token")
+    if not token:
+        token = websocket.query_params.get("token")
+    if not token:
+        return None
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            res = await client.get(
+                f"{settings.SUPABASE_URL}/auth/v1/user",
+                headers={"apikey": settings.SUPABASE_KEY, "Authorization": f"Bearer {token}"},
+            )
+            if res.status_code != 200:
+                return None
+            user = res.json()
+            user_id = user.get("id")
+            db_res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}&select=role,academy_id",
+                headers=supabase.admin_headers,
+            )
+            role, academy_id = "parent", None
+            if db_res.status_code == 200 and db_res.json():
+                row = db_res.json()[0]
+                role = row.get("role", "parent")
+                academy_id = row.get("academy_id")
+            return {"user_id": user_id, "role": role, "academy_id": academy_id}
+    except Exception as e:
+        logger.warning(f"WS auth error: {e}")
+        return None
+
+
+@ws_router.websocket("/ws/{group_id}")
+async def websocket_chat(websocket: WebSocket, group_id: str):
+    """
+    Real-time WebSocket endpoint for a chat group.
+    - Auth: reads access_token httpOnly cookie (no CSRF needed for WS).
+    - Receives: { type: "typing", user_id, user_name, is_typing } | { type: "ping" }
+    - Broadcasts typing events to all others in the group.
+    - New messages are broadcast by the HTTP POST /chat/messages endpoint.
+    """
+    user = await _verify_ws_token(websocket)
+    if not user:
+        await websocket.close(code=4001)
+        return
+
+    await manager.connect(group_id, websocket)
+    logger.info(f"WS connected: user={user['user_id']} group={group_id}")
+    try:
+        while True:
+            data = await websocket.receive_json()
+            event_type = data.get("type")
+
+            if event_type == "typing":
+                await manager.broadcast(group_id, {
+                    "type": "typing",
+                    "user_id": data.get("user_id"),
+                    "user_name": data.get("user_name"),
+                    "is_typing": data.get("is_typing", False),
+                })
+            elif event_type == "ping":
+                await websocket.send_json({"type": "pong"})
+
+    except WebSocketDisconnect:
+        manager.disconnect(group_id, websocket)
+        logger.info(f"WS disconnected: user={user['user_id']} group={group_id}")
+    except Exception as e:
+        logger.warning(f"WS error user={user['user_id']} group={group_id}: {e}")
+        manager.disconnect(group_id, websocket)
+
+
+# ─────────────────────────────────────────────
+# Schemas
+# ─────────────────────────────────────────────
+
+class SendMessageRequest(BaseModel):
+    group_id: str
+    sender_id: str
+    sender_name: str = Field(..., max_length=100)
+    sender_role: str = Field(..., max_length=50)
+    content: Optional[str] = Field(None, max_length=5000)
+    image_url: Optional[str] = Field(None, max_length=500)
+    message_type: Literal['text', 'image', 'file', 'system'] = "text"
+
+    @field_validator("content")
+    @classmethod
+    def strip_html(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            return _re.sub(r"<[^>]+>", "", v).strip()
+        return v
+
+class TypingRequest(BaseModel):
+    group_id: str
+    user_id: str
+    user_name: str = Field(..., max_length=100)
+    is_typing: bool
+
+class JoinGroupRequest(BaseModel):
+    group_id: str
+    user_id: str
+    user_name: str = Field(..., max_length=100)
+    user_role: str = Field(..., max_length=50)
+    is_moderator: bool = False
+
+class MuteRequest(BaseModel):
+    group_id: str
+    target_user_id: str
+    mute_type: Literal['temporary', 'permanent', 'none']
+    mute_minutes: Optional[int] = Field(None, ge=1, le=10080)  # max 1 week
+
+class BanRequest(BaseModel):
+    group_id: str
+    target_user_id: str
+    ban_type: Literal['temporary', 'permanent', 'none']
+    ban_minutes: Optional[int] = Field(None, ge=1, le=525960)  # max 1 year
+
+class CreateGroupRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    type: Literal['group', 'direct', 'announcement'] = "group"
+    category: Optional[str] = Field(None, max_length=50)
+    squad_id: Optional[str] = None
+    created_by: Optional[str] = None
+
+    @field_validator("name", "description")
+    @classmethod
+    def strip_html(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            return _re.sub(r"<[^>]+>", "", v).strip()
+        return v
+
+
+# ─────────────────────────────────────────────
+# GET: All Chat Groups
+# ─────────────────────────────────────────────
+
+@router.get("/groups")
+async def get_chat_groups(user_id: Optional[str] = None, role: Optional[str] = None, current_user: dict = Depends(verify_token)):
+    """Get chat groups based on role. Uses verified auth context as fallback for impersonated sessions."""
+    from core.config import settings
+    import httpx
+
+    # Use auth context as fallback (handles impersonation — X-Impersonate-User is already resolved)
+    if not user_id:
+        user_id = current_user.get("user_id")
+    if not role:
+        role = current_user.get("role")
+
+    async with httpx.AsyncClient(trust_env=False) as client:
+        if role in ("admin", "super_admin", "sous_admin") or not role:
+            res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/chat_groups?select=*&order=created_at.asc",
+                headers=supabase.headers
+            )
+            res.raise_for_status()
+            return res.json()
+        else:
+            if not user_id:
+                return []
+                
+            group_ids_set = set()
+            
+            # For parent role: resolve to child's user_id first
+            resolved_uid = user_id
+            if role == "parent":
+                p_res = await client.get(
+                    f"{settings.SUPABASE_URL}/rest/v1/players?parent_id=eq.{user_id}&select=user_id&limit=1",
+                    headers=supabase.admin_headers
+                )
+                if p_res.status_code == 200 and p_res.json():
+                    resolved_uid = p_res.json()[0].get("user_id", user_id)
+                    role = "player"  # Treat parent as player for group lookup
+
+            # 1. Get groups they are already members of
+            member_res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?user_id=eq.{resolved_uid}&select=group_id",
+                headers=supabase.admin_headers
+            )
+            if member_res.status_code == 200 and member_res.json():
+                for m in member_res.json():
+                    group_ids_set.add(m["group_id"])
+                    
+            # 1.5 Get academy-wide general groups (category = 'general' or 'academy')
+            gen_res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/chat_groups?category=in.(general,General,academy,Academy)&select=id",
+                headers=supabase.admin_headers
+            )
+            if gen_res.status_code == 200 and gen_res.json():
+                for g in gen_res.json():
+                    group_ids_set.add(g["id"])
+
+            # 2. Get groups that match their squad (player)
+            if role == "player":
+                p_res = await client.get(
+                    f"{settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{resolved_uid}&select=squad_id",
+                    headers=supabase.admin_headers
+                )
+                if p_res.status_code == 200 and p_res.json():
+                    squad_id = p_res.json()[0].get("squad_id")
+                    if squad_id:
+                        sg_res = await client.get(
+                            f"{settings.SUPABASE_URL}/rest/v1/chat_groups?squad_id=eq.{squad_id}&select=id",
+                            headers=supabase.admin_headers
+                        )
+                        if sg_res.status_code == 200 and sg_res.json():
+                            for g in sg_res.json():
+                                group_ids_set.add(g["id"])
+
+            if not group_ids_set:
+                return []
+                
+            group_ids = ",".join(list(group_ids_set))
+            res = await client.get(
+                f"{settings.SUPABASE_URL}/rest/v1/chat_groups?id=in.({group_ids})&select=*&order=created_at.asc",
+                headers=supabase.admin_headers
+            )
+            res.raise_for_status()
+            return res.json()
+
+@router.post("/groups/{group_id}/add_member")
+async def force_add_member(group_id: str, req: dict):
+    """Admin forcibly adding a member (coach) to a group"""
+    import httpx
+    from core.config import settings
+    
+    async with httpx.AsyncClient(trust_env=False) as client:
+        check_res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&user_id=eq.{req.get('user_id')}&select=id",
+            headers=supabase.headers
+        )
+        if check_res.status_code == 200 and check_res.json():
+            return {"message": "Already a member"}
+            
+        data = {
+            "group_id": group_id,
+            "user_id": req.get("user_id"),
+            "user_name": req.get("user_name"),
+            "user_role": req.get("user_role"),
+            "is_moderator": True if req.get("user_role") == "coach" else False
+        }
+        
+        res = await client.post(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_group_members",
+            json=data,
+            headers={**supabase.headers, "Prefer": "return=representation"}
+        )
+        res.raise_for_status()
+        return res.json()
+
+
+@router.get("/groups/{group_id}")
+async def get_chat_group(group_id: str):
+    """Get a single chat group with members"""
+    import httpx
+    from core.config import settings
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_groups?id=eq.{group_id}&select=*",
+            headers=supabase.headers
+        )
+        res.raise_for_status()
+        data = res.json()
+        return data[0] if data else None
+
+
+@router.get("/groups/{group_id}/members")
+async def get_group_members(group_id: str):
+    """Get members of a group"""
+    import httpx
+    from core.config import settings
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&select=*&order=joined_at.asc",
+            headers=supabase.headers
+        )
+        res.raise_for_status()
+        return res.json()
+
+
+@router.post("/groups/{group_id}/join")
+async def join_group(group_id: str, req: JoinGroupRequest):
+    """Join a chat group"""
+    import httpx
+    from core.config import settings
+
+    async with httpx.AsyncClient(trust_env=False) as client:
+        # Check if already a member
+        check_res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&user_id=eq.{req.user_id}&select=id",
+            headers=supabase.headers
+        )
+        if check_res.status_code == 200 and check_res.json():
+            return {"message": "Already a member"}
+
+        data = {
+            "group_id": group_id,
+            "user_id": req.user_id,
+            "user_name": req.user_name,
+            "user_role": req.user_role,
+            "is_moderator": req.is_moderator
+        }
+        res = await client.post(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_group_members",
+            json=data,
+            headers={**supabase.headers, "Prefer": "return=representation"}
+        )
+        res.raise_for_status()
+        return res.json()
+
+
+@router.post("/groups")
+async def create_group(req: CreateGroupRequest):
+    """Create a new chat group (admin only on frontend)"""
+    import httpx
+    from core.config import settings
+
+    data = {
+        "name": req.name,
+        "description": req.description,
+        "type": req.type,
+        "category": req.category,
+        "squad_id": req.squad_id,
+        "created_by": req.created_by
+    }
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.post(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_groups",
+            json=data,
+            headers={**supabase.headers, "Prefer": "return=representation"}
+        )
+        res.raise_for_status()
+        result = res.json()
+        return result[0] if result else {}
+
+
+@router.post("/sync-category-groups")
+async def sync_category_chat_groups():
+    """
+    Auto-create one chat group per age category defined in academy_settings.age_categories.
+    Sub-divisions (U11 A, U11 B, U11 ELITE) are individual entries in age_categories
+    so they each get their own group. All players matching that category are added.
+    Idempotent.
+    """
+    import httpx
+    from core.config import settings as app_settings
+    from core.context import academy_id_ctx
+
+    created, updated, skipped_players = [], [], 0
+    academy_id = academy_id_ctx.get(None)
+
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            # Fetch this academy's settings (or fallback to first row if no academy_id)
+            if academy_id:
+                url = f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?academy_id=eq.{academy_id}&select=age_categories&limit=1"
+            else:
+                url = f"{app_settings.SUPABASE_URL}/rest/v1/academy_settings?select=age_categories&limit=1"
+            s_res = await client.get(url, headers=supabase.headers)
+            if s_res.status_code != 200:
+                logger.error(f"sync-category-groups: settings fetch {s_res.status_code} {s_res.text}")
+                raise HTTPException(status_code=500, detail=f"Settings fetch failed: HTTP {s_res.status_code}")
+            s_rows = s_res.json()
+            categories = (s_rows[0] if s_rows else {}).get("age_categories") or []
+            if not categories:
+                return {"success": False, "error": f"No age categories in settings (academy_id={academy_id}). Add some in Settings → Age Categories first."}
+
+            # Players (best-effort — if column missing, skip player auto-add)
+            players = []
+            try:
+                p_res = await client.get(
+                    f"{app_settings.SUPABASE_URL}/rest/v1/players?select=user_id,full_name,u_category",
+                    headers=supabase.headers,
+                )
+                if p_res.status_code == 200:
+                    players = p_res.json()
+                else:
+                    logger.warning(f"sync-category-groups: players fetch failed {p_res.status_code} — continuing without players")
+            except Exception as pe:
+                logger.warning(f"sync-category-groups: players fetch raised — continuing: {pe}")
+
+            # Existing category-only groups (no squad_id)
+            g_res = await client.get(
+                f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups?squad_id=is.null&select=id,name,category",
+                headers=supabase.headers,
+            )
+            if g_res.status_code != 200:
+                logger.error(f"sync-category-groups: chat_groups fetch {g_res.status_code} {g_res.text}")
+                raise HTTPException(status_code=500, detail=f"chat_groups fetch failed: HTTP {g_res.status_code}")
+            existing = {g["category"]: g for g in g_res.json() if g.get("category")}
+
+            for cat in categories:
+                if cat in existing:
+                    group = existing[cat]
+                    group_id = group["id"]
+                    updated.append(group_id)
+                else:
+                    gd = {
+                        "name": f"{cat} — Groupe Officiel",
+                        "description": f"Groupe de chat de la catégorie {cat}",
+                        "type": "group",
+                        "category": cat,
+                        "squad_id": None,
+                        "created_by": "00000000-0000-0000-0000-000000000000",
+                    }
+                    cr = await client.post(
+                        f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups",
+                        json=gd,
+                        headers={**supabase.headers, "Prefer": "return=representation"},
+                    )
+                    if cr.status_code not in (200, 201):
+                        logger.error(f"sync-category-groups: chat_groups create failed {cr.status_code} {cr.text}")
+                        raise HTTPException(status_code=500, detail=f"Group create failed for '{cat}': HTTP {cr.status_code} — {cr.text[:160]}")
+                    rows = cr.json()
+                    if not rows:
+                        raise HTTPException(status_code=500, detail=f"Group create returned empty for '{cat}'")
+                    group_id = rows[0]["id"]
+                    created.append(group_id)
+
+                # Add players whose u_category matches this entry (best-effort)
+                for pl in players:
+                    if pl.get("u_category") != cat:
+                        continue
+                    try:
+                        check = await client.get(
+                            f"{app_settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&user_id=eq.{pl['user_id']}&select=id",
+                            headers=supabase.headers,
+                        )
+                        if check.status_code == 200 and check.json():
+                            continue
+                        await client.post(
+                            f"{app_settings.SUPABASE_URL}/rest/v1/chat_group_members",
+                            json={
+                                "group_id": group_id,
+                                "user_id": pl["user_id"],
+                                "user_name": pl["full_name"],
+                                "user_role": "player",
+                                "is_moderator": False,
+                            },
+                            headers={**supabase.headers, "Prefer": "return=minimal"},
+                        )
+                    except Exception as me:
+                        skipped_players += 1
+                        logger.warning(f"sync-category-groups: skipped player {pl.get('user_id')}: {me}")
+
+        return {
+            "success": True,
+            "groups_created": len(created),
+            "groups_updated": len(updated),
+            "categories": categories,
+            "skipped_players": skipped_players,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"sync-category-groups failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"sync-category-groups: {type(e).__name__}: {str(e)[:200]}")
+
+
+class LockGroupRequest(BaseModel):
+    group_id: str
+    is_locked: bool
+
+
+@router.post("/moderation/lock-group")
+async def lock_unlock_group(req: LockGroupRequest):
+    """Lock/unlock writing in a group. When locked, only admins can write."""
+    import httpx
+    from core.config import settings as app_settings
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.patch(
+            f"{app_settings.SUPABASE_URL}/rest/v1/chat_groups?id=eq.{req.group_id}",
+            json={"is_locked": req.is_locked},
+            headers=supabase.headers,
+        )
+        res.raise_for_status()
+    action = "🔒 الكتابة محظورة (Admin فقط)" if req.is_locked else "🔓 الكتابة مسموحة للجميع"
+    await _send_system_message_async(req.group_id, action)
+    return {"success": True, "is_locked": req.is_locked}
+
+
+@router.post("/sync-groups")
+async def sync_chat_groups():
+    """
+    Admin action: Auto-create one chat group per squad.
+    Each group gets the squad's coach as moderator and all squad players as members.
+    Idempotent — safe to run multiple times.
+    """
+    import httpx
+    from core.config import settings
+
+    created = []
+    updated = []
+
+    async with httpx.AsyncClient(trust_env=False) as client:
+        # 1. Fetch all squads
+        squads_res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/squads?select=*",
+            headers=supabase.headers
+        )
+        squads_res.raise_for_status()
+        squads = squads_res.json()
+
+        # 2. Fetch all players (to map squad → players)
+        players_res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/players?select=user_id,full_name,squad_id,u_category",
+            headers=supabase.headers
+        )
+        players_res.raise_for_status()
+        players = players_res.json()
+
+        # 3. Fetch all coaches
+        coaches_res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/coaches?select=user_id,full_name,squad_id",
+            headers=supabase.headers
+        )
+        coaches_res.raise_for_status()
+        coaches = coaches_res.json()
+
+        # 4. Fetch existing chat groups
+        groups_res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_groups?select=id,squad_id,name",
+            headers=supabase.headers
+        )
+        groups_res.raise_for_status()
+        existing_groups = {g["squad_id"]: g for g in groups_res.json() if g.get("squad_id")}
+
+        for squad in squads:
+            squad_id = squad["id"]
+            squad_name = squad.get("name", "Groupe")
+            squad_category = squad.get("category", "")
+
+            # Check if group already exists for this squad
+            if squad_id in existing_groups:
+                group = existing_groups[squad_id]
+                group_id = group["id"]
+                updated.append(group_id)
+            else:
+                # Create new group
+                group_data = {
+                    "name": f"{squad_name} — {squad_category}",
+                    "description": f"Groupe de la catégorie {squad_category}",
+                    "type": "group",
+                    "category": squad_category,
+                    "squad_id": squad_id,
+                    "created_by": "00000000-0000-0000-0000-000000000000"
+                }
+                create_res = await client.post(
+                    f"{settings.SUPABASE_URL}/rest/v1/chat_groups",
+                    json=group_data,
+                    headers={**supabase.headers, "Prefer": "return=representation"}
+                )
+                create_res.raise_for_status()
+                group = create_res.json()[0]
+                group_id = group["id"]
+                created.append(group_id)
+
+            # Helper to upsert a member
+            async def ensure_member(uid: str, uname: str, urole: str, moderator: bool):
+                check = await client.get(
+                    f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{group_id}&user_id=eq.{uid}&select=id",
+                    headers=supabase.headers
+                )
+                if check.status_code == 200 and check.json():
+                    return  # already member
+                await client.post(
+                    f"{settings.SUPABASE_URL}/rest/v1/chat_group_members",
+                    json={
+                        "group_id": group_id,
+                        "user_id": uid,
+                        "user_name": uname,
+                        "user_role": urole,
+                        "is_moderator": moderator
+                    },
+                    headers={**supabase.headers, "Prefer": "return=minimal"}
+                )
+
+            # Add coach(es) assigned to this squad
+            squad_coaches = [c for c in coaches if c.get("squad_id") == squad_id]
+            for coach in squad_coaches:
+                await ensure_member(coach["user_id"], coach["full_name"], "coach", True)
+
+            # Add players of this squad
+            squad_players = [p for p in players if p.get("squad_id") == squad_id]
+            for player in squad_players:
+                await ensure_member(player["user_id"], player["full_name"], "player", False)
+
+    return {
+        "success": True,
+        "groups_created": len(created),
+        "groups_updated": len(updated),
+        "total_squads": len(squads)
+    }
+
+
+# ─────────────────────────────────────────────
+# MESSAGES
+# ─────────────────────────────────────────────
+
+@router.get("/groups/{group_id}/messages")
+async def get_messages(group_id: str, limit: int = 50, offset: int = 0):
+    """Get messages for a group"""
+    import httpx
+    from core.config import settings
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_messages?group_id=eq.{group_id}&is_deleted=eq.false&select=*&order=created_at.desc&limit={limit}&offset={offset}",
+            headers=supabase.headers
+        )
+        res.raise_for_status()
+        msgs = res.json()
+        msgs.reverse()  # Show oldest first
+        return msgs
+
+
+@router.post("/messages")
+async def send_message(req: SendMessageRequest):
+    """Send a message to a group"""
+    import httpx
+    from core.config import settings
+
+    async with httpx.AsyncClient(trust_env=False) as client:
+        # Check if group is locked (admin-only writing)
+        gres = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_groups?id=eq.{req.group_id}&select=is_locked",
+            headers=supabase.headers,
+        )
+        if gres.status_code == 200 and gres.json():
+            if gres.json()[0].get("is_locked") and req.sender_role != "admin":
+                raise HTTPException(status_code=403, detail="هذه المجموعة مغلقة. فقط الإداريون يستطيعون الكتابة.")
+
+        # Check if user is muted or banned
+        member_res = await client.get(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{req.group_id}&user_id=eq.{req.sender_id}&select=*",
+            headers=supabase.headers
+        )
+        if member_res.status_code == 200 and member_res.json():
+            member = member_res.json()[0]
+            now = datetime.utcnow()
+
+            # Check permanent mute
+            if member.get("is_muted") and member.get("mute_type") == "permanent":
+                raise HTTPException(status_code=403, detail="You are permanently muted in this group.")
+
+            # Check temporary mute
+            if member.get("mute_until"):
+                mute_until = datetime.fromisoformat(member["mute_until"].replace("Z", "+00:00")).replace(tzinfo=None)
+                if now < mute_until:
+                    remaining = int((mute_until - now).total_seconds() / 60)
+                    raise HTTPException(status_code=403, detail=f"You are muted for {remaining} more minute(s).")
+                else:
+                    # Mute expired, clear it
+                    await client.patch(
+                        f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{req.group_id}&user_id=eq.{req.sender_id}",
+                        json={"is_muted": False, "mute_until": None, "mute_type": None},
+                        headers=supabase.headers
+                    )
+
+            # Check ban
+            if member.get("banned") and member.get("ban_until"):
+                ban_until = datetime.fromisoformat(member["ban_until"].replace("Z", "+00:00")).replace(tzinfo=None)
+                if now < ban_until:
+                    remaining = int((ban_until - now).total_seconds() / 60)
+                    raise HTTPException(status_code=403, detail=f"You are banned for {remaining} more minute(s).")
+
+            if member.get("banned") and not member.get("ban_until"):
+                raise HTTPException(status_code=403, detail="You are permanently banned from this group.")
+
+        # Validate: only admins and coaches can send images
+        if req.message_type == "image" and req.sender_role not in ["admin", "coach"]:
+            raise HTTPException(status_code=403, detail="Only admins and coaches can send images.")
+
+        data = {
+            "group_id": req.group_id,
+            "sender_id": req.sender_id,
+            "sender_name": req.sender_name,
+            "sender_role": req.sender_role,
+            "content": req.content,
+            "image_url": req.image_url,
+            "message_type": req.message_type
+        }
+        res = await client.post(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_messages",
+            json=data,
+            headers={**supabase.headers, "Prefer": "return=representation"}
+        )
+        res.raise_for_status()
+        result = res.json()
+        message = result[0] if result else {}
+
+        # Broadcast to all WebSocket clients in the group
+        if message:
+            await manager.broadcast(req.group_id, {"type": "message", "message": message})
+
+        return message
+
+
+@router.delete("/messages/{message_id}")
+async def delete_message(message_id: str):
+    """Soft delete a message (admin/moderator)"""
+    import httpx
+    from core.config import settings
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.patch(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_messages?id=eq.{message_id}",
+            json={"is_deleted": True, "deleted_at": datetime.utcnow().isoformat()},
+            headers=supabase.headers
+        )
+        res.raise_for_status()
+        return {"success": True}
+
+
+# ─────────────────────────────────────────────
+# TYPING INDICATORS
+# ─────────────────────────────────────────────
+
+@router.post("/typing")
+async def update_typing(req: TypingRequest):
+    """Update typing status (upsert)"""
+    import httpx
+    from core.config import settings
+
+    data = {
+        "group_id": req.group_id,
+        "user_id": req.user_id,
+        "user_name": req.user_name,
+        "is_typing": req.is_typing,
+        "updated_at": datetime.utcnow().isoformat()
+    }
+    headers = {**supabase.headers, "Prefer": "resolution=merge-duplicates,return=minimal"}
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.post(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_typing",
+            json=data,
+            headers=headers
+        )
+        res.raise_for_status()
+        return {"success": True}
+
+
+@router.get("/groups/{group_id}/typing")
+async def get_typing(group_id: str, exclude_user: Optional[str] = None):
+    """Get who is typing in a group (exclude requester)"""
+    import httpx
+    from core.config import settings
+
+    # Only fetch recent typing (last 5 seconds)
+    url = f"{settings.SUPABASE_URL}/rest/v1/chat_typing?group_id=eq.{group_id}&is_typing=eq.true&select=user_name,user_id,updated_at"
+    if exclude_user:
+        url += f"&user_id=neq.{quote(exclude_user)}"
+
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.get(url, headers=supabase.headers)
+        res.raise_for_status()
+
+        # Filter to only those typing in the last 6 seconds
+        now = datetime.utcnow()
+        all_typing = res.json()
+        active = []
+        for t in all_typing:
+            try:
+                updated = datetime.fromisoformat(t["updated_at"].replace("Z", "+00:00")).replace(tzinfo=None)
+                if (now - updated).total_seconds() < 6:
+                    active.append(t)
+            except Exception as e:
+                logger.warning(f"Could not parse typing indicator timestamp: {e}")
+
+        return active
+
+
+# ─────────────────────────────────────────────
+# MODERATION: MUTE & BAN
+# ─────────────────────────────────────────────
+
+@router.post("/moderation/mute")
+async def mute_user(req: MuteRequest):
+    """Mute a user in a group (admin/moderator action)"""
+    import httpx
+    from core.config import settings
+
+    if req.mute_type == "none":
+        # Unmute
+        update_data = {"is_muted": False, "mute_until": None, "mute_type": None}
+    elif req.mute_type == "permanent":
+        update_data = {"is_muted": True, "mute_until": None, "mute_type": "permanent"}
+    elif req.mute_type == "temporary":
+        if not req.mute_minutes:
+            raise HTTPException(status_code=400, detail="mute_minutes required for temporary mute")
+        mute_until = (datetime.utcnow() + timedelta(minutes=req.mute_minutes)).isoformat()
+        update_data = {"is_muted": True, "mute_until": mute_until, "mute_type": "temporary"}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid mute_type")
+
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.patch(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{req.group_id}&user_id=eq.{req.target_user_id}",
+            json=update_data,
+            headers=supabase.headers
+        )
+        res.raise_for_status()
+
+    # Send system message
+    action = "تم إلغاء الكتم" if req.mute_type == "none" else f"تم الكتم ({req.mute_type})"
+    await _send_system_message_async(req.group_id, f"🔇 {action}")
+    return {"success": True}
+
+
+@router.post("/moderation/ban")
+async def ban_user(req: BanRequest):
+    """Ban a user from a group (admin only)"""
+    import httpx
+    from core.config import settings
+
+    if req.ban_type == "none":
+        update_data = {"banned": False, "ban_until": None}
+    elif req.ban_type == "permanent":
+        update_data = {"banned": True, "ban_until": None}
+    elif req.ban_type == "temporary":
+        if not req.ban_minutes:
+            raise HTTPException(status_code=400, detail="ban_minutes required for temporary ban")
+        ban_until = (datetime.utcnow() + timedelta(minutes=req.ban_minutes)).isoformat()
+        update_data = {"banned": True, "ban_until": ban_until}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid ban_type")
+
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.patch(
+            f"{settings.SUPABASE_URL}/rest/v1/chat_group_members?group_id=eq.{req.group_id}&user_id=eq.{req.target_user_id}",
+            json=update_data,
+            headers=supabase.headers
+        )
+        res.raise_for_status()
+
+    action = "تم إلغاء الحظر" if req.ban_type == "none" else f"تم الحظر ({req.ban_type})"
+    await _send_system_message_async(req.group_id, f"🚫 {action}")
+    return {"success": True}
+
+
+# ─────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────
+
+async def _send_system_message_async(group_id: str, content: str):
+    """Internal: send a system message to a group"""
+    import httpx
+    from core.config import settings
+    try:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            await client.post(
+                f"{settings.SUPABASE_URL}/rest/v1/chat_messages",
+                json={
+                    "group_id": group_id,
+                    "sender_id": "00000000-0000-0000-0000-000000000000",
+                    "sender_name": "النظام",
+                    "sender_role": "admin",
+                    "content": content,
+                    "message_type": "system"
+                },
+                headers={**supabase.headers, "Prefer": "return=minimal"}
+            )
+    except Exception as e:
+        logger.warning(f"Failed to send system message to group {group_id}: {e}")
+
+
+# ─────────────────────────────────────────────
+# IMAGE UPLOAD (admin only)
+# ─────────────────────────────────────────────
+
+@router.post("/upload-image")
+async def upload_chat_image(
+    file: UploadFile = File(...),
+    sender_role: str = Form(...)
+):
+    """Upload image for chat (admin and coach)"""
+    if sender_role not in ("admin", "coach"):
+        raise HTTPException(status_code=403, detail="Only admins and coaches can upload images.")
+
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are allowed.")
+
+    import httpx
+    from core.config import settings
+    import uuid
+
+    file_content = await file.read()
+    filename = f"chat/{uuid.uuid4()}{file.filename[file.filename.rfind('.'):]}"
+
+    # Upload to Supabase Storage — use service_role to bypass storage RLS
+    _storage_key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+    upload_headers = {
+        "apikey": _storage_key,
+        "Authorization": f"Bearer {_storage_key}",
+        "Content-Type": file.content_type
+    }
+    async with httpx.AsyncClient(trust_env=False) as client:
+        res = await client.post(
+            f"{settings.SUPABASE_URL}/storage/v1/object/chat-images/{filename}",
+            content=file_content,
+            headers=upload_headers
+        )
+
+    if res.status_code not in [200, 201]:
+        raise HTTPException(status_code=500, detail="Image upload failed.")
+
+    public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/chat-images/{filename}"
+    return {"url": public_url, "filename": filename}

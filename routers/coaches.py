@@ -1,0 +1,140 @@
+import logging
+from fastapi import APIRouter, Depends, HTTPException, status
+from core.auth_middleware import verify_token, require_role
+from core.context import user_id_ctx, role_ctx
+from typing import List
+from schemas.coaches import CoachCreate, CoachResponse
+from services.supabase_client import supabase
+
+logger = logging.getLogger("coaches")
+from urllib.parse import quote
+import secrets
+import string
+import uuid as uuid_lib
+
+router = APIRouter(prefix="/coaches", tags=["Coaches"], dependencies=[Depends(verify_token)])
+
+@router.get("/", response_model=List[CoachResponse])
+async def get_all_coaches():
+    try:
+        response = await supabase.get_coaches()
+        # sous_admin: filter to only coaches in their assigned branches
+        if role_ctx.get(None) == "sous_admin":
+            uid = user_id_ctx.get(None)
+            assigned = await supabase._get(
+                f"/rest/v1/sous_admin_branches?user_id=eq.{uid}&select=branch_id"
+            )
+            allowed_branches = {r["branch_id"] for r in (assigned or [])}
+            response = [c for c in (response or []) if c.get("branch_id") in allowed_branches]
+        return response
+    except Exception as e:
+        logger.error("Error fetching coaches: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
+
+def generate_temp_password(length=12):
+    import string, secrets, random
+    lower = string.ascii_lowercase
+    upper = string.ascii_uppercase
+    digits = string.digits
+    special = "!@#$%^&*"
+    pwd = [
+        secrets.choice(lower),
+        secrets.choice(upper),
+        secrets.choice(digits),
+        secrets.choice(special)
+    ]
+    pwd += [secrets.choice(lower + upper + digits + special) for _ in range(length - 4)]
+    random.shuffle(pwd)
+    return "".join(pwd)
+
+@router.post("/", response_model=CoachResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
+async def create_coach(coach: CoachCreate):
+    try:
+        coach_dict = coach.model_dump()
+        email = coach_dict.get("email", "")
+        
+        # --- Duplicate Check: Email ---
+        if email:
+            existing = await supabase._get(f"/rest/v1/coaches?email=eq.{quote(email)}&select=id")
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"This email is already used by another coach. | هاد الإيميل ديجا مستعمل من طرف مدرب آخر: {email}"
+                )
+        
+        temp_password = generate_temp_password()
+
+        # user_id is a foreign key to users table. Since we bypass Supabase Auth
+        # and it's nullable, we just don't set it to avoid FK constraint errors.
+        if "user_id" in coach_dict:
+            del coach_dict["user_id"]
+
+        # Insert directly into coaches table — gracefully drop u_category if
+        # the column doesn't exist yet (admin hasn't run the migration).
+        try:
+            response = await supabase.insert_coach(coach_dict)
+        except Exception as ie:
+            ie_msg = str(ie).lower()
+            if "u_category" in ie_msg or "column" in ie_msg or "schema" in ie_msg:
+                logger.warning("insert_coach failed; retrying without u_category (run migrate_coach_u_category.sql to fix)")
+                coach_dict.pop("u_category", None)
+                response = await supabase.insert_coach(coach_dict)
+            else:
+                raise
+
+        created_coach = response[0]
+        # Show the temp password to the admin once
+        created_coach["temp_password"] = temp_password
+
+        return created_coach
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error("Error creating coach: %s", e, exc_info=True)
+        if "duplicate" in error_msg.lower() or "23505" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"This email already exists. | هاد الإيميل ديجا كاين: {email}"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"[DEBUG] create_coach failed: {type(e).__name__}: {error_msg}"
+        )
+
+@router.put("/{coach_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
+async def update_coach(coach_id: str, coach: CoachCreate):
+    try:
+        coach_dict = coach.model_dump(exclude_none=True)
+        try:
+            response = await supabase.update_coach(coach_id, coach_dict)
+        except Exception as ie:
+            ie_msg = str(ie).lower()
+            if "u_category" in ie_msg or "column" in ie_msg or "schema" in ie_msg:
+                logger.warning("update_coach: retrying without u_category (run migrate_coach_u_category.sql to fix)")
+                coach_dict.pop("u_category", None)
+                response = await supabase.update_coach(coach_id, coach_dict)
+            else:
+                raise
+        return response[0] if isinstance(response, list) else response
+    except Exception as e:
+        logger.error("Error updating coach: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
+
+@router.delete("/{coach_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
+async def delete_coach(coach_id: str):
+    try:
+        await supabase.delete_coach(coach_id)
+        return {"message": "Coach deleted successfully"}
+    except Exception as e:
+        logger.error("Error deleting coach: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
