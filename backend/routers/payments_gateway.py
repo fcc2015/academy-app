@@ -77,19 +77,24 @@ def get_paypal_base_url() -> str:
 
 
 # ── Lemon Squeezy Sandbox Configuration ──
+# Basic:      monthly=1748453 | yearly=1748330
+# Pro:        monthly=1748483 | yearly=1748646
+# Enterprise: yearly only — variant pending creation in LS dashboard
 
 LEMON_SQUEEZY_VARIANTS = {
     "basic": {
         "monthly": "1748453",
-        "yearly": "1748330"
+        "yearly":  "1748330"
     },
     "pro": {
         "monthly": "1748483",
-        "yearly": "1748646"
+        "yearly":  "1748646"
     },
     "enterprise": {
-        "monthly": "1116761",
-        "yearly": "1116761"
+        # Enterprise is yearly-only — no monthly plan
+        # TODO: replace None with actual variant ID once created in Lemon Squeezy dashboard
+        "monthly": None,
+        "yearly":  None   # <-- set to real variant ID when ready
     }
 }
 
@@ -249,9 +254,20 @@ async def create_paypal_order(req: CreateOrderRequest):
             mapped_plan = "basic"
         elif "enterprise" in plan_id_lower:
             mapped_plan = "enterprise"
-            
+
         variant_map = LEMON_SQUEEZY_VARIANTS.get(mapped_plan) or LEMON_SQUEEZY_VARIANTS["pro"]
-        variant_id = variant_map.get(billing_cycle_lower) or variant_map["monthly"]
+
+        # Enterprise is yearly-only — force yearly cycle
+        if mapped_plan == "enterprise":
+            billing_cycle_lower = "yearly"
+
+        variant_id = variant_map.get(billing_cycle_lower) or variant_map.get("yearly") or variant_map.get("monthly")
+
+        if not variant_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Lemon Squeezy variant not configured for plan '{mapped_plan}' ({billing_cycle_lower}). Please create it in the LS dashboard first."
+            )
         
         # Determine success URL
         if req.source == 'saas_landing':
