@@ -79,7 +79,7 @@ def get_paypal_base_url() -> str:
 # ── Lemon Squeezy Sandbox Configuration ──
 # Basic:      monthly=1748453 | yearly=1748330
 # Pro:        monthly=1748483 | yearly=1748646
-# Enterprise: yearly only — variant pending creation in LS dashboard
+# Enterprise: yearly=1748545
 
 LEMON_SQUEEZY_VARIANTS = {
     "basic": {
@@ -92,9 +92,8 @@ LEMON_SQUEEZY_VARIANTS = {
     },
     "enterprise": {
         # Enterprise is yearly-only — no monthly plan
-        # TODO: replace None with actual variant ID once created in Lemon Squeezy dashboard
         "monthly": None,
-        "yearly":  None   # <-- set to real variant ID when ready
+        "yearly":  "1748545"
     }
 }
 
