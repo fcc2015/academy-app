@@ -4,7 +4,7 @@ import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import {
     Shield, AlertCircle, CreditCard, Banknote, Loader2, CheckCircle,
-    Building2, Copy, ChevronDown, ChevronUp, Smartphone, Zap
+    Building2, Copy, ChevronDown, ChevronUp, Smartphone
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -13,7 +13,7 @@ const ParentCheckout = () => {
     const [error, setError] = useState('');
     const [settings, setSettings] = useState(null);
     const [paypalProcessing, setPaypalProcessing] = useState(false);
-    const [stripeProcessing, setStripeProcessing] = useState(false);
+
     const [cashProvider, setCashProvider] = useState(null); // 'wafacash' | 'cashplus'
     const [cashProcessing, setCashProcessing] = useState(false);
     const [cashCode, setCashCode] = useState(null);
@@ -94,33 +94,7 @@ const ParentCheckout = () => {
         }
     };
 
-    const handleStripe = async () => {
-        setStripeProcessing(true);
-        setError('');
-        try {
-            const res = await authFetch(`${API_URL}/payments/gateway/stripe/create-checkout-session`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    academy_id: userId,
-                    plan_id: 'registration',
-                    amount: settings?.registration_fee || 500,
-                    currency: 'MAD',
-                    description: `Academy Registration Fee - Parent ${userId}`
-                })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Stripe payment failed');
-            if (data.checkout_url) {
-                window.location.href = data.checkout_url;
-            } else {
-                throw new Error("No checkout URL returned from Stripe");
-            }
-        } catch (err) {
-            setError(err.message);
-            setStripeProcessing(false);
-        }
-    };
+
 
     const handleCashPayment = async (provider) => {
         setCashProvider(provider);
@@ -309,7 +283,7 @@ const ParentCheckout = () => {
                         {/* PayPal Button */}
                         <button
                             onClick={handlePaypal}
-                            disabled={paypalProcessing || stripeProcessing || cashProcessing}
+                            disabled={paypalProcessing || cashProcessing}
                             className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-xl font-bold text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0 disabled:shadow-none"
                             style={{ background: 'linear-gradient(135deg, #0070ba, #1546a0)' }}
                         >
@@ -323,22 +297,7 @@ const ParentCheckout = () => {
                                 : (isRTL ? 'الدفع عبر PayPal' : 'Payer avec PayPal')}
                         </button>
 
-                        {/* Stripe Button */}
-                        <button
-                            onClick={handleStripe}
-                            disabled={paypalProcessing || stripeProcessing || cashProcessing}
-                            className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-xl font-bold text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0 disabled:shadow-none"
-                            style={{ background: 'linear-gradient(135deg, #635bff, #9d68ff)' }}
-                        >
-                            {stripeProcessing ? (
-                                <Loader2 size={20} className="animate-spin" />
-                            ) : (
-                                <Zap size={20} />
-                            )}
-                            {stripeProcessing
-                                ? (isRTL ? 'جاري التحويل...' : 'Redirection...')
-                                : (isRTL ? 'الدفع بالبطاقة البنكية (Stripe)' : 'Payer par carte (Stripe)')}
-                        </button>
+
 
                         {/* Divider */}
                         <div className="flex items-center gap-3 py-1">
@@ -353,7 +312,7 @@ const ParentCheckout = () => {
                         <div className="border-2 border-slate-200 rounded-xl overflow-hidden">
                             <button
                                 onClick={() => setShowCashSection(v => !v)}
-                                disabled={paypalProcessing || stripeProcessing}
+                                disabled={paypalProcessing}
                                 className="w-full flex items-center justify-between px-5 py-4 font-bold text-slate-700 bg-slate-50 hover:bg-slate-100 transition-colors"
                             >
                                 <div className="flex items-center gap-3">
@@ -374,7 +333,7 @@ const ParentCheckout = () => {
                                     {/* Wafacash */}
                                     <button
                                         onClick={() => handleCashPayment('wafacash')}
-                                        disabled={cashProcessing || paypalProcessing || stripeProcessing}
+                                        disabled={cashProcessing || paypalProcessing}
                                         className="w-full flex items-center justify-center gap-3 py-3 px-5 rounded-xl font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-60"
                                         style={{ background: 'linear-gradient(135deg, #e63c2f, #b92a20)' }}
                                     >
@@ -391,7 +350,7 @@ const ParentCheckout = () => {
                                     {/* CashPlus */}
                                     <button
                                         onClick={() => handleCashPayment('cashplus')}
-                                        disabled={cashProcessing || paypalProcessing || stripeProcessing}
+                                        disabled={cashProcessing || paypalProcessing}
                                         className="w-full flex items-center justify-center gap-3 py-3 px-5 rounded-xl font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-60"
                                         style={{ background: 'linear-gradient(135deg, #1a7f37, #16632c)' }}
                                     >

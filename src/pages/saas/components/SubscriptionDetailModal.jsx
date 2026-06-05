@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
     X, ArrowUpRight, CheckCircle2, Calculator, Loader2, CreditCard,
-    Building2, Zap, ShieldCheck, CheckCircle, AlertCircle, Copy
+    Building2, ShieldCheck, CheckCircle, AlertCircle, Copy
 } from 'lucide-react';
 import { API_URL } from '../../../config';
 import { authFetch } from '../../../api';
@@ -31,7 +31,7 @@ export default function SubscriptionDetailModal({
     billingCycle = 'monthly',
     setBillingCycle,
 }) {
-    const [stripeProcessing, setStripeProcessing] = useState(null);   // plan id
+
     const [cashProcessing, setCashProcessing] = useState(null);       // plan id
     const [cashCodes, setCashCodes] = useState({});                   // planId → { wafacash|cashplus: codeData }
     const [activeCashProvider, setActiveCashProvider] = useState({}); // planId → provider
@@ -40,40 +40,7 @@ export default function SubscriptionDetailModal({
     const [confirmResult, setConfirmResult] = useState(null);
     const [codeCopied, setCodeCopied] = useState(null);
 
-    const handleStripeCheckout = async (academy, planId) => {
-        setStripeProcessing(planId);
-        const newPlan = PLANS.find(p => p.id === planId);
-        const currentPlan = PLANS.find(p => p.id === academy.plan_id);
-        if (!newPlan) return;
-        const basePrice = billingCycle === 'yearly' ? newPlan.price * 10 : newPlan.price;
-        const proRata = calculateProRata(currentPlan, newPlan, academy.billing_cycle_start);
-        const chargeAmount = currentPlan ? proRata.amount : basePrice;
 
-        try {
-            const res = await authFetch(`${API_URL}/payments/gateway/stripe/create-checkout-session`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    academy_id: academy.id,
-                    plan_id: planId,
-                    billing_cycle_type: billingCycle,
-                    amount: chargeAmount || newPlan.price,
-                    currency: 'MAD',
-                    description: currentPlan
-                        ? `Upgrade ${currentPlan.name} → ${newPlan.name} (Pro-Rata: ${chargeAmount} MAD)`
-                        : `${newPlan.name} Plan — ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} — ${academy.name}`
-                })
-            });
-            const data = await res.json();
-            if (data.checkout_url) {
-                window.open(data.checkout_url, '_blank');
-            }
-        } catch (err) {
-            console.error('Stripe error:', err);
-        } finally {
-            setStripeProcessing(null);
-        }
-    };
 
     const handleCashCode = async (academy, planId, provider) => {
         setCashProcessing(planId);
@@ -148,7 +115,7 @@ export default function SubscriptionDetailModal({
 
     const isCashTx = (tx) =>
         tx.paypal_order_id?.startsWith('WC-') || tx.paypal_order_id?.startsWith('CP-');
-    const isStripeTx = (tx) => tx.paypal_order_id?.startsWith('stripe_');
+
 
     return (
         <>
@@ -383,21 +350,7 @@ export default function SubscriptionDetailModal({
                                                                 Pay via PayPal
                                                             </button>
 
-                                                            {/* Stripe */}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleStripeCheckout(selectedAcademy, plan.id)}
-                                                                disabled={stripeProcessing === plan.id}
-                                                                className="w-full py-2 rounded-lg text-xs font-black border-0 shadow-sm transition-colors flex items-center justify-center gap-1.5 text-white"
-                                                                style={{ background: 'linear-gradient(135deg, #635bff, #9d68ff)' }}
-                                                            >
-                                                                {stripeProcessing === plan.id ? (
-                                                                    <Loader2 size={14} className="animate-spin" />
-                                                                ) : (
-                                                                    <Zap size={13} />
-                                                                )}
-                                                                Pay via Stripe
-                                                            </button>
+
 
                                                             {/* Moroccan Cash */}
                                                             <div className="grid grid-cols-2 gap-1.5">
@@ -481,7 +434,6 @@ export default function SubscriptionDetailModal({
                                                         : 'bg-slate-50 text-slate-500'
                                                     }`}>
                                                         {isCashTx(tx) ? <Building2 className="w-5 h-5" /> :
-                                                         isStripeTx(tx) ? <Zap className="w-5 h-5" /> :
                                                          <CreditCard className="w-5 h-5" />}
                                                     </div>
                                                     <div>
@@ -493,7 +445,6 @@ export default function SubscriptionDetailModal({
                                                             <span>•</span>
                                                             <span className="font-mono">
                                                                 {isCashTx(tx) ? `💵 ${tx.paypal_order_id}` :
-                                                                 isStripeTx(tx) ? `⚡ Stripe` :
                                                                  `PayPal`}
                                                             </span>
                                                         </div>
@@ -513,7 +464,7 @@ export default function SubscriptionDetailModal({
                                                         </span>
 
                                                         {/* PayPal verify */}
-                                                        {tx.status === 'pending' && tx.paypal_order_id && !isCashTx(tx) && !isStripeTx(tx) && (
+                                                        {tx.status === 'pending' && tx.paypal_order_id && !isCashTx(tx) && (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleVerifyOrder(tx.paypal_order_id)}
