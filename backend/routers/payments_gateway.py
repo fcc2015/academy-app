@@ -123,6 +123,7 @@ async def get_lemonsqueezy_store_id() -> str:
 
 
 # ── Sources routing map ──
+# Trigger CI rebuild after restoring requirements-dev.txt
 # SaaS → Academy subscriptions  : source in ('saas_landing', 'saas_dashboard') → Lemon Squeezy
 # Academy → Player/Parent payments: all other sources                          → PayPal
 
