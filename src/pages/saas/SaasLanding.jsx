@@ -5,7 +5,8 @@ import {
     Check, ChevronRight, Star, Users, Phone, Mail, MapPin,
     Shield, Trophy, BarChart3, Zap, Globe, Crown, Clock, X, Menu,
     ArrowRight, CheckCircle2, Loader2, MessageSquare, FileText, RotateCcw,
-    Lock, Headphones, TrendingUp, Layout, Database, Smartphone, Search, Building2
+    Lock, Headphones, TrendingUp, Layout, Database, Smartphone, Search, Building2,
+    CreditCard
 } from 'lucide-react';
 
 const PLANS = [
@@ -64,7 +65,7 @@ export default function SaasLanding() {
     const [activeSection, setActiveSection] = useState('');
     const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', academy: '', message: '' });
     const [contactStatus, setContactStatus] = useState(null);
-    const [paypalLoading, setPaypalLoading] = useState(null);
+    const [paymentLoading, setPaymentLoading] = useState(null);
     const [activeTab, setActiveTab] = useState(null); // 'privacy' | 'refund' | null
     const [yearlyMode, setYearlyMode] = useState(false);
     const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
@@ -282,38 +283,45 @@ export default function SaasLanding() {
         }
     };
 
-    const handlePayPal = async (plan) => {
+    const handleCheckout = async (plan, gateway) => {
         if (plan.price === 0) {
             openRegModal();
             return;
         }
-        setPaypalLoading(plan.id);
+        
+        const loadingKey = `${plan.id}-${gateway}`;
+        setPaymentLoading(loadingKey);
+        
         try {
-            // Convert MAD to USD for PayPal (approximate rate: 1 USD ≈ 10 MAD)
             const amountMAD = yearlyMode ? Math.round(plan.price * 12 * 0.85) : plan.price;
-            const amountUSD = Math.max(1, Math.round(amountMAD / 10 * 100) / 100);
+            
+            // For Lemon Squeezy, we pass MAD. For PayPal, we pass USD (converted).
+            const currency = gateway === 'lemonsqueezy' ? 'MAD' : 'USD';
+            const amount = gateway === 'lemonsqueezy' 
+                ? amountMAD 
+                : Math.max(1, Math.round(amountMAD / 10 * 100) / 100);
+            
+            const source = gateway === 'lemonsqueezy' ? 'saas_landing' : 'saas_landing_paypal';
 
-            // Use production backend for PayPal (reliable network) with local fallback
-            const PAYPAL_API = API_URL.includes('localhost')
-                ? 'https://academy-backend-4dln.onrender.com'
-                : API_URL;
+            // Wake up production Render backend if we are in production, otherwise use local API_URL directly
+            const TARGET_API = API_URL.includes('localhost')
+                ? API_URL
+                : API_URL; // Using configured API_URL directly
 
-            // Wake up Render backend (free tier sleeps after 15min)
-            try { await fetch(`${PAYPAL_API}/health`, { signal: AbortSignal.timeout(8000) }); } catch {}
-
-            const res = await fetch(`${PAYPAL_API}/payments/gateway/create-order`, {
+            const res = await fetch(`${TARGET_API}/payments/gateway/create-order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     academy_id: 'pending_signup',
                     plan_id: plan.id,
-                    amount: amountUSD,
-                    currency: 'USD',
+                    amount: amount,
+                    currency: currency,
                     description: `${plan.name} Plan — Academy SaaS (${amountMAD} MAD)`,
-                    source: 'saas_landing',
+                    source: source,
                     billing_cycle_type: yearlyMode ? 'yearly' : 'monthly'
                 })
             });
+            
             if (res.ok) {
                 const data = await res.json();
                 if (data.approve_url) {
@@ -323,10 +331,11 @@ export default function SaasLanding() {
                 const errData = await res.json().catch(() => ({}));
                 toast.error(errData.detail || "Erreur de paiement. Veuillez réessayer.");
             }
-        } catch {
+        } catch (error) {
+            console.error("Payment error:", error);
             toast.error("Connexion échouée. Veuillez réessayer.");
         } finally {
-            setPaypalLoading(null);
+            setPaymentLoading(null);
         }
     };
 
@@ -1051,24 +1060,42 @@ export default function SaasLanding() {
                                             {plan.cta} <ArrowRight size={16} />
                                         </button>
                                     ) : (
-                                        <div className="space-y-2">
+                                        <div className="space-y-2.5">
+                                            {/* Lemon Squeezy (Carte Bancaire) */}
                                             <button
-                                                onClick={() => handlePayPal(plan)}
-                                                disabled={paypalLoading === plan.id}
+                                                onClick={() => handleCheckout(plan, 'lemonsqueezy')}
+                                                disabled={paymentLoading !== null}
                                                 className="w-full py-3.5 rounded-xl font-black text-sm uppercase tracking-wider text-white transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
                                                 style={{ background: plan.popular ? `linear-gradient(135deg, ${plan.color}, #8b5cf6)` : plan.color, boxShadow: `0 8px 24px ${plan.glow}` }}>
-                                                {paypalLoading === plan.id ? (
+                                                {paymentLoading === `${plan.id}-lemonsqueezy` ? (
                                                     <Loader2 size={16} className="animate-spin" />
                                                 ) : (
                                                     <>
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                                            <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.383 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z" />
-                                                        </svg>
-                                                        Payer via PayPal
+                                                        <CreditCard size={16} />
+                                                        Payer par Carte
                                                     </>
                                                 )}
                                             </button>
-                                            <p className="text-center text-[10px] text-slate-400 font-medium">
+
+                                            {/* PayPal (Standby) */}
+                                            <button
+                                                onClick={() => handleCheckout(plan, 'paypal')}
+                                                disabled={paymentLoading !== null}
+                                                className="w-full py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 border border-slate-200"
+                                                style={{ background: '#f8fafc', color: '#0070ba' }}>
+                                                {paymentLoading === `${plan.id}-paypal` ? (
+                                                    <Loader2 size={14} className="animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                                            <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.383 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z" />
+                                                        </svg>
+                                                        Ou Payer via PayPal
+                                                    </>
+                                                )}
+                                            </button>
+
+                                            <p className="text-center text-[10px] text-slate-400 font-medium pt-1">
                                                 Paiement sécurisé · Annulable à tout moment
                                             </p>
                                         </div>
