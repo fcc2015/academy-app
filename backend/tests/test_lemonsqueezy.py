@@ -41,7 +41,7 @@ def test_lemonsqueezy_create_order_succeeds(client, respx_mock, monkeypatch):
             "plan_id": "pro",
             "amount": 499.00,
             "currency": "MAD",
-            "source": "saas_subscriptions"
+            "source": "academy_subscription"
         },
     )
     assert res.status_code == 200
