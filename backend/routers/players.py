@@ -1,12 +1,14 @@
 import logging
+import re
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from core.auth_middleware import verify_token, require_role, assert_parent_owns_player
 from core.context import user_id_ctx, role_ctx
-from typing import List
+from typing import List, Optional, Literal
+from datetime import date
 import secrets
 import string
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger("players")
 from schemas.users import PlayerCreate, PlayerResponse, UserBase
@@ -283,6 +285,82 @@ async def reset_parent_password(player_id: str, current_user: dict = Depends(ver
     except Exception as e:
         logger.error(f"Error resetting parent password: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class PlayerPatch(BaseModel):
+    """Partial update schema — all fields optional, for inline editing."""
+    full_name: Optional[str] = Field(None, max_length=100)
+    parent_name: Optional[str] = Field(None, max_length=100)
+    parent_whatsapp: Optional[str] = Field(None, pattern=r"^\+?[0-9]{8,15}$")
+    technical_level: Optional[Literal['A', 'B']] = None
+    subscription_type: Optional[str] = Field(None, max_length=50)
+    account_status: Optional[Literal['Pending', 'Active', 'Inactive', 'Suspended']] = None
+    birth_date: Optional[date] = None
+    transport_zone: Optional[str] = Field(None, max_length=100)
+    coach_notes: Optional[str] = Field(None, max_length=5000)
+
+    @field_validator("full_name", "parent_name")
+    @classmethod
+    def strip_html(cls, v):
+        if v:
+            return re.sub(r"<[^>]+>", "", v).strip()
+        return v
+
+@router.patch("/{user_id}", dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
+async def patch_player(user_id: str, patch: PlayerPatch):
+    """Partial update — only update provided fields. Perfect for inline cell editing."""
+    try:
+        # Build the update dict with only the non-None fields
+        updates = patch.model_dump(exclude_none=True, mode='json')
+
+        # If full_name is being updated, we need to also update the users table
+        full_name = updates.pop("full_name", None)
+
+        if not updates and not full_name:
+            raise HTTPException(status_code=400, detail="No fields provided to update")
+
+        result_player = None
+
+        if updates:
+            res = await supabase.update_player(user_id, updates)
+            if not res:
+                raise HTTPException(status_code=404, detail="Player not found")
+            result_player = res[0]
+
+        if full_name:
+            # Update full_name in users table
+            try:
+                import httpx as _httpx
+                from core.config import settings as _s
+                async with _httpx.AsyncClient(trust_env=False, timeout=10.0) as _c:
+                    fn_res = await _c.patch(
+                        f"{_s.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}",
+                        headers={**supabase.admin_headers, "Content-Type": "application/json", "Prefer": "return=representation"},
+                        json={"full_name": full_name}
+                    )
+                    if fn_res.status_code not in (200, 204):
+                        logger.warning("Failed to update full_name in users table: %s", fn_res.text)
+            except Exception as fn_err:
+                logger.warning("Error updating full_name: %s", fn_err)
+
+            if not result_player:
+                # Re-fetch if we only updated full_name
+                existing = await supabase._get(f"/rest/v1/players?user_id=eq.{user_id}&select=*")
+                if not existing:
+                    raise HTTPException(status_code=404, detail="Player not found")
+                result_player = existing[0]
+
+            result_player["full_name"] = full_name
+
+        return result_player
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error patching player %s: %s", user_id, e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
 
 
 @router.put("/{user_id}", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])

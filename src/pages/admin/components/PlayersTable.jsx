@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
     useReactTable,
     getCoreRowModel,
@@ -6,12 +6,197 @@ import {
     getSortedRowModel,
     flexRender
 } from '@tanstack/react-table';
-import { Search, Trophy, Filter, Users, Eye, QrCode, Edit2, LogIn, Key, Trash2, Smartphone, AlertCircle, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+    Search, Trophy, Filter, Users, Eye, QrCode, Edit2, LogIn, Key,
+    Trash2, Smartphone, AlertCircle, Loader2, ChevronUp, ChevronDown,
+    Pencil, Check, X as XIcon
+} from 'lucide-react';
 import Swal from 'sweetalert2';
 import { impersonateUser } from '../../../utils/impersonate';
 import { authFetch } from '../../../api';
 import { API_URL } from '../../../config';
 
+/* ─────────────────────────────────────────────
+   InlineEditCell — click-to-edit any text cell
+   ───────────────────────────────────────────── */
+const InlineEditCell = ({ value: initialValue, playerId, field, onSave, isRTL, multiline = false }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [value, setValue] = useState(initialValue ?? '');
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState(null);
+    const inputRef = useRef(null);
+
+    // Reset when player data changes externally
+    useEffect(() => {
+        if (!isEditing) setValue(initialValue ?? '');
+    }, [initialValue, isEditing]);
+
+    const startEdit = () => {
+        setValue(initialValue ?? '');
+        setError(null);
+        setIsEditing(true);
+    };
+
+    useEffect(() => {
+        if (isEditing && inputRef.current) inputRef.current.focus();
+    }, [isEditing]);
+
+    const cancel = () => {
+        setValue(initialValue ?? '');
+        setError(null);
+        setIsEditing(false);
+    };
+
+    const save = useCallback(async () => {
+        const trimmed = value.trim();
+        if (trimmed === (initialValue ?? '').trim()) {
+            setIsEditing(false);
+            return;
+        }
+        if (!trimmed) {
+            setError('Value cannot be empty');
+            return;
+        }
+        setSaving(true);
+        setError(null);
+        try {
+            await onSave(playerId, field, trimmed);
+            setIsEditing(false);
+        } catch (err) {
+            setError(err.message || 'Save failed');
+            setValue(initialValue ?? '');
+        } finally {
+            setSaving(false);
+        }
+    }, [value, initialValue, playerId, field, onSave]);
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !multiline) { e.preventDefault(); save(); }
+        if (e.key === 'Escape') cancel();
+    };
+
+    if (!isEditing) {
+        return (
+            <div
+                className="group/cell flex items-center gap-2 cursor-pointer min-w-0"
+                onClick={startEdit}
+                title="Click to edit"
+            >
+                <span className="truncate">{initialValue || <span className="text-slate-300 italic text-xs">—</span>}</span>
+                <button
+                    className="opacity-0 group-hover/cell:opacity-100 transition-opacity p-1 rounded-lg bg-indigo-50 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-600 flex-shrink-0"
+                    onClick={(e) => { e.stopPropagation(); startEdit(); }}
+                    tabIndex={-1}
+                    aria-label="Edit"
+                >
+                    <Pencil size={11} />
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-1 min-w-0">
+            <div className={`flex items-center gap-1.5 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                {multiline ? (
+                    <textarea
+                        ref={inputRef}
+                        value={value}
+                        onChange={e => setValue(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        rows={2}
+                        disabled={saving}
+                        className="flex-1 text-sm font-bold px-2 py-1 border-2 border-indigo-400 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white resize-none min-w-0 w-full"
+                        dir={isRTL ? 'rtl' : 'ltr'}
+                    />
+                ) : (
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={value}
+                        onChange={e => setValue(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={saving}
+                        className="flex-1 text-sm font-bold px-2 py-1 border-2 border-indigo-400 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white min-w-0 w-full"
+                        dir={isRTL ? 'rtl' : 'ltr'}
+                    />
+                )}
+                {saving ? (
+                    <Loader2 size={16} className="animate-spin text-indigo-500 flex-shrink-0" />
+                ) : (
+                    <>
+                        <button
+                            onClick={save}
+                            className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all flex-shrink-0"
+                            title="Save (Enter)"
+                        >
+                            <Check size={13} />
+                        </button>
+                        <button
+                            onClick={cancel}
+                            className="p-1.5 rounded-lg bg-slate-100 text-slate-400 hover:bg-slate-200 transition-all flex-shrink-0"
+                            title="Cancel (Esc)"
+                        >
+                            <XIcon size={13} />
+                        </button>
+                    </>
+                )}
+            </div>
+            {error && (
+                <span className="text-[10px] font-bold text-red-500 px-1">{error}</span>
+            )}
+        </div>
+    );
+};
+
+/* ─────────────────────────────────────────────
+   TechnicalLevelCell — click to toggle A ↔ B
+   ───────────────────────────────────────────── */
+const TechnicalLevelCell = ({ player, onSave }) => {
+    const [level, setLevel] = useState(player.technical_level);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => { setLevel(player.technical_level); }, [player.technical_level]);
+
+    const toggle = async () => {
+        const next = level === 'A' ? 'B' : 'A';
+        const prev = level;
+        setLevel(next);
+        setSaving(true);
+        try {
+            await onSave(player.user_id, 'technical_level', next);
+        } catch {
+            setLevel(prev);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <button
+            onClick={toggle}
+            disabled={saving}
+            title="Click to toggle level"
+            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all hover:scale-105 active:scale-95 ${
+                level === 'A'
+                    ? 'bg-yellow-50 text-yellow-700 border-yellow-300 hover:bg-yellow-100'
+                    : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
+            }`}
+        >
+            {saving
+                ? <Loader2 size={10} className="animate-spin" />
+                : level === 'A'
+                    ? <Trophy size={10} fill="currentColor" />
+                    : null
+            }
+            {level}
+        </button>
+    );
+};
+
+/* ─────────────────────────────────────────────
+   StatusCell — dropdown in-place
+   ───────────────────────────────────────────── */
 const StatusCell = ({ player, t, isRTL, fetchPlayers }) => {
     const [status, setStatus] = useState(player.account_status);
     const [isUpdating, setIsUpdating] = useState(false);
@@ -23,7 +208,7 @@ const StatusCell = ({ player, t, isRTL, fetchPlayers }) => {
         setIsUpdating(true);
         try {
             const res = await authFetch(`${API_URL}/players/${player.user_id}`, {
-                method: 'PUT',
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ account_status: newStatus })
             });
@@ -40,12 +225,7 @@ const StatusCell = ({ player, t, isRTL, fetchPlayers }) => {
             }
         } catch (err) {
             setStatus(prevStatus);
-            Swal.fire({
-                icon: 'error',
-                title: isRTL ? 'خطأ' : 'Error',
-                text: err.message,
-                confirmButtonColor: '#4f46e5'
-            });
+            Swal.fire({ icon: 'error', title: isRTL ? 'خطأ' : 'Error', text: err.message, confirmButtonColor: '#4f46e5' });
         } finally {
             setIsUpdating(false);
         }
@@ -61,10 +241,10 @@ const StatusCell = ({ player, t, isRTL, fetchPlayers }) => {
                 onChange={handleStatusChange}
                 disabled={isUpdating}
                 className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border-2 cursor-pointer outline-none transition-all ${
-                    status === 'Active' 
-                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200 focus:ring-emerald-500/20' 
-                        : status === 'Pending' 
-                            ? 'bg-amber-50 text-amber-600 border-amber-200 focus:ring-amber-500/20' 
+                    status === 'Active'
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200 focus:ring-emerald-500/20'
+                        : status === 'Pending'
+                            ? 'bg-amber-50 text-amber-600 border-amber-200 focus:ring-amber-500/20'
                             : 'bg-slate-100 text-slate-500 border-slate-200 focus:ring-slate-500/20'
                 }`}
             >
@@ -76,6 +256,9 @@ const StatusCell = ({ player, t, isRTL, fetchPlayers }) => {
     );
 };
 
+/* ─────────────────────────────────────────────
+   Main PlayersTable component
+   ───────────────────────────────────────────── */
 const PlayersTable = ({
     isRTL,
     dir,
@@ -102,12 +285,29 @@ const PlayersTable = ({
 }) => {
     const [sorting, setSorting] = useState([]);
 
+    /* Shared PATCH handler used by all inline-edit cells */
+    const handleInlineSave = useCallback(async (playerId, field, newValue) => {
+        const res = await authFetch(`${API_URL}/players/${playerId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [field]: newValue })
+        });
+        if (!res.ok) {
+            let detail = 'Failed to save';
+            try {
+                const j = await res.json();
+                detail = j.detail || detail;
+            } catch { /* ignore */ }
+            throw new Error(detail);
+        }
+        // Silently refresh in the background so optimistic update is confirmed
+        if (fetchPlayers) fetchPlayers();
+    }, [fetchPlayers]);
+
     // Synchronize selectedPlayerIds array from parent with TanStack rowSelection object
     const rowSelection = useMemo(() => {
         const sel = {};
-        selectedPlayerIds.forEach(id => {
-            sel[id] = true;
-        });
+        selectedPlayerIds.forEach(id => { sel[id] = true; });
         return sel;
     }, [selectedPlayerIds]);
 
@@ -117,7 +317,6 @@ const PlayersTable = ({
         setSelectedPlayerIds(nextIds);
     };
 
-    // Columns definition
     const columns = useMemo(() => [
         {
             id: 'select',
@@ -179,16 +378,22 @@ const PlayersTable = ({
                                 </span>
                             )}
                         </div>
-                        <div className={isRTL ? 'text-right' : 'text-left'}>
-                            <div className="flex items-center gap-2">
-                                <div className="text-[15px] font-black text-slate-900 tracking-tight">{player.full_name}</div>
-                                {player.technical_level === 'A' && (
-                                    <span className="bg-yellow-100 text-yellow-800 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border border-yellow-200">PRO</span>
-                                )}
+                        <div className={`min-w-0 flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+                            {/* Inline editable name */}
+                            <div className="text-[15px] font-black text-slate-900 tracking-tight">
+                                <InlineEditCell
+                                    value={player.full_name}
+                                    playerId={player.user_id}
+                                    field="full_name"
+                                    onSave={handleInlineSave}
+                                    isRTL={isRTL}
+                                />
                             </div>
-                            <div className="text-[11px] font-bold text-slate-400">{t('players.bornOn')} {player.birth_date}</div>
-                            <div className={`mt-1 flex ${isRTL ? 'justify-end' : 'justify-start'}`}>
-                                <span className="text-[9px] font-black uppercase bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200">LVL: {player.technical_level}</span>
+                            <div className="text-[11px] font-bold text-slate-400 mt-0.5">
+                                {t('players.bornOn')} {player.birth_date}
+                            </div>
+                            <div className={`mt-1 flex items-center gap-2 ${isRTL ? 'justify-end' : 'justify-start'}`}>
+                                <TechnicalLevelCell player={player} onSave={handleInlineSave} />
                             </div>
                         </div>
                     </div>
@@ -216,11 +421,28 @@ const PlayersTable = ({
                 const player = row.original;
                 return (
                     <div className={isRTL ? 'text-right' : 'text-left'}>
-                        <div className="font-black text-slate-800 text-[14px]">{player.parent_name}</div>
+                        <div className="font-black text-slate-800 text-[14px]">
+                            <InlineEditCell
+                                value={player.parent_name}
+                                playerId={player.user_id}
+                                field="parent_name"
+                                onSave={handleInlineSave}
+                                isRTL={isRTL}
+                            />
+                        </div>
                         <div className={`flex items-center gap-2 mt-1 ${isRTL ? 'justify-end flex-row-reverse' : 'justify-start'}`}>
-                            <span className="font-bold text-slate-400 text-xs" dir="ltr">{player.parent_whatsapp || '—'}</span>
+                            {/* Inline editable WhatsApp */}
+                            <span className="font-bold text-slate-400 text-xs" dir="ltr">
+                                <InlineEditCell
+                                    value={player.parent_whatsapp || ''}
+                                    playerId={player.user_id}
+                                    field="parent_whatsapp"
+                                    onSave={handleInlineSave}
+                                    isRTL={false}
+                                />
+                            </span>
                             {player.parent_whatsapp && (
-                                <a href={`https://wa.me/${player.parent_whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-emerald-500 transition-colors">
+                                <a href={`https://wa.me/${player.parent_whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-emerald-500 transition-colors flex-shrink-0">
                                     <Smartphone size={14} />
                                 </a>
                             )}
@@ -313,15 +535,11 @@ const PlayersTable = ({
                                 <button
                                     onClick={async () => {
                                         try {
-                                            const targetId = player.parent_id || player.user_id;
-                                            const data = await impersonateUser(targetId);
+                                            await impersonateUser(player.parent_id || player.user_id);
                                             const storedId = localStorage.getItem('impersonating_user_id');
-                                            if (!storedId) {
-                                                throw new Error(isRTL ? 'فشل حفظ بيانات الجلسة' : 'Failed to save impersonation session');
-                                            }
+                                            if (!storedId) throw new Error(isRTL ? 'فشل حفظ بيانات الجلسة' : 'Failed to save impersonation session');
                                             navigate('/parent');
-                                        }
-                                        catch (e) {
+                                        } catch (e) {
                                             Swal.fire({ icon: 'error', title: 'Login As failed', text: e.message });
                                         }
                                     }}
@@ -335,7 +553,7 @@ const PlayersTable = ({
                                         onClick={async () => {
                                             const result = await Swal.fire({
                                                 title: isRTL ? 'إعادة تعيين كلمة المرور؟' : 'Reset Parent Password?',
-                                                text: isRTL ? 'هل أنت متأكد من تغيير كلمة مرور ولي الأمر؟' : 'Are you sure you want to reset this parent\'s password?',
+                                                text: isRTL ? 'هل أنت متأكد من تغيير كلمة مرور ولي الأمر؟' : "Are you sure you want to reset this parent's password?",
                                                 icon: 'warning',
                                                 showCancelButton: true,
                                                 confirmButtonText: isRTL ? 'نعم، تغيير' : 'Yes, reset',
@@ -347,21 +565,13 @@ const PlayersTable = ({
                                                     if (!res.ok) {
                                                         const text = await res.text();
                                                         let errorMessage = text;
-                                                        try {
-                                                            const parsed = JSON.parse(text);
-                                                            if (parsed.detail) errorMessage = parsed.detail;
-                                                        } catch (err) { }
+                                                        try { const parsed = JSON.parse(text); if (parsed.detail) errorMessage = parsed.detail; } catch { }
                                                         throw new Error(errorMessage);
                                                     }
                                                     const data = await res.json();
                                                     Swal.fire({
                                                         title: isRTL ? 'تم تغيير كلمة المرور!' : 'Password Reset Successful!',
-                                                        html: `
-                                                            <div class="text-left mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200" dir="ltr">
-                                                                <p class="mb-2"><strong>Login:</strong> <span class="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-mono">${data.email || 'Unknown'}</span></p>
-                                                                <p><strong>Password:</strong> <code class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded select-all font-mono">${data.new_password}</code></p>
-                                                            </div>
-                                                        `,
+                                                        html: `<div class="text-left mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200" dir="ltr"><p class="mb-2"><strong>Login:</strong> <span class="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-mono">${data.email || 'Unknown'}</span></p><p><strong>Password:</strong> <code class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded select-all font-mono">${data.new_password}</code></p></div>`,
                                                         icon: 'success'
                                                     });
                                                 } catch (e) {
@@ -383,17 +593,14 @@ const PlayersTable = ({
             },
             enableSorting: false,
         }
-    ], [isRTL, t, navigate, openProfileModal, openMatchesModal, setCurrentPlayer, setIsBadgeModalOpen, openEditModal, handleDelete]);
+    ], [isRTL, t, navigate, openProfileModal, openMatchesModal, setCurrentPlayer, setIsBadgeModalOpen, openEditModal, handleDelete, handleInlineSave, fetchPlayers]);
 
     const table = useReactTable({
         data: players,
         columns,
-        state: {
-            sorting,
-            rowSelection,
-        },
+        state: { sorting, rowSelection },
         onSortingChange: setSorting,
-        onRowSelectionChange: onRowSelectionChange,
+        onRowSelectionChange,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
@@ -402,11 +609,11 @@ const PlayersTable = ({
     });
 
     const pageIndex = table.getState().pagination.pageIndex;
-    const pageSize = table.getState().pagination.pageSize;
     const pageCount = table.getPageCount();
 
     return (
         <div className={`bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden border-b-8 border-b-slate-900 ${isRTL ? 'text-right' : 'text-left'}`}>
+            {/* Search + Filter bar */}
             <div className={`p-6 border-b border-slate-100 flex flex-col sm:flex-row gap-4 bg-slate-50/50 ${isRTL ? 'sm:flex-row-reverse' : ''}`}>
                 <div className="relative flex-1">
                     <div className={`absolute inset-y-0 ${isRTL ? 'right-0 pr-5' : 'left-0 pl-5'} flex items-center pointer-events-none text-slate-300`}><Search size={20} /></div>
@@ -431,6 +638,15 @@ const PlayersTable = ({
                 </button>
             </div>
 
+            {/* Inline edit hint banner */}
+            <div className={`px-8 py-2.5 bg-indigo-50/60 border-b border-indigo-100 flex items-center gap-2 text-indigo-500 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <Pencil size={12} className="flex-shrink-0" />
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                    {isRTL ? 'انقر على أي اسم أو رقم هاتف أو مستوى لتعديله مباشرة' : 'Click any name, phone, or level to edit inline'}
+                </span>
+            </div>
+
+            {/* Table body */}
             <div className="overflow-x-auto min-h-[400px]">
                 {fetchError ? (
                     <div className="flex flex-col items-center justify-center py-40 gap-4">
@@ -457,16 +673,11 @@ const PlayersTable = ({
                             {table.getHeaderGroups().map(headerGroup => (
                                 <tr key={headerGroup.id} className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                                     {headerGroup.headers.map(header => (
-                                        <th 
-                                            key={header.id} 
+                                        <th
+                                            key={header.id}
                                             className={`px-8 py-6 text-center ${header.column.id === 'select' ? 'w-12 px-6' : ''}`}
                                         >
-                                            {header.isPlaceholder
-                                                ? null
-                                                : flexRender(
-                                                    header.column.columnDef.header,
-                                                    header.getContext()
-                                                )}
+                                            {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                                         </th>
                                     ))}
                                 </tr>
@@ -474,11 +685,11 @@ const PlayersTable = ({
                         </thead>
                         <tbody className="divide-y divide-slate-50">
                             {table.getRowModel().rows.map(row => (
-                                <tr key={row.id} className="hover:bg-slate-50/50 group">
+                                <tr key={row.id} className="hover:bg-slate-50/50 group transition-colors">
                                     {row.getVisibleCells().map(cell => (
-                                        <td 
-                                            key={cell.id} 
-                                            className={`px-8 py-6 ${cell.column.id === 'select' ? 'px-6' : ''}`}
+                                        <td
+                                            key={cell.id}
+                                            className={`px-8 py-5 ${cell.column.id === 'select' ? 'px-6' : ''}`}
                                         >
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </td>
