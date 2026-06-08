@@ -1,11 +1,12 @@
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import { impersonateUser } from '../../utils/impersonate';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     UserPlus, Mail, Phone, Shield, Trash2, Search,
     X, AlertCircle, Loader2, CheckCircle, Dumbbell,
-    Target, Star, Users, RefreshCw, Edit2, Plus, LogIn
+    Target, Star, Users, RefreshCw, Edit2, Plus, LogIn,
+    BarChart2, TrendingUp, Activity, Award, Calendar, ChevronRight
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -30,8 +31,235 @@ const AVATAR_GRADIENTS = [
 const getGradient = (name = '') =>
     AVATAR_GRADIENTS[name.charCodeAt(0) % AVATAR_GRADIENTS.length];
 
+// ─── Coach Metrics Modal ─────────────────────────────────────────────
+const CoachMetricsModal = ({ coachId, onClose, isRTL }) => {
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        if (!coachId) return;
+        setLoading(true);
+        setError(null);
+        authFetch(`${API_URL}/coaches/${coachId}/metrics`)
+            .then(r => r.ok ? r.json() : Promise.reject(r))
+            .then(d => { setData(d); setLoading(false); })
+            .catch(() => { setError(true); setLoading(false); });
+    }, [coachId]);
+
+    const scoreColor = (s) => {
+        if (s === null || s === undefined) return 'text-slate-400';
+        if (s >= 8) return 'text-emerald-600';
+        if (s >= 6) return 'text-amber-600';
+        return 'text-red-500';
+    };
+
+    const attColor = (r) => {
+        if (r >= 80) return 'bg-emerald-500';
+        if (r >= 60) return 'bg-amber-500';
+        return 'bg-red-500';
+    };
+
+    const maxSessions = data ? Math.max(...data.monthly_sessions.map(m => m.sessions), 1) : 1;
+
+    return (
+        <div className="fixed inset-0 z-[200] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+            <div
+                className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl flex flex-col border border-slate-100 overflow-hidden"
+                style={{ maxHeight: '90vh' }}
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className={`flex items-center justify-between p-6 sm:p-8 border-b border-slate-100 bg-gradient-to-r from-indigo-600 to-purple-600 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                    <div className={`flex items-center gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                        <div className="p-3 bg-white/20 rounded-2xl">
+                            <BarChart2 size={22} className="text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-black text-white tracking-tight">
+                                {isRTL ? 'لوحة أداء المدرب' : 'Coach Performance'}
+                            </h2>
+                            {data && (
+                                <p className="text-indigo-200 text-[11px] font-bold mt-0.5">{data.coach.full_name}</p>
+                            )}
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-all">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="overflow-y-auto custom-scrollbar flex-1 p-6 sm:p-8 space-y-6">
+                    {loading && (
+                        <div className="flex flex-col items-center justify-center py-16 gap-4">
+                            <Loader2 className="text-indigo-600 animate-spin" size={36} />
+                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                {isRTL ? 'جاري التحميل...' : 'Loading metrics...'}
+                            </p>
+                        </div>
+                    )}
+                    {error && (
+                        <div className="flex flex-col items-center justify-center py-16 gap-3 text-red-400">
+                            <AlertCircle size={36} />
+                            <p className="text-sm font-bold">{isRTL ? 'فشل تحميل البيانات' : 'Failed to load metrics'}</p>
+                        </div>
+                    )}
+                    {data && !loading && (
+                        <>
+                            {/* KPI Cards */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {[
+                                    { icon: Users, label: isRTL ? 'اللاعبون' : 'Players', value: data.players_count, sub: `${data.active_players_count} ${isRTL ? 'نشط' : 'active'}`, color: 'indigo' },
+                                    { icon: Calendar, label: isRTL ? 'الجلسات' : 'Sessions', value: data.sessions_count, sub: `${data.sessions_this_month} ${isRTL ? 'هذا الشهر' : 'this month'}`, color: 'purple' },
+                                    { icon: Activity, label: isRTL ? 'نسبة الحضور' : 'Attendance', value: `${data.attendance_rate}%`, sub: `${data.total_attendance_records} ${isRTL ? 'سجل' : 'records'}`, color: data.attendance_rate >= 80 ? 'emerald' : data.attendance_rate >= 60 ? 'amber' : 'red' },
+                                    { icon: Award, label: isRTL ? 'التقييم' : 'Avg Score', value: data.avg_evaluation_score !== null ? data.avg_evaluation_score : '—', sub: `${data.total_evaluations} ${isRTL ? 'تقييم' : 'evals'}`, color: 'rose' },
+                                ].map((kpi, i) => {
+                                    const Icon = kpi.icon;
+                                    const colors = {
+                                        indigo: 'bg-indigo-50 text-indigo-600',
+                                        purple: 'bg-purple-50 text-purple-600',
+                                        emerald: 'bg-emerald-50 text-emerald-600',
+                                        amber: 'bg-amber-50 text-amber-700',
+                                        red: 'bg-red-50 text-red-600',
+                                        rose: 'bg-rose-50 text-rose-600',
+                                    };
+                                    return (
+                                        <div key={i} className="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col gap-2">
+                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${colors[kpi.color]}`}>
+                                                <Icon size={16} />
+                                            </div>
+                                            <div className="text-2xl font-black text-slate-900">{kpi.value}</div>
+                                            <div>
+                                                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{kpi.label}</div>
+                                                <div className="text-[10px] font-bold text-slate-400 mt-0.5">{kpi.sub}</div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Sessions sparkline (last 6 months) */}
+                            <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100">
+                                <div className={`flex items-center justify-between mb-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                    <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                                        {isRTL ? 'الجلسات — آخر 6 أشهر' : 'Sessions — Last 6 Months'}
+                                    </h3>
+                                    <TrendingUp size={14} className={data.sessions_this_month >= data.sessions_last_month ? 'text-emerald-500' : 'text-red-400'} />
+                                </div>
+                                <div className="flex items-end gap-2 h-16">
+                                    {data.monthly_sessions.map((m, i) => (
+                                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                                            <div
+                                                className="w-full bg-indigo-200 hover:bg-indigo-500 rounded-t-lg transition-all duration-300"
+                                                style={{ height: `${(m.sessions / maxSessions) * 52}px`, minHeight: m.sessions > 0 ? '6px' : '2px' }}
+                                                title={`${m.sessions} sessions`}
+                                            />
+                                            <span className="text-[9px] font-black text-slate-400">{m.month}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Top players attendance */}
+                            {data.top_players.length > 0 && (
+                                <div>
+                                    <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">
+                                        {isRTL ? '🏅 أفضل اللاعبين حضوراً' : '🏅 Top Players by Attendance'}
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {data.top_players.map((p, i) => (
+                                            <div key={i} className={`flex items-center gap-3 bg-white rounded-2xl p-3.5 border border-slate-100 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0 ${
+                                                    i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-300 text-white' : 'bg-amber-700/20 text-amber-800'
+                                                }`}>#{i + 1}</div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-black text-slate-800 truncate">{p.name}</div>
+                                                    <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1.5">
+                                                        <div
+                                                            className={`h-1.5 rounded-full transition-all ${attColor(p.rate)}`}
+                                                            style={{ width: `${p.rate}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className={`text-right shrink-0 ${isRTL ? 'text-left' : ''}`}>
+                                                    <div className="text-sm font-black text-slate-900">{p.present}/{p.total}</div>
+                                                    <div className={`text-[10px] font-bold ${attColor(p.rate).replace('bg-', 'text-')}`}>{p.rate}%</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Squads */}
+                            {data.squads.length > 0 && (
+                                <div>
+                                    <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">
+                                        {isRTL ? '⚽ الفرق المسؤول عنها' : '⚽ Assigned Squads'}
+                                    </h3>
+                                    <div className={`flex flex-wrap gap-2 ${isRTL ? 'justify-end' : ''}`}>
+                                        {data.squads.map((s, i) => (
+                                            <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-xl text-[11px] font-black">
+                                                {s.name}{s.u_category ? ` (${s.u_category})` : ''}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Recent evaluations */}
+                            {data.recent_evaluations.length > 0 && (
+                                <div>
+                                    <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-3">
+                                        {isRTL ? '📋 آخر التقييمات' : '📋 Recent Evaluations'}
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {data.recent_evaluations.map((ev, i) => (
+                                            <div key={i} className={`flex items-center justify-between bg-white rounded-2xl px-4 py-3 border border-slate-100 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                <div className={`flex items-center gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                                                    <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-[11px] font-black text-slate-500">{i + 1}</div>
+                                                    <div>
+                                                        <div className="text-sm font-black text-slate-800">{ev.player_name}</div>
+                                                        <div className="text-[10px] text-slate-400 font-bold">{ev.date}</div>
+                                                    </div>
+                                                </div>
+                                                <div className={`text-xl font-black ${scoreColor(ev.score)}`}>
+                                                    {ev.score !== null ? ev.score : '—'}
+                                                    <span className="text-xs text-slate-300">/10</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {data.top_players.length === 0 && data.recent_evaluations.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-10 gap-3 text-slate-300">
+                                    <BarChart2 size={40} />
+                                    <p className="text-sm font-black uppercase tracking-widest">
+                                        {isRTL ? 'لا توجد بيانات كافية بعد' : 'Not enough data yet'}
+                                    </p>
+                                    <p className="text-xs text-slate-400">{isRTL ? 'سيتم ملء البيانات بعد تسجيل الجلسات' : 'Data will populate as sessions are recorded'}</p>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-5 border-t border-slate-100 bg-slate-50/50 shrink-0">
+                    <button onClick={onClose} className="w-full py-3 text-sm font-black uppercase tracking-widest text-slate-500 hover:bg-white rounded-2xl border border-slate-200 transition-all">
+                        {isRTL ? 'إغلاق' : 'Close'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── Coach Card ───────────────────────────────────────────────────────
-const CoachCard = ({ coach, onEdit, onDelete, onLoginAs, isRTL }) => {
+const CoachCard = ({ coach, onEdit, onDelete, onLoginAs, onMetrics, isRTL }) => {
     const spec = SPEC_CONFIG[coach.specialization] || SPEC_CONFIG.Technical;
     const SpecIcon = spec.icon;
     const gradient = getGradient(coach.full_name);
@@ -91,6 +319,14 @@ const CoachCard = ({ coach, onEdit, onDelete, onLoginAs, isRTL }) => {
                     <div className="flex gap-2">
                         <button
                             type="button"
+                            onClick={() => onMetrics(coach)}
+                            className="p-2.5 text-purple-500 bg-purple-50 border border-purple-100 rounded-xl hover:bg-purple-600 hover:text-white transition-all"
+                            title={isRTL ? 'إحصائيات المدرب' : 'Coach metrics'}
+                        >
+                            <BarChart2 size={14} strokeWidth={2.5} />
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => onEdit(coach)}
                             className="p-2.5 text-slate-400 bg-slate-50 border border-slate-100 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-all"
                             title={isRTL ? 'تعديل المدرب' : 'Edit coach'}
@@ -140,6 +376,7 @@ const CoachesManagement = () => {
     });
     const [branches, setBranches] = useState([]);
     const [ageCategories, setAgeCategories] = useState([]);
+    const [metricsCoachId, setMetricsCoachId] = useState(null);
     const toast = useToast();
 
     const showBanner = (message, type = 'success') => {
@@ -396,6 +633,7 @@ const CoachesManagement = () => {
                             coach={coach}
                             onEdit={handleEditClick}
                             onDelete={handleDelete}
+                            onMetrics={(c) => setMetricsCoachId(c.id)}
                             onLoginAs={async (c) => {
                                 try {
                                     const data = await impersonateUser(c.user_id);
@@ -540,6 +778,14 @@ const CoachesManagement = () => {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {metricsCoachId && (
+                <CoachMetricsModal
+                    coachId={metricsCoachId}
+                    onClose={() => setMetricsCoachId(null)}
+                    isRTL={isRTL}
+                />
             )}
 
             <ConfirmDialog

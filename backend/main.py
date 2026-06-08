@@ -13,18 +13,31 @@ from routers import auth, players, finances, coaches, events, stats, settings as
 
 # ─── Structured Logging with Request ID ─────────────────────
 class RequestIdFilter(logging.Filter):
-    """Injects request_id from context into every log record."""
+    """Injects request_id from context into every log record.
+    Always sets the field so the format string never raises KeyError/ValueError.
+    """
     def filter(self, record):
-        if not hasattr(record, "request_id"):
+        # Always inject — even if another handler already set it
+        try:
             record.request_id = request_id_ctx.get("-")
+        except Exception:
+            record.request_id = "-"
         return True
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s [%(name)s] [%(request_id)s] %(message)s",
+_request_id_filter = RequestIdFilter()
+
+# Configure root handler manually so we can attach the filter before any
+# third-party library (httpx, uvicorn) gets a chance to emit a record
+# without the request_id field present.
+_log_handler = logging.StreamHandler(sys.stdout)
+_log_handler.addFilter(_request_id_filter)
+_log_handler.setFormatter(
+    logging.Formatter("%(asctime)s %(levelname)s [%(name)s] [%(request_id)s] %(message)s")
 )
-# Add filter to root logger so all child loggers inherit it
-logging.getLogger().addFilter(RequestIdFilter())
+logging.root.setLevel(logging.INFO)
+logging.root.addHandler(_log_handler)
+# Also add the filter to the root logger so propagated records are safe
+logging.root.addFilter(_request_id_filter)
 logger = logging.getLogger("academy")
 
 # ─── Sentry Error Tracking ──────────────────────────────────

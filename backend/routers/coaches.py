@@ -138,3 +138,175 @@ async def delete_coach(coach_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred. Please try again."
         )
+
+
+@router.get("/{coach_id}/metrics", dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
+async def get_coach_metrics(coach_id: str):
+    """
+    Returns a full performance scorecard for a coach:
+    - players_count: total players in their squads
+    - sessions_count: distinct training session dates
+    - attendance_rate: % present across all sessions
+    - avg_evaluation_score: mean overall_score for their players
+    - sessions_this_month / sessions_last_month
+    - top_players: top 5 by attendance
+    - monthly_sessions: last 6 months session counts (for sparkline)
+    - recent_evaluations: last 5 evaluations for their players
+    """
+    import asyncio
+    from datetime import date, datetime, timedelta
+    from collections import defaultdict
+    from core.config import settings as _s
+
+    try:
+        # ── 1. Fetch coach profile ────────────────────────────────────────
+        coach_res = await supabase._get(f"/rest/v1/coaches?id=eq.{coach_id}&select=*")
+        if not coach_res:
+            raise HTTPException(status_code=404, detail="Coach not found")
+        coach = coach_res[0]
+
+        # ── 2. Find squads run by this coach ─────────────────────────────
+        squads_res = await supabase._get(
+            f"/rest/v1/squads?coach_id=eq.{coach_id}&select=id,name,u_category"
+        )
+        squad_ids = [s["id"] for s in (squads_res or [])]
+
+        # ── 3. Parallel: attendance + players + evaluations ──────────────
+        async with __import__("httpx").AsyncClient(trust_env=False, timeout=15.0) as client:
+            tasks = []
+
+            # Attendance for all squads of this coach
+            if squad_ids:
+                squad_filter = ",".join(squad_ids)
+                att_url = f"{_s.SUPABASE_URL}/rest/v1/attendance?squad_id=in.({squad_filter})&select=player_id,status,date,squad_id"
+            else:
+                att_url = f"{_s.SUPABASE_URL}/rest/v1/attendance?squad_id=eq.none&select=player_id,status,date"
+
+            tasks.append(client.get(att_url, headers=supabase.admin_headers))
+
+            # Players in coach's u_category (or all if no category)
+            u_cat = coach.get("u_category")
+            if u_cat:
+                players_url = f"{_s.SUPABASE_URL}/rest/v1/players?u_category=eq.{u_cat}&select=user_id,full_name,account_status"
+            else:
+                players_url = f"{_s.SUPABASE_URL}/rest/v1/players?select=user_id,full_name,account_status&limit=200"
+            tasks.append(client.get(players_url, headers=supabase.admin_headers))
+
+            # Evaluations — for players in squads
+            evals_url = f"{_s.SUPABASE_URL}/rest/v1/evaluations?select=player_id,overall_score,created_at,players(full_name)&order=created_at.desc&limit=200"
+            tasks.append(client.get(evals_url, headers=supabase.admin_headers))
+
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+        attendance = responses[0].json() if not isinstance(responses[0], Exception) and responses[0].status_code == 200 else []
+        players    = responses[1].json() if not isinstance(responses[1], Exception) and responses[1].status_code == 200 else []
+        all_evals  = responses[2].json() if not isinstance(responses[2], Exception) and responses[2].status_code == 200 else []
+
+        player_ids = {p["user_id"] for p in players}
+
+        # Filter evaluations to this coach's players only
+        evals = [e for e in all_evals if e.get("player_id") in player_ids] if player_ids else all_evals[:50]
+
+        # ── 4. Sessions (distinct dates) ─────────────────────────────────
+        session_dates = sorted({a["date"] for a in attendance if a.get("date")})
+        sessions_count = len(session_dates)
+
+        today = date.today()
+        cur_month  = today.strftime("%Y-%m")
+        prev_month = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+
+        sessions_this_month = len({d for d in session_dates if d[:7] == cur_month})
+        sessions_last_month = len({d for d in session_dates if d[:7] == prev_month})
+
+        # Monthly sessions for last 6 months (sparkline)
+        month_keys = []
+        for i in range(5, -1, -1):
+            d = today.replace(day=1)
+            for _ in range(i):
+                d = (d - timedelta(days=1)).replace(day=1)
+            month_keys.append(d.strftime("%Y-%m"))
+
+        monthly_sessions = []
+        for mk in month_keys:
+            cnt = len({d for d in session_dates if d[:7] == mk})
+            label = datetime.strptime(mk, "%Y-%m").strftime("%b")
+            monthly_sessions.append({"month": label, "sessions": cnt})
+
+        # ── 5. Attendance rate ───────────────────────────────────────────
+        total_att = len(attendance)
+        present_att = sum(1 for a in attendance if (a.get("status") or "").lower() in ("present", "حاضر"))
+        attendance_rate = round((present_att / total_att * 100) if total_att else 0, 1)
+
+        # ── 6. Top 5 players by attendance ──────────────────────────────
+        player_present: dict = defaultdict(int)
+        player_total: dict = defaultdict(int)
+        for a in attendance:
+            pid = a.get("player_id")
+            if pid:
+                player_total[pid] += 1
+                if (a.get("status") or "").lower() in ("present", "حاضر"):
+                    player_present[pid] += 1
+
+        player_name_map = {p["user_id"]: p["full_name"] for p in players}
+        top_players = sorted(
+            [
+                {
+                    "player_id": pid,
+                    "name": player_name_map.get(pid, "—"),
+                    "present": player_present[pid],
+                    "total": player_total[pid],
+                    "rate": round((player_present[pid] / player_total[pid] * 100) if player_total[pid] else 0, 1),
+                }
+                for pid in player_total
+            ],
+            key=lambda x: -x["present"]
+        )[:5]
+
+        # ── 7. Evaluation score ──────────────────────────────────────────
+        scores = [float(e["overall_score"]) for e in evals if e.get("overall_score") is not None]
+        avg_evaluation_score = round(sum(scores) / len(scores), 1) if scores else None
+
+        # Recent evaluations (last 5)
+        recent_evaluations = []
+        for e in evals[:5]:
+            player_info = e.get("players") or {}
+            name = player_info.get("full_name") if isinstance(player_info, dict) else player_name_map.get(e.get("player_id"), "—")
+            recent_evaluations.append({
+                "player_name": name or "—",
+                "score": e.get("overall_score"),
+                "date": (e.get("created_at") or "")[:10],
+            })
+
+        # ── 8. Compose response ──────────────────────────────────────────
+        return {
+            "coach": {
+                "id": coach.get("id"),
+                "full_name": coach.get("full_name"),
+                "specialization": coach.get("specialization"),
+                "status": coach.get("status"),
+                "u_category": coach.get("u_category"),
+                "photo_url": coach.get("photo_url"),
+            },
+            "squads": squads_res or [],
+            "players_count": len(players),
+            "active_players_count": sum(1 for p in players if p.get("account_status") == "Active"),
+            "sessions_count": sessions_count,
+            "sessions_this_month": sessions_this_month,
+            "sessions_last_month": sessions_last_month,
+            "attendance_rate": attendance_rate,
+            "total_attendance_records": total_att,
+            "avg_evaluation_score": avg_evaluation_score,
+            "total_evaluations": len(evals),
+            "top_players": top_players,
+            "monthly_sessions": monthly_sessions,
+            "recent_evaluations": recent_evaluations,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error fetching coach metrics for %s: %s", coach_id, e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )

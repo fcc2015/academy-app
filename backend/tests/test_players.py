@@ -343,3 +343,101 @@ class TestPlayerRoleGates:
             files={"file": ("x.jpg", b"\xff", "image/jpeg")},
         )
         assert r.status_code == 403
+
+
+# =========================================================
+# PLAYER STREAKS & LEADERBOARD
+# =========================================================
+
+class TestPlayerStreaks:
+    """GET /players/{player_id}/streak and /players/streaks/leaderboard"""
+
+    def test_get_player_streak_success(self, admin_client, mocker):
+        attendance_mock = [
+            {"date": "2026-06-08", "status": "present"},
+            {"date": "2026-06-07", "status": "present"},
+            {"date": "2026-06-06", "status": "present"},
+            {"date": "2026-06-05", "status": "present"},
+            {"date": "2026-06-04", "status": "present"}, # streak = 5 -> Bronze
+            {"date": "2026-06-03", "status": "absent"},
+            {"date": "2026-06-02", "status": "present"},
+        ]
+        mocker.patch(
+            "routers.players.supabase.get_player_attendance",
+            new_callable=AsyncMock,
+            return_value=attendance_mock,
+        )
+
+        r = admin_client.get("/api/v1/players/player-1/streak")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["current_streak"] == 5
+        assert data["longest_streak"] == 5
+        assert data["reward_tier"] == "Bronze"
+        assert data["reward_label"] == "🥉 Bronze"
+        assert data["next_milestone"] == 10
+        assert data["sessions_to_next"] == 5
+        assert data["total_present"] == 6
+        assert data["total_sessions"] == 7
+        assert data["attendance_rate"] == 85.7
+
+    def test_get_player_streak_empty_records(self, admin_client, mocker):
+        mocker.patch(
+            "routers.players.supabase.get_player_attendance",
+            new_callable=AsyncMock,
+            return_value=[],
+        )
+
+        r = admin_client.get("/api/v1/players/player-1/streak")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["current_streak"] == 0
+        assert data["longest_streak"] == 0
+        assert data["reward_tier"] is None
+        assert data["next_milestone"] == 5
+
+    def test_get_player_streak_db_error(self, admin_client, mocker):
+        mocker.patch(
+            "routers.players.supabase.get_player_attendance",
+            new_callable=AsyncMock,
+            side_effect=Exception("Database failure"),
+        )
+
+        r = admin_client.get("/api/v1/players/player-1/streak")
+        assert r.status_code == 500
+
+    def test_get_leaderboard_success(self, admin_client, mocker):
+        attendance_mock = [
+            {"player_id": "p1", "status": "present", "date": "2026-06-08"},
+            {"player_id": "p1", "status": "present", "date": "2026-06-07"},
+            {"player_id": "p2", "status": "present", "date": "2026-06-08"},
+        ]
+        players_mock = [
+            {"user_id": "p1", "full_name": "Player One", "u_category": "U12"},
+            {"user_id": "p2", "full_name": "Player Two", "u_category": "U14"},
+        ]
+
+        async def mock_get(path):
+            if "attendance" in path:
+                return attendance_mock
+            if "players" in path:
+                return players_mock
+            return []
+
+        mocker.patch("routers.players.supabase._get", new_callable=AsyncMock, side_effect=mock_get)
+
+        r = admin_client.get("/api/v1/players/streaks/leaderboard")
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) == 2
+        assert data[0]["player_id"] == "p1"
+        assert data[0]["current_streak"] == 2
+        assert data[0]["name"] == "Player One"
+        assert data[1]["player_id"] == "p2"
+        assert data[1]["current_streak"] == 1
+
+    def test_get_leaderboard_role_gate(self, parent_client):
+        # Parents should not access leaderboard
+        r = parent_client.get("/api/v1/players/streaks/leaderboard")
+        assert r.status_code == 403
+

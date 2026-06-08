@@ -207,7 +207,7 @@
 - [x] Player progression over time (evaluation trends)
 - [x] Revenue analytics (MRR, churn, growth)
 - [x] Attendance analytics (best/worst days, seasonal trends)
-- [ ] Coach performance metrics
+- [x] Coach performance metrics
 - [x] PDF report generation (branded, exportable)
 
 ### 6.2 Subscription & Billing Engine
