@@ -93,3 +93,24 @@ jobs:
             print(f'Lines covered: {t.attrib[\"lines-covered\"]} / {t.attrib[\"lines-valid\"]}')" \
             >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+
+  deploy:
+    name: Deploy to Hugging Face Spaces
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install huggingface_hub
+
+      - name: Deploy backend
+        run: python scratch/deploy_hf.py ${{ secrets.HF_TOKEN }}
+

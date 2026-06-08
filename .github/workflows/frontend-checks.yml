@@ -65,3 +65,34 @@ jobs:
           name: dist
           path: dist
           retention-days: 3
+
+  deploy:
+    name: Deploy to Vercel
+    needs: lint-and-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: team_T7QqhIIXhoGBNBR8bzc9oqxB
+          VERCEL_PROJECT_ID: prj_j3aHUeL6fRC3wXx3uJA30df5TH0e
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: team_T7QqhIIXhoGBNBR8bzc9oqxB
+          VERCEL_PROJECT_ID: prj_j3aHUeL6fRC3wXx3uJA30df5TH0e
+
+      - name: Deploy Project Artifacts to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: team_T7QqhIIXhoGBNBR8bzc9oqxB
+          VERCEL_PROJECT_ID: prj_j3aHUeL6fRC3wXx3uJA30df5TH0e
+
