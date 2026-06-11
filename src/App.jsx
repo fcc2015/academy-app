@@ -17,6 +17,8 @@ import NotFound from './pages/NotFound';
 const DownloadPage = lazy(() => import('./pages/DownloadPage'));
 const QRLoginPage = lazy(() => import('./pages/QRLoginPage'));
 const ParentSignup = lazy(() => import('./pages/parent/ParentSignup'));
+const AcademyPublicPage = lazy(() => import('./pages/AcademyPublicPage'));
+const AcademyDirectory = lazy(() => import('./pages/AcademyDirectory'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 
 // SaaS Root
@@ -151,6 +153,9 @@ function App() {
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/parent/signup" element={<ParentSignup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          {/* Public Academy Pages */}
+          <Route path="/academies" element={<AcademyDirectory />} />
+          <Route path="/academy/:subdomain" element={<AcademyPublicPage />} />
 
           {/* SaaS Root */}
           <Route path="/saas" element={<SaasLayout />}>
