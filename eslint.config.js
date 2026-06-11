@@ -10,6 +10,8 @@ export default defineConfig([
     'dist-ssr',
     'build',
     'coverage',
+    '.vercel',
+    '.netlify',
     // Android Capacitor build artifacts — generated bundled JS, not source
     'android/app/build',
     'android/app/src/main/assets/public',
