@@ -1,12 +1,14 @@
 import logging
+import re
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from core.auth_middleware import verify_token, require_role, assert_parent_owns_player
 from core.context import user_id_ctx, role_ctx
-from typing import List
+from typing import List, Optional, Literal
+from datetime import date
 import secrets
 import string
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger("players")
 from schemas.users import PlayerCreate, PlayerResponse, UserBase
@@ -285,6 +287,82 @@ async def reset_parent_password(player_id: str, current_user: dict = Depends(ver
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class PlayerPatch(BaseModel):
+    """Partial update schema — all fields optional, for inline editing."""
+    full_name: Optional[str] = Field(None, max_length=100)
+    parent_name: Optional[str] = Field(None, max_length=100)
+    parent_whatsapp: Optional[str] = Field(None, pattern=r"^\+?[0-9]{8,15}$")
+    technical_level: Optional[Literal['A', 'B']] = None
+    subscription_type: Optional[str] = Field(None, max_length=50)
+    account_status: Optional[Literal['Pending', 'Active', 'Inactive', 'Suspended']] = None
+    birth_date: Optional[date] = None
+    transport_zone: Optional[str] = Field(None, max_length=100)
+    coach_notes: Optional[str] = Field(None, max_length=5000)
+
+    @field_validator("full_name", "parent_name")
+    @classmethod
+    def strip_html(cls, v):
+        if v:
+            return re.sub(r"<[^>]+>", "", v).strip()
+        return v
+
+@router.patch("/{user_id}", dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
+async def patch_player(user_id: str, patch: PlayerPatch):
+    """Partial update — only update provided fields. Perfect for inline cell editing."""
+    try:
+        # Build the update dict with only the non-None fields
+        updates = patch.model_dump(exclude_none=True, mode='json')
+
+        # If full_name is being updated, we need to also update the users table
+        full_name = updates.pop("full_name", None)
+
+        if not updates and not full_name:
+            raise HTTPException(status_code=400, detail="No fields provided to update")
+
+        result_player = None
+
+        if updates:
+            res = await supabase.update_player(user_id, updates)
+            if not res:
+                raise HTTPException(status_code=404, detail="Player not found")
+            result_player = res[0]
+
+        if full_name:
+            # Update full_name in users table
+            try:
+                import httpx as _httpx
+                from core.config import settings as _s
+                async with _httpx.AsyncClient(trust_env=False, timeout=10.0) as _c:
+                    fn_res = await _c.patch(
+                        f"{_s.SUPABASE_URL}/rest/v1/users?id=eq.{user_id}",
+                        headers={**supabase.admin_headers, "Content-Type": "application/json", "Prefer": "return=representation"},
+                        json={"full_name": full_name}
+                    )
+                    if fn_res.status_code not in (200, 204):
+                        logger.warning("Failed to update full_name in users table: %s", fn_res.text)
+            except Exception as fn_err:
+                logger.warning("Error updating full_name: %s", fn_err)
+
+            if not result_player:
+                # Re-fetch if we only updated full_name
+                existing = await supabase._get(f"/rest/v1/players?user_id=eq.{user_id}&select=*")
+                if not existing:
+                    raise HTTPException(status_code=404, detail="Player not found")
+                result_player = existing[0]
+
+            result_player["full_name"] = full_name
+
+        return result_player
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error patching player %s: %s", user_id, e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred. Please try again."
+        )
+
+
 @router.put("/{user_id}", response_model=PlayerResponse, dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
 async def update_player(user_id: str, player: PlayerCreate):
     try:
@@ -375,6 +453,118 @@ async def delete_player(user_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred. Please try again."
         )
+
+
+@router.get("/streaks/leaderboard", dependencies=[Depends(require_role("admin", "super_admin", "sous_admin", "coach"))])
+async def get_streak_leaderboard():
+    """Top 10 players by current attendance streak academy-wide."""
+    from collections import defaultdict
+    TIERS = [(30, "🏆"), (20, "🥇"), (10, "🥈"), (5, "🥉")]
+    try:
+        att_raw = await supabase._get(
+            "/rest/v1/attendance?select=player_id,status,date&order=date.desc&limit=5000"
+        )
+        players_raw = await supabase._get("/rest/v1/players?select=user_id,full_name,u_category&limit=500")
+        player_map = {p["user_id"]: p for p in (players_raw or [])}
+
+        by_player: dict = defaultdict(list)
+        for a in (att_raw or []):
+            pid = a.get("player_id")
+            if pid:
+                by_player[pid].append(a)
+
+        leaderboard = []
+        for pid, records in by_player.items():
+            sorted_desc = sorted(records, key=lambda a: a["date"], reverse=True)
+            streak = 0
+            for a in sorted_desc:
+                if (a.get("status") or "").lower() in ("present", "حاضر"):
+                    streak += 1
+                else:
+                    break
+            if streak == 0:
+                continue
+            emoji = next((e for t, e in TIERS if streak >= t), "")
+            p_info = player_map.get(pid, {})
+            leaderboard.append({
+                "player_id": pid,
+                "name": p_info.get("full_name", "—"),
+                "u_category": p_info.get("u_category", ""),
+                "current_streak": streak,
+                "tier_emoji": emoji,
+            })
+
+        leaderboard.sort(key=lambda x: -x["current_streak"])
+        return leaderboard[:10]
+    except Exception as e:
+        logger.error("Streak leaderboard error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
+
+
+@router.get("/{player_id}/streak")
+async def get_player_streak(player_id: str):
+    """
+    Attendance streak metrics:
+    - current_streak: consecutive present sessions (most recent first)
+    - longest_streak: best ever
+    - reward_tier: None | Bronze | Silver | Gold | Platinum
+    - next_milestone + sessions_to_next
+    """
+    TIERS = [(30, "Platinum", "🏆 Platinum"), (20, "Gold", "🥇 Gold"), (10, "Silver", "🥈 Silver"), (5, "Bronze", "🥉 Bronze")]
+    MILESTONES = [5, 10, 20, 30]
+    try:
+        att_raw = await supabase.get_player_attendance(player_id)
+        records = sorted(
+            [a for a in (att_raw if isinstance(att_raw, list) else []) if a.get("date")],
+            key=lambda a: a["date"], reverse=True
+        )
+        total_sessions = len(records)
+        total_present = sum(1 for a in records if (a.get("status") or "").lower() in ("present", "حاضر"))
+        attendance_rate = round((total_present / total_sessions * 100) if total_sessions else 0, 1)
+
+        # Current streak
+        current_streak = 0
+        for a in records:
+            if (a.get("status") or "").lower() in ("present", "حاضر"):
+                current_streak += 1
+            else:
+                break
+
+        # Longest streak
+        longest_streak, run = 0, 0
+        for a in sorted(records, key=lambda a: a["date"]):
+            if (a.get("status") or "").lower() in ("present", "حاضر"):
+                run += 1
+                longest_streak = max(longest_streak, run)
+            else:
+                run = 0
+
+        reward_tier = reward_label = None
+        for threshold, tier, label in TIERS:
+            if current_streak >= threshold:
+                reward_tier, reward_label = tier, label
+                break
+
+        next_milestone = next((m for m in MILESTONES if current_streak < m), None)
+
+        return {
+            "player_id": player_id,
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "total_present": total_present,
+            "total_sessions": total_sessions,
+            "attendance_rate": attendance_rate,
+            "reward_tier": reward_tier,
+            "reward_label": reward_label,
+            "next_milestone": next_milestone,
+            "sessions_to_next": (next_milestone - current_streak) if next_milestone else 0,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error computing streak for %s: %s", player_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
+
 
 @router.get("/parent/{parent_id}", response_model=List[PlayerResponse])
 async def get_players_by_parent(parent_id: str):
