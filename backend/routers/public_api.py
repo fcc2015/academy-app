@@ -107,6 +107,37 @@ async def get_public_academy(subdomain: str):
         }
 
 
+@router.get("/academy/{subdomain}/plans")
+async def get_public_academy_plans(subdomain: str):
+    """
+    Public read of active plans for an academy by subdomain.
+    """
+    from core.config import settings as _s
+    async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+        # First, find the academy
+        ac = await client.get(
+            f"{_s.SUPABASE_URL}/rest/v1/academies"
+            f"?subdomain=eq.{quote(subdomain)}"
+            "&select=id,status",
+            headers=supabase.admin_headers,
+        )
+        if ac.status_code != 200 or not ac.json():
+            raise HTTPException(status_code=404, detail="Academy not found")
+        row = ac.json()[0]
+        if (row.get("status") or "active") == "suspended":
+            raise HTTPException(status_code=403, detail="Academy is suspended")
+
+        # Now, query subscription_plans for this academy_id
+        pl = await client.get(
+            f"{_s.SUPABASE_URL}/rest/v1/subscription_plans"
+            f"?academy_id=eq.{row['id']}&is_active=eq.true&order=sort_order.asc",
+            headers=supabase.admin_headers,
+        )
+        if pl.status_code == 200:
+            return pl.json()
+        return []
+
+
 class SetupAcademyRequest(BaseModel):
     academy_name: str = Field(..., min_length=2, max_length=100)
     country: Optional[str] = Field(None, max_length=100)
@@ -443,7 +474,7 @@ async def get_public_academies_directory(country: Optional[str] = None, city: Op
     Parents use this to find and register to academies by country/city.
     """
     try:
-        query = f"{supabase.url}/rest/v1/academies?select=id,name,city,country,logo_url,primary_color,plan_id&status=eq.active&order=name.asc"
+        query = f"{supabase.url}/rest/v1/academies?select=id,name,subdomain,city,country,logo_url,primary_color,plan_id&status=eq.active&order=name.asc"
         
         if country:
             query += f"&country=ilike.*{quote(country)}*"

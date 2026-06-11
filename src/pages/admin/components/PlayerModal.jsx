@@ -26,6 +26,29 @@ const playerSchema = z.object({
     photo_url: z.string().optional().nullable(),
 });
 
+const computeUCategory = (birthDateStr, ageCategories) => {
+    if (!birthDateStr || !ageCategories?.length) return null;
+    const birth = new Date(birthDateStr);
+    if (isNaN(birth)) return null;
+    const today = new Date();
+    const seasonYear = today.getMonth() >= 7 ? today.getFullYear() : today.getFullYear() - 1;
+    const ageAtSeasonStart = seasonYear - birth.getFullYear();
+    const targetU = `U${ageAtSeasonStart}`;
+    const exact = ageCategories.find(c => c.toUpperCase() === targetU);
+    if (exact) return exact;
+    const prefix = ageCategories.find(c =>
+        c.toUpperCase() === targetU ||
+        c.toUpperCase().startsWith(targetU + ' ') ||
+        c.toUpperCase().startsWith(targetU + '-')
+    );
+    if (prefix) return prefix;
+    if (ageAtSeasonStart >= 18) {
+        const senior = ageCategories.find(c => c.toLowerCase().includes('senior'));
+        if (senior) return senior;
+    }
+    return null;
+};
+
 const PlayerModal = ({
     isOpen, onClose, onSubmit, title, isEdit, modalStep, setModalStep,
     formData, subscriptionPlans, isSubmitting, settings, t, isRTL, dir, branches = [],
@@ -38,38 +61,22 @@ const PlayerModal = ({
 
     useEffect(() => {
         if (isOpen) {
-            reset(formData);
+            const updatedData = { ...formData };
+            if (updatedData.birth_date && (!updatedData.u_category || updatedData.u_category === settings?.age_categories?.[0])) {
+                const auto = computeUCategory(updatedData.birth_date, settings?.age_categories);
+                if (auto) {
+                    updatedData.u_category = auto;
+                }
+            }
+            reset(updatedData);
         }
-    }, [isOpen, formData, reset]);
+    }, [isOpen, formData, reset, settings?.age_categories]);
 
     if (!isOpen) return null;
 
     const currentSubscriptionType = watch('subscription_type');
     const photoUrl = watch('photo_url');
     const selectedPlanObj = subscriptionPlans.find(p => p.name === currentSubscriptionType) || null;
-
-    const computeUCategory = (birthDateStr, ageCategories) => {
-        if (!birthDateStr || !ageCategories?.length) return null;
-        const birth = new Date(birthDateStr);
-        if (isNaN(birth)) return null;
-        const today = new Date();
-        const seasonYear = today.getMonth() >= 7 ? today.getFullYear() : today.getFullYear() - 1;
-        const ageAtSeasonStart = seasonYear - birth.getFullYear();
-        const targetU = `U${ageAtSeasonStart}`;
-        const exact = ageCategories.find(c => c.toUpperCase() === targetU);
-        if (exact) return exact;
-        const prefix = ageCategories.find(c =>
-            c.toUpperCase() === targetU ||
-            c.toUpperCase().startsWith(targetU + ' ') ||
-            c.toUpperCase().startsWith(targetU + '-')
-        );
-        if (prefix) return prefix;
-        if (ageAtSeasonStart >= 18) {
-            const senior = ageCategories.find(c => c.toLowerCase().includes('senior'));
-            if (senior) return senior;
-        }
-        return null;
-    };
 
     const getErrorMessage = (field) => {
         const err = errors[field];

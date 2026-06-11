@@ -142,3 +142,62 @@ async def unsubscribe_push(req: UnsubscribeRequest, user: dict = Depends(verify_
             detail="Could not remove subscription."
         )
 
+
+class WhatsAppBlastRequest(BaseModel):
+    message: str
+    target_role: Optional[str] = "parent"
+    player_ids: Optional[List[str]] = None
+
+
+@router.post("/whatsapp-blast")
+async def send_whatsapp_blast(req: WhatsAppBlastRequest, user: dict = Depends(verify_token)):
+    if user.get("role") not in ["admin", "super_admin"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can send WhatsApp blasts")
+
+    from services.whatsapp_service import send_whatsapp_message
+    import httpx
+    
+    academy_id = user.get("academy_id")
+    query = f"{settings.SUPABASE_URL}/rest/v1/players?select=id,parent_whatsapp,full_name&parent_whatsapp=not.is.null"
+    if academy_id:
+        query += f"&academy_id=eq.{academy_id}"
+        
+    if req.player_ids:
+        ids_str = ",".join(req.player_ids)
+        query += f"&id=in.({ids_str})"
+        
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+        res = await client.get(query, headers=supabase.admin_headers)
+        if res.status_code != 200:
+            logger.error(f"Failed to fetch players: {res.text}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch players contact list")
+        players = res.json()
+        
+    phone_to_name = {}
+    for p in players:
+        phone = p.get("parent_whatsapp")
+        if phone:
+            clean_phone = "".join(filter(str.isdigit, phone))
+            if clean_phone:
+                phone_to_name[clean_phone] = p.get("full_name")
+                
+    if not phone_to_name:
+        return {"success": True, "sent_count": 0, "message": "No valid parent phone numbers found."}
+        
+    sent_count = 0
+    failed_count = 0
+    for phone, name in phone_to_name.items():
+        msg_text = req.message.replace("{player_name}", name)
+        success = await send_whatsapp_message(phone, msg_text)
+        if success:
+            sent_count += 1
+        else:
+            failed_count += 1
+            
+    return {
+        "success": True,
+        "sent_count": sent_count,
+        "failed_count": failed_count,
+        "total_targets": len(phone_to_name)
+    }
+

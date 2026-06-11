@@ -53,6 +53,7 @@ const AdminDashboard = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
     const [notifData, setNotifData] = useState({ title: '', message: '', target_role: '' });
+    const [sendWhatsApp, setSendWhatsApp] = useState(false);
 
     const fetchDashboardData = useCallback(async () => {
         setIsLoading(true);
@@ -148,8 +149,23 @@ const AdminDashboard = () => {
                 })
             });
             if (res.ok) {
+                if (sendWhatsApp) {
+                    try {
+                        await authFetch(`${API_URL}/notifications/whatsapp-blast`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                message: `📢 *${notifData.title}*\n\n${notifData.message}`,
+                                target_role: notifData.target_role || 'parent'
+                            })
+                        });
+                    } catch (wErr) {
+                        console.error('Failed to send WhatsApp blast:', wErr);
+                    }
+                }
                 setIsNotificationModalOpen(false);
                 setNotifData({ title: '', message: '', target_role: '' });
+                setSendWhatsApp(false);
                 toast.success(t('dashboard.sendSuccess'));
             }
         } catch (err) {
@@ -437,7 +453,7 @@ const AdminDashboard = () => {
                             </button>
 
                             <button
-                                onClick={() => setIsNotificationModalOpen(true)}
+                                onClick={() => { setIsNotificationModalOpen(true); setSendWhatsApp(false); }}
                                 className="w-full flex items-center gap-4 p-5 bg-white border-2 border-slate-100 rounded-2xl group hover:border-purple-500 hover:shadow-lg hover:shadow-purple-100 transition-all text-left rtl:text-right"
                             >
                                 <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:bg-purple-500 group-hover:text-white transition-all">
@@ -524,6 +540,18 @@ const AdminDashboard = () => {
                                     <option value="parent">{t('ui.parentsPlayers')}</option>
                                     <option value="coach">{t('ui.coachesStaff')}</option>
                                 </select>
+                            </div>
+                            <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+                                <input 
+                                    type="checkbox" 
+                                    id="sendWhatsApp"
+                                    checked={sendWhatsApp}
+                                    onChange={(e) => setSendWhatsApp(e.target.checked)}
+                                    className="w-5 h-5 rounded border-slate-200 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                />
+                                <label htmlFor="sendWhatsApp" className="text-sm font-bold text-slate-700 cursor-pointer select-none">
+                                    {isRTL ? 'إرسال أيضاً عبر WhatsApp Blast لأولياء الأمور' : 'Envoyer également via WhatsApp Blast aux parents'}
+                                </label>
                             </div>
                             <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
                                 <button type="button" onClick={() => setIsNotificationModalOpen(false)} className="px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all">
