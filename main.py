@@ -310,7 +310,7 @@ async def _daily_alert_scheduler():
     from routers.finances import run_alert_check
     from datetime import datetime, timedelta as _td
 
-    logger.info("📅 Daily alert scheduler started")
+    logger.info("[Scheduler] Daily alert scheduler started")
 
     while True:
         try:
@@ -321,35 +321,35 @@ async def _daily_alert_scheduler():
                 target += _td(days=1)
             wait_seconds = (target - now).total_seconds()
 
-            logger.info(f"⏰ Next alert check in {wait_seconds / 3600:.1f} hours (at {target.isoformat()})")
+            logger.info(f"[Scheduler] Next alert check in {wait_seconds / 3600:.1f} hours (at {target.isoformat()})")
             await asyncio.sleep(wait_seconds)
 
             # Run the alert check
-            logger.info("🔔 Running daily alert check...")
+            logger.info("[Scheduler] Running daily alert check...")
             result = await run_alert_check()
             logger.info(
-                f"✅ Alert check complete: {result.get('alerts_sent', 0)} alerts, "
+                f"[Scheduler] Alert check complete: {result.get('alerts_sent', 0)} alerts, "
                 f"{result.get('players_suspended', 0)} suspended, "
                 f"{result.get('players_reactivated', 0)} reactivated"
             )
 
             # Run the SaaS expiry check (academies)
             try:
-                logger.info("🔔 Running daily SaaS expiry check...")
+                logger.info("[Scheduler] Running daily SaaS expiry check...")
                 from routers.saas_admin import run_saas_expiry_check
                 saas_result = await run_saas_expiry_check()
                 logger.info(
-                    f"✅ SaaS expiry check complete: {saas_result.get('checked_academies', 0)} checked, "
+                    f"[Scheduler] SaaS expiry check complete: {saas_result.get('checked_academies', 0)} checked, "
                     f"suspended: {saas_result.get('suspended', [])}, "
                     f"warned: {saas_result.get('warned', [])}"
                 )
             except Exception as saas_err:
-                logger.error(f"❌ Daily SaaS expiry check error: {saas_err}", exc_info=True)
+                logger.error(f"[Scheduler] Daily SaaS expiry check error: {saas_err}", exc_info=True)
         except asyncio.CancelledError:
             logger.info("Daily alert scheduler cancelled")
             break
         except Exception as e:
-            logger.error(f"❌ Daily alert check error: {e}", exc_info=True)
+            logger.error(f"[Scheduler] Daily alert check error: {e}", exc_info=True)
             # Wait 1 hour before retrying on error
             await asyncio.sleep(3600)
 
@@ -358,5 +358,5 @@ async def _daily_alert_scheduler():
 async def start_daily_scheduler():
     """Launch the daily alert-check background task."""
     asyncio.create_task(_daily_alert_scheduler())
-    logger.info("📅 Daily alert scheduler registered")
+    logger.info("[Scheduler] Daily alert scheduler registered")
 
