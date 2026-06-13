@@ -35,6 +35,11 @@ class AcademySettingsBase(BaseModel):
     wafacash_details: Optional[str] = None
     cashplus_details: Optional[str] = None
     family_discount_percentage: int = 10
+    primary_color: str = "#4f46e5"
+    secondary_color: str = "#7c3aed"
+    whatsapp_absence_alert: bool = True
+    whatsapp_payment_reminder: bool = True
+    whatsapp_language: str = "ar"
 
 class AcademySettingsUpdate(BaseModel):
     academy_name: Optional[str] = None
@@ -66,6 +71,11 @@ class AcademySettingsUpdate(BaseModel):
     wafacash_details: Optional[str] = None
     cashplus_details: Optional[str] = None
     family_discount_percentage: Optional[int] = None
+    primary_color: Optional[str] = None
+    secondary_color: Optional[str] = None
+    whatsapp_absence_alert: Optional[bool] = None
+    whatsapp_payment_reminder: Optional[bool] = None
+    whatsapp_language: Optional[str] = None
 
 class AcademySettingsResponse(AcademySettingsBase):
     id: str

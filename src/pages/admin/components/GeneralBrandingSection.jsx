@@ -41,7 +41,7 @@ const GeneralBrandingSection = ({
     handleLogoUpload
 }) => {
     return (
-        <div className="lg:col-span-2 space-y-8">
+        <div className="space-y-8">
             {/* الهوية والعلامة التجارية */}
             <div className="bg-white rounded-3xl border border-slate-200 premium-shadow overflow-hidden">
                 <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3 justify-start">
