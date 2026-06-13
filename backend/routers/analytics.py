@@ -68,10 +68,10 @@ async def get_analytics_overview():
         # ── 1. Parallel data fetch ──────────────────────────────────────
         tasks = [
             supabase.client.get(f"{supabase.url}/rest/v1/payments?select=id,amount,status,payment_method,payment_date,created_at"),
-            supabase.client.get(f"{supabase.url}/rest/v1/players?select=id,full_name,u_category,created_at"),
+            supabase.client.get(f"{supabase.url}/rest/v1/players?select=user_id,u_category,created_at,users!players_user_id_fkey(full_name)"),
             supabase.client.get(f"{supabase.url}/rest/v1/attendance?select=player_id,status,date"),
-            supabase.client.get(f"{supabase.url}/rest/v1/evaluations?select=player_id,overall_score,created_at,players(full_name)"),
-            supabase.client.get(f"{supabase.url}/rest/v1/expenses?select=amount,category,date,created_at"),
+            supabase.client.get(f"{supabase.url}/rest/v1/evaluations?select=player_id,technical_score,tactical_score,physical_score,mental_score,created_at,players(users!players_user_id_fkey(full_name))"),
+            supabase.client.get(f"{supabase.url}/rest/v1/expenses?select=amount,category,expense_date,created_at"),
             supabase.client.get(f"{supabase.url}/rest/v1/coaches?select=id,status"),
             supabase.client.get(f"{supabase.url}/rest/v1/subscriptions?select=id,status,monthly_amount,annual_amount,billing_type,created_at"),
         ]
@@ -84,6 +84,17 @@ async def get_analytics_overview():
         expenses   = responses[4].json() if not isinstance(responses[4], Exception) and responses[4].status_code == 200 else []
         coaches    = responses[5].json() if not isinstance(responses[5], Exception) and responses[5].status_code == 200 else []
         subs       = responses[6].json() if not isinstance(responses[6], Exception) and responses[6].status_code == 200 else []
+
+        # Process evaluations to calculate overall_score on the fly if missing
+        for ev in evals:
+            if "overall_score" not in ev or ev["overall_score"] is None:
+                scores = [
+                    ev.get("technical_score", 0) or 0,
+                    ev.get("tactical_score", 0) or 0,
+                    ev.get("physical_score", 0) or 0,
+                    ev.get("mental_score", 0) or 0
+                ]
+                ev["overall_score"] = sum(scores) / len(scores) if scores else 0
 
         months_12 = _last_n_months(12)
         months_6  = _last_n_months(6)
@@ -164,7 +175,7 @@ async def get_analytics_overview():
             if a.get("status") in ("present", "Present"):
                 player_att_count[a.get("player_id") or ""] += 1
 
-        player_name_map = {pl.get("id"): pl.get("full_name", "?") for pl in players}
+        player_name_map = {pl.get("user_id"): (pl.get("users") or {}).get("full_name", "?") for pl in players}
         top_attenders = sorted(player_att_count.items(), key=lambda x: -x[1])[:5]
         top_players_attendance = [
             {"name": player_name_map.get(pid, pid), "sessions": cnt}
@@ -206,7 +217,7 @@ async def get_analytics_overview():
         exp_by_month: dict[str, float] = defaultdict(float)
         exp_by_cat: dict[str, float] = defaultdict(float)
         for ex in expenses:
-            key = _month_key(ex.get("date") or ex.get("created_at") or "")
+            key = _month_key(ex.get("expense_date") or ex.get("created_at") or "")
             amt = float(ex.get("amount", 0) or 0)
             if key in months_6:
                 exp_by_month[key] += amt
