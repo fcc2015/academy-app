@@ -40,6 +40,7 @@ import LandingPageEditorSection from './components/LandingPageEditorSection';
 import MembershipPlansSection from './components/MembershipPlansSection';
 import CouponsSection from './components/CouponsSection';
 import SecuritySection from './components/SecuritySection';
+import WhatsAppNotificationsSection from './components/WhatsAppNotificationsSection';
 
 const SettingsManagement = () => {
     const { refreshBranding } = useBranding();
@@ -277,22 +278,30 @@ const SettingsManagement = () => {
             const res = await authFetch(`${API_URL}/settings/`);
             if (res.ok) {
                 const data = await res.json();
-                // Parse branding colors serialized in about_text as JSON
+                
+                let pCol = data.primary_color || '#4f46e5';
+                let sCol = data.secondary_color || '#7c3aed';
+                let abText = data.about_text || '';
+
                 const rawAbout = data.about_text || '';
                 if (rawAbout.startsWith('{')) {
                     try {
                         const parsed = JSON.parse(rawAbout);
                         if (parsed && typeof parsed === 'object') {
-                            setPrimaryColor(parsed.primary_color || '#4f46e5');
-                            setSecondaryColor(parsed.secondary_color || '#7c3aed');
-                            setAboutText(parsed.about_text || '');
-                            document.documentElement.style.setProperty('--color-primary', parsed.primary_color || '#4f46e5');
-                            document.documentElement.style.setProperty('--color-secondary', parsed.secondary_color || '#7c3aed');
+                            pCol = parsed.primary_color || pCol;
+                            sCol = parsed.secondary_color || sCol;
+                            abText = parsed.about_text || '';
                         }
-                    } catch { setAboutText(rawAbout); }
+                    } catch { abText = rawAbout; }
                 } else {
-                    setAboutText(rawAbout);
+                    abText = rawAbout;
                 }
+
+                setPrimaryColor(pCol);
+                setSecondaryColor(sCol);
+                setAboutText(abText);
+                document.documentElement.style.setProperty('--color-primary', pCol);
+                document.documentElement.style.setProperty('--color-secondary', sCol);
                 setSettings(data);
             }
         } catch (error) {
@@ -473,7 +482,12 @@ const SettingsManagement = () => {
                 about_text: aboutText || '',
             });
 
-            const cleanedSettings = { ...settings, about_text: serializedAbout };
+            const cleanedSettings = {
+                ...settings,
+                primary_color: primaryColor || '#4f46e5',
+                secondary_color: secondaryColor || '#7c3aed',
+                about_text: serializedAbout
+            };
             if (!cleanedSettings.season_start) delete cleanedSettings.season_start;
             if (!cleanedSettings.season_end) delete cleanedSettings.season_end;
 
@@ -534,32 +548,39 @@ const SettingsManagement = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* General Information */}
-                <GeneralBrandingSection
-                    settings={settings}
-                    handleInputChange={handleInputChange}
-                    newCategoryInput={newCategoryInput}
-                    setNewCategoryInput={setNewCategoryInput}
-                    addAgeCategory={addAgeCategory}
-                    removeAgeCategory={removeAgeCategory}
-                    newTerrain={newTerrain}
-                    setNewTerrain={setNewTerrain}
-                    TERRAIN_SIZES={TERRAIN_SIZES}
-                    addTerrain={addTerrain}
-                    removeTerrain={removeTerrain}
-                    newTournamentInput={newTournamentInput}
-                    setNewTournamentInput={setNewTournamentInput}
-                    DEFAULT_TOURNAMENTS={DEFAULT_TOURNAMENTS}
-                    addTournament={addTournament}
-                    addTournamentPreset={addTournamentPreset}
-                    removeTournament={removeTournament}
-                    primaryColor={primaryColor}
-                    setPrimaryColor={setPrimaryColor}
-                    secondaryColor={secondaryColor}
-                    setSecondaryColor={setSecondaryColor}
-                    uploadingLogo={uploadingLogo}
-                    handleLogoUpload={handleLogoUpload}
-                />
+                {/* Left Column: General Branding & WhatsApp Settings */}
+                <div className="lg:col-span-2 space-y-8">
+                    <GeneralBrandingSection
+                        settings={settings}
+                        handleInputChange={handleInputChange}
+                        newCategoryInput={newCategoryInput}
+                        setNewCategoryInput={setNewCategoryInput}
+                        addAgeCategory={addAgeCategory}
+                        removeAgeCategory={removeAgeCategory}
+                        newTerrain={newTerrain}
+                        setNewTerrain={setNewTerrain}
+                        TERRAIN_SIZES={TERRAIN_SIZES}
+                        addTerrain={addTerrain}
+                        removeTerrain={removeTerrain}
+                        newTournamentInput={newTournamentInput}
+                        setNewTournamentInput={setNewTournamentInput}
+                        DEFAULT_TOURNAMENTS={DEFAULT_TOURNAMENTS}
+                        addTournament={addTournament}
+                        addTournamentPreset={addTournamentPreset}
+                        removeTournament={removeTournament}
+                        primaryColor={primaryColor}
+                        setPrimaryColor={setPrimaryColor}
+                        secondaryColor={secondaryColor}
+                        setSecondaryColor={setSecondaryColor}
+                        uploadingLogo={uploadingLogo}
+                        handleLogoUpload={handleLogoUpload}
+                    />
+
+                    <WhatsAppNotificationsSection
+                        settings={settings}
+                        handleInputChange={handleInputChange}
+                    />
+                </div>
 
                 {/* Right Column: Pricing, Landing Page Editor, Save */}
                 <div className="space-y-8">
