@@ -107,9 +107,31 @@ LEMON_SQUEEZY_VARIANTS = {
     }
 }
 
+async def get_ls_credentials() -> tuple[str | None, str | None]:
+    """
+    Get Lemon Squeezy API Key and Signing Secret.
+    Priority: saas_settings DB row → .env variables
+    """
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
+            res = await client.get(
+                f"{supabase.url}/rest/v1/saas_settings?select=lemon_squeezy_api_key,lemon_squeezy_signing_secret&limit=1",
+                headers=supabase.admin_headers
+            )
+            if res.status_code == 200 and res.json():
+                row = res.json()[0]
+                db_api_key = row.get("lemon_squeezy_api_key") or ""
+                db_signing = row.get("lemon_squeezy_signing_secret") or ""
+                if db_api_key.strip():
+                    return db_api_key.strip(), (db_signing.strip() or settings.LEMON_SQUEEZY_SIGNING_SECRET)
+    except Exception as e:
+        logger.debug(f"Could not fetch LS credentials from DB: {e}")
+    return settings.LEMON_SQUEEZY_API_KEY, settings.LEMON_SQUEEZY_SIGNING_SECRET
+
+
 async def get_lemonsqueezy_store_id() -> str:
     """Retrieve the Lemon Squeezy store ID dynamically, falling back to 397704."""
-    api_key = settings.LEMON_SQUEEZY_API_KEY
+    api_key, _ = await get_ls_credentials()
     if not api_key:
         return "397704"
     try:
@@ -150,9 +172,10 @@ async def create_paypal_order(req: CreateOrderRequest):
     effective_academy_id = req.academy_id or f"temp_{uuid.uuid4().hex[:12]}"
 
     # ══ GATE: Is this a SaaS subscription purchase? ══
+    _ls_api_key_check, _ = await get_ls_credentials()
     is_saas_purchase = (
         req.source in _SAAS_SOURCES
-        and bool(settings.LEMON_SQUEEZY_API_KEY)
+        and bool(_ls_api_key_check)
     )
 
     # ── PayPal Path — Academy internal payments (parents / players) ──
@@ -248,7 +271,7 @@ async def create_paypal_order(req: CreateOrderRequest):
 
     # ── Lemon Squeezy Path — SaaS subscriptions ONLY (academy owners paying US) ──
     else:
-        api_key = settings.LEMON_SQUEEZY_API_KEY
+        api_key, _ = await get_ls_credentials()
         if not api_key:
             raise HTTPException(
                 status_code=500,
@@ -396,7 +419,7 @@ async def capture_paypal_order(req: CaptureOrderRequest):
             is_lemonsqueezy = True
             
     if is_lemonsqueezy:
-        api_key = settings.LEMON_SQUEEZY_API_KEY
+        api_key, _ = await get_ls_credentials()
         async with httpx.AsyncClient(trust_env=False, timeout=20.0) as ls_client:
             res = await ls_client.get(
                 f"https://api.lemonsqueezy.com/v1/checkouts/{req.order_id}",
@@ -865,7 +888,7 @@ async def paypal_webhook(request: Request):
 
 async def verify_lemonsqueezy_webhook_signature(request: Request, raw_body: bytes) -> bool:
     """Verify Lemon Squeezy webhook signature using HMAC-SHA256."""
-    signing_secret = settings.LEMON_SQUEEZY_SIGNING_SECRET
+    _, signing_secret = await get_ls_credentials()
     if not signing_secret:
         logger.warning("LEMON_SQUEEZY_SIGNING_SECRET not set — skipping signature verification (set it in .env for production)")
         return True
@@ -879,7 +902,7 @@ async def verify_lemonsqueezy_webhook_signature(request: Request, raw_body: byte
         import hmac
         import hashlib
         digest = hmac.new(
-            signing_secret.encode(),
+            signing_secret.encode("utf-8"),
             msg=raw_body,
             digestmod=hashlib.sha256
         ).hexdigest()
@@ -1018,6 +1041,203 @@ def payment_status():
         "mode": "sandbox" if settings.PAYPAL_SANDBOX else "live",
         "frontend_url": settings.FRONTEND_URL
     }
+
+
+@router.get("/lemonsqueezy/config", dependencies=[])
+async def get_lemonsqueezy_config():
+    """Get current Lemon Squeezy configuration (keys masked for security)."""
+    api_key, signing_secret = await get_ls_credentials()
+    
+    # Check if values come from DB
+    db_values = {}
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=5.0) as client:
+            res = await client.get(
+                f"{supabase.url}/rest/v1/saas_settings?select=lemon_squeezy_api_key,lemon_squeezy_signing_secret&limit=1",
+                headers=supabase.admin_headers
+            )
+            if res.status_code == 200 and res.json():
+                row = res.json()[0]
+                db_values = {
+                    "api_key_in_db": bool(row.get("lemon_squeezy_api_key", "")),
+                    "signing_in_db": bool(row.get("lemon_squeezy_signing_secret", "")),
+                }
+    except Exception:
+        pass
+    
+    def mask(val: str | None) -> str:
+        if not val:
+            return ""
+        return val[:8] + "..." + val[-4:] if len(val) > 12 else "***"
+    
+    return {
+        "api_key_masked": mask(api_key),
+        "signing_secret_masked": mask(signing_secret),
+        "api_key_configured": bool(api_key),
+        "signing_secret_configured": bool(signing_secret),
+        "source": "database" if db_values.get("api_key_in_db") else "environment",
+        **db_values,
+    }
+
+
+class LemonSqueezyConfigUpdate(BaseModel):
+    lemon_squeezy_api_key: str | None = None
+    lemon_squeezy_signing_secret: str | None = None
+
+
+@router.put("/lemonsqueezy/config")
+async def update_lemonsqueezy_config(data: LemonSqueezyConfigUpdate):
+    """Save Lemon Squeezy API Key and Signing Secret to saas_settings DB.
+    This overrides the .env values without redeploying the backend.
+    Requires super_admin auth (handled by SaaS admin dashboard)."""
+    patch = {}
+    if data.lemon_squeezy_api_key is not None:
+        patch["lemon_squeezy_api_key"] = data.lemon_squeezy_api_key.strip()
+    if data.lemon_squeezy_signing_secret is not None:
+        patch["lemon_squeezy_signing_secret"] = data.lemon_squeezy_signing_secret.strip()
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update.")
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
+            check = await client.get(
+                f"{supabase.url}/rest/v1/saas_settings?select=id&limit=1",
+                headers=supabase.admin_headers
+            )
+            existing = check.json() if check.status_code == 200 else []
+            if existing:
+                res = await client.patch(
+                    f"{supabase.url}/rest/v1/saas_settings?id=eq.{existing[0]['id']}",
+                    json=patch,
+                    headers=supabase.admin_headers
+                )
+            else:
+                res = await client.post(
+                    f"{supabase.url}/rest/v1/saas_settings",
+                    json=patch,
+                    headers=supabase.admin_headers
+                )
+            if res.status_code >= 400:
+                error_body = res.text
+                # Columns may not exist yet — we'll return a helpful error
+                if "column" in error_body.lower() or "does not exist" in error_body.lower():
+                    raise HTTPException(
+                        status_code=422,
+                        detail="DB columns lemon_squeezy_api_key / lemon_squeezy_signing_secret do not exist yet. Run the migration SQL first."
+                    )
+                raise HTTPException(status_code=500, detail=f"DB error: {error_body[:200]}")
+        return {"success": True, "message": "Lemon Squeezy credentials saved to database."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to save LS config: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/lemonsqueezy/status", dependencies=[])
+async def lemonsqueezy_status():
+    """Verify Lemon Squeezy integration status, fetches stores and products dynamically."""
+    api_key, signing_secret = await get_ls_credentials()
+    
+    if not api_key:
+        return {
+            "configured": False,
+            "message": "Lemon Squeezy API Key is not set in backend environment variables.",
+            "mode": "test"
+        }
+        
+    headers = {
+        "Accept": "application/vnd.api+json",
+        "Content-Type": "application/vnd.api+json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+            # Fetch stores
+            res = await client.get("https://api.lemonsqueezy.com/v1/stores", headers=headers)
+            if res.status_code != 200:
+                return {
+                    "configured": False,
+                    "message": f"Failed to authenticate with Lemon Squeezy: Status {res.status_code}",
+                    "mode": "test"
+                }
+            
+            stores_data = res.json().get("data", [])
+            if not stores_data:
+                return {
+                    "configured": False,
+                    "message": "Authenticated successfully, but no stores found on this account.",
+                    "mode": "test"
+                }
+                
+            first_store = stores_data[0]
+            store_id = str(first_store["id"])
+            store_name = first_store["attributes"]["name"]
+            
+            # Try to fetch products and variants
+            products_res = await client.get("https://api.lemonsqueezy.com/v1/products", headers=headers)
+            variants_list = []
+            if products_res.status_code == 200:
+                products_data = products_res.json().get("data", [])
+                for p in products_data:
+                    p_id = p["id"]
+                    p_name = p["attributes"]["name"]
+                    
+                    # Fetch variants for this product
+                    v_res = await client.get(f"https://api.lemonsqueezy.com/v1/variants?filter[product_id]={p_id}", headers=headers)
+                    if v_res.status_code == 200:
+                        v_data = v_res.json().get("data", [])
+                        for v in v_data:
+                            v_id = v["id"]
+                            v_name = v["attributes"]["name"]
+                            v_status = v["attributes"]["status"]
+                            v_price = float(v["attributes"].get("price", 0)) / 100.0
+                            variants_list.append({
+                                "product_name": p_name,
+                                "variant_name": v_name,
+                                "variant_id": v_id,
+                                "status": v_status,
+                                "price": v_price
+                            })
+            
+            # Fetch configured webhooks (handle gracefully if token scope is restricted)
+            webhooks_res = await client.get("https://api.lemonsqueezy.com/v1/webhooks", headers=headers)
+            webhooks_configured = []
+            webhooks_scope_error = False
+            if webhooks_res.status_code == 200:
+                webhooks_data = webhooks_res.json().get("data", [])
+                for w in webhooks_data:
+                    url = w["attributes"]["url"]
+                    status = w["attributes"]["status"]
+                    events = w["attributes"]["events"]
+                    webhooks_configured.append({
+                        "id": w["id"],
+                        "url": url,
+                        "status": status,
+                        "events": events
+                    })
+            else:
+                webhooks_scope_error = True
+                
+            return {
+                "configured": True,
+                "store_name": store_name,
+                "store_id": store_id,
+                "mode": "sandbox" if (len(api_key) > 400 or "test" in api_key.lower()) else "live",
+                "signing_secret_configured": bool(signing_secret),
+                "variants": variants_list,
+                "webhooks": webhooks_configured,
+                "webhooks_scope_error": webhooks_scope_error,
+                "webhook_target_url": "https://elghazali1987-academy-backend.hf.space/api/v1/payments/gateway/lemonsqueezy/webhook"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error checking Lemon Squeezy status: {e}")
+        return {
+            "configured": False,
+            "message": f"Connection error: {str(e)}",
+            "mode": "test"
+        }
 
 
 
