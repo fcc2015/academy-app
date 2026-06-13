@@ -187,13 +187,13 @@ async def get_coach_metrics(coach_id: str):
             # Players in coach's u_category (or all if no category)
             u_cat = coach.get("u_category")
             if u_cat:
-                players_url = f"{_s.SUPABASE_URL}/rest/v1/players?u_category=eq.{u_cat}&select=user_id,full_name,account_status"
+                players_url = f"{_s.SUPABASE_URL}/rest/v1/players?u_category=eq.{u_cat}&select=user_id,account_status,users!players_user_id_fkey(full_name)"
             else:
-                players_url = f"{_s.SUPABASE_URL}/rest/v1/players?select=user_id,full_name,account_status&limit=200"
+                players_url = f"{_s.SUPABASE_URL}/rest/v1/players?select=user_id,account_status,users!players_user_id_fkey(full_name)&limit=200"
             tasks.append(client.get(players_url, headers=supabase.admin_headers))
 
             # Evaluations — for players in squads
-            evals_url = f"{_s.SUPABASE_URL}/rest/v1/evaluations?select=player_id,overall_score,created_at,players(full_name)&order=created_at.desc&limit=200"
+            evals_url = f"{_s.SUPABASE_URL}/rest/v1/evaluations?select=player_id,technical_score,tactical_score,physical_score,mental_score,created_at,players(users!players_user_id_fkey(full_name))&order=created_at.desc&limit=200"
             tasks.append(client.get(evals_url, headers=supabase.admin_headers))
 
             responses = await asyncio.gather(*tasks, return_exceptions=True)
@@ -201,6 +201,17 @@ async def get_coach_metrics(coach_id: str):
         attendance = responses[0].json() if not isinstance(responses[0], Exception) and responses[0].status_code == 200 else []
         players    = responses[1].json() if not isinstance(responses[1], Exception) and responses[1].status_code == 200 else []
         all_evals  = responses[2].json() if not isinstance(responses[2], Exception) and responses[2].status_code == 200 else []
+
+        # Process all_evals to calculate overall_score on the fly if missing
+        for e in all_evals:
+            if "overall_score" not in e or e["overall_score"] is None:
+                scores = [
+                    e.get("technical_score", 0) or 0,
+                    e.get("tactical_score", 0) or 0,
+                    e.get("physical_score", 0) or 0,
+                    e.get("mental_score", 0) or 0
+                ]
+                e["overall_score"] = sum(scores) / len(scores) if scores else 0
 
         player_ids = {p["user_id"] for p in players}
 
@@ -247,7 +258,7 @@ async def get_coach_metrics(coach_id: str):
                 if (a.get("status") or "").lower() in ("present", "حاضر"):
                     player_present[pid] += 1
 
-        player_name_map = {p["user_id"]: p["full_name"] for p in players}
+        player_name_map = {p["user_id"]: (p.get("users") or {}).get("full_name", "—") for p in players}
         top_players = sorted(
             [
                 {
@@ -270,7 +281,9 @@ async def get_coach_metrics(coach_id: str):
         recent_evaluations = []
         for e in evals[:5]:
             player_info = e.get("players") or {}
-            name = player_info.get("full_name") if isinstance(player_info, dict) else player_name_map.get(e.get("player_id"), "—")
+            name = (player_info.get("users") or {}).get("full_name") if isinstance(player_info, dict) and "users" in player_info else player_info.get("full_name") if isinstance(player_info, dict) else None
+            if not name:
+                name = player_name_map.get(e.get("player_id"), "—")
             recent_evaluations.append({
                 "player_name": name or "—",
                 "score": e.get("overall_score"),
