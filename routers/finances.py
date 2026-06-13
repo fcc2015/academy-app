@@ -587,18 +587,32 @@ async def run_alert_check():
                             logger.warning(f"Email reminder failed for {parent_email}: {e}")
                     
                     # Automated WhatsApp Alert
+                    enable_wa_reminders = academy_settings.get("whatsapp_payment_reminder", True)
                     parent_phone = player_info.get("parent_whatsapp") or player_info.get("phone")
-                    if parent_phone and amount:
+                    if parent_phone and amount and enable_wa_reminders:
                         try:
                             from services.whatsapp_service import send_whatsapp_message
-                            wa_text = (
-                                f"⚽ *Rappel de paiement — Casablanca Football Academy*\n\n"
-                                f"Bonjour,\n"
-                                f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
-                                f"d'un montant de *{float(amount):.2f} MAD* est dû (Échéance: {next_due}).\n\n"
-                                f"Merci de régulariser la situation.\n"
-                                f"L'Administration"
-                            )
+                            academy_name = academy_settings.get("academy_name") or "Academy"
+                            wa_lang = academy_settings.get("whatsapp_language", "ar")
+
+                            if wa_lang == "ar":
+                                wa_text = (
+                                    f"⚽ *تذكير بالأداء — {academy_name}*\n\n"
+                                    f"السلام عليكم،\n"
+                                    f"نذكركم بأن أداء الاشتراك للاعب *{player_name}* بمبلغ *{float(amount):.2f} MAD* قد حل موعده (تاريخ الاستحقاق: {next_due}).\n\n"
+                                    f"يرجى تسوية الوضعية في أقرب وقت.\n\n"
+                                    f"مع تحياتنا،\n"
+                                    f"إدارة الأكاديمية"
+                                )
+                            else:
+                                wa_text = (
+                                    f"⚽ *Rappel de paiement — {academy_name}*\n\n"
+                                    f"Bonjour,\n"
+                                    f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
+                                    f"d'un montant de *{float(amount):.2f} MAD* est dû (Échéance: {next_due}).\n\n"
+                                    f"Merci de régulariser la situation.\n\n"
+                                    f"L'Administration"
+                                )
                             await send_whatsapp_message(parent_phone, wa_text)
                         except Exception as wa_err:
                             logger.warning(f"WhatsApp alert failed for {parent_phone}: {wa_err}")
@@ -786,15 +800,36 @@ async def trigger_whatsapp_payment_reminder(
             detail="Parent Whatsapp phone number not set for this player. | رقم واتساب الأب غير مسجل لهذا اللاعب."
         )
     
-    message_text = (
-        f"⚽ *Rappel de paiement — Casablanca Football Academy*\n\n"
-        f"Bonjour,\n"
-        f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
-        f"d'un montant de *{amount:.2f} MAD* est en attente (Échéance: {due_date}).\n\n"
-        f"Merci de régulariser la situation au plus vite.\n"
-        f"Sportivement,\n"
-        f"L'Administration"
-    )
+    # Get academy name + whatsapp settings if possible
+    ac_name = "Academy"
+    wa_lang = "ar"
+    try:
+        ac_sett = await supabase.get_academy_settings()
+        if ac_sett:
+            ac_name = ac_sett.get("academy_name") or ac_name
+            wa_lang = ac_sett.get("whatsapp_language", "ar") or wa_lang
+    except Exception:
+        pass
+
+    if wa_lang == "ar":
+        message_text = (
+            f"⚽ *تذكير بالأداء — {ac_name}*\n\n"
+            f"السلام عليكم،\n"
+            f"نذكركم بأن أداء الاشتراك للاعب *{player_name}* بمبلغ *{amount:.2f} MAD* قد حل موعده (تاريخ الاستحقاق: {due_date}).\n\n"
+            f"يرجى تسوية الوضعية في أقرب وقت.\n\n"
+            f"مع تحياتنا،\n"
+            f"إدارة الأكاديمية"
+        )
+    else:
+        message_text = (
+            f"⚽ *Rappel de paiement — {ac_name}*\n\n"
+            f"Bonjour,\n"
+            f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
+            f"d'un montant de *{amount:.2f} MAD* est en attente (Échéance: {due_date}).\n\n"
+            f"Merci de régulariser la situation au plus vite.\n\n"
+            f"Sportivement,\n"
+            f"L'Administration"
+        )
     
     # Generate direct link
     web_link = generate_whatsapp_link(parent_whatsapp, message_text)
