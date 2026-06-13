@@ -115,6 +115,10 @@ async def update_settings(settings_id: str, settings: AcademySettingsUpdate):
                     academy_update["logo_url"] = settings_dict["logo_url"]
                 if "academy_name" in settings_dict:
                     academy_update["name"] = settings_dict["academy_name"]
+                if "primary_color" in settings_dict:
+                    academy_update["primary_color"] = settings_dict["primary_color"]
+                if "secondary_color" in settings_dict:
+                    academy_update["secondary_color"] = settings_dict["secondary_color"]
                 
                 about_text = settings_dict.get("about_text")
                 if about_text and about_text.startswith("{"):
@@ -123,6 +127,8 @@ async def update_settings(settings_id: str, settings: AcademySettingsUpdate):
                         parsed = json.loads(about_text)
                         if "primary_color" in parsed:
                             academy_update["primary_color"] = parsed["primary_color"]
+                        if "secondary_color" in parsed:
+                            academy_update["secondary_color"] = parsed["secondary_color"]
                     except Exception:
                         pass
                 
