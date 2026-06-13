@@ -781,13 +781,18 @@ async def trigger_whatsapp_payment_reminder(
     
     # 1. Fetch payment details
     res = await supabase.client.get(
-        f"{settings.SUPABASE_URL}/rest/v1/payments?id=eq.{payment_id}&select=*,players(*)"
+        f"{settings.SUPABASE_URL}/rest/v1/payments?id=eq.{payment_id}&select=*,users(full_name,players!players_user_id_fkey(parent_name,parent_whatsapp))"
     )
     if res.status_code != 200 or not res.json():
         raise HTTPException(status_code=404, detail="Payment not found")
     
     payment = res.json()[0]
-    player = payment.get("players") or {}
+    user_info = payment.get("users") or {}
+    player_info = user_info.get("players") or {}
+    player = {
+        "full_name": user_info.get("full_name", "Player"),
+        "parent_whatsapp": player_info.get("parent_whatsapp")
+    }
     
     player_name = player.get("full_name", "Player")
     parent_whatsapp = player.get("parent_whatsapp")
