@@ -102,6 +102,11 @@ export default function SaasSettings() {
     const [paypalStatus, setPaypalStatus] = useState(null);
     const [lemonsqueezyStatus, setLemonsqueezyStatus] = useState(null);
     const [loadingLs, setLoadingLs] = useState(false);
+    const [lsConfig, setLsConfig] = useState({ api_key: '', signing_secret: '' });
+    const [lsConfigStatus, setLsConfigStatus] = useState(null); // masked current values
+    const [savingLsConfig, setSavingLsConfig] = useState(false);
+    const [savedLsConfig, setSavedLsConfig] = useState(false);
+    const [lsConfigError, setLsConfigError] = useState('');
 
     const [config, setConfig] = useState({
         platform_name: 'Academy SaaS Platform',
@@ -162,6 +167,7 @@ export default function SaasSettings() {
         fetchSettings();
         fetchPaypalStatus();
         fetchLemonsqueezyStatus();
+        fetchLsConfig();
         fetchLanding();
     }, []);
 
@@ -259,6 +265,50 @@ export default function SaasSettings() {
             setLoadingLs(false);
         }
     }
+
+    async function fetchLsConfig() {
+        try {
+            const res = await fetch(`${API_URL}/payments/gateway/lemonsqueezy/config`);
+            if (res.ok) {
+                const data = await res.json();
+                setLsConfigStatus(data);
+            }
+        } catch { /* ignore */ }
+    }
+
+    const saveLsConfig = async () => {
+        setSavingLsConfig(true);
+        setSavedLsConfig(false);
+        setLsConfigError('');
+        try {
+            const payload = {};
+            if (lsConfig.api_key.trim()) payload.lemon_squeezy_api_key = lsConfig.api_key.trim();
+            if (lsConfig.signing_secret.trim()) payload.lemon_squeezy_signing_secret = lsConfig.signing_secret.trim();
+            if (!Object.keys(payload).length) {
+                setLsConfigError('Please enter at least one value to update.');
+                return;
+            }
+            const res = await authFetch(`${API_URL}/payments/gateway/lemonsqueezy/config`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (res.ok) {
+                setSavedLsConfig(true);
+                setLsConfig({ api_key: '', signing_secret: '' });
+                await fetchLsConfig();
+                await fetchLemonsqueezyStatus();
+                setTimeout(() => setSavedLsConfig(false), 3000);
+            } else {
+                const d = await res.json().catch(() => ({}));
+                setLsConfigError(d.detail || 'Failed to save credentials.');
+            }
+        } catch (e) {
+            setLsConfigError('Network error: ' + (e.message || 'unknown'));
+        } finally {
+            setSavingLsConfig(false);
+        }
+    };
 
     const handleSave = async () => {
         setSaving(true);
@@ -909,7 +959,7 @@ export default function SaasSettings() {
                     {/* Products and Variants */}
                     <div className="premium-card p-6">
                         <h3 className="text-sm font-semibold text-surface-900 border-b border-surface-200 pb-4 mb-5 flex items-center gap-2">
-                            <Crown className="w-4 h-4 text-violet-500" /> Store Products & Variant Configuration
+                            <Crown className="w-4 h-4 text-violet-500" /> Store Products &amp; Variant Configuration
                         </h3>
 
                         {lemonsqueezyStatus ? (
@@ -965,8 +1015,124 @@ export default function SaasSettings() {
                             </div>
                         )}
                     </div>
+
+                    {/* ── Credentials Configuration ── */}
+                    <div className="premium-card p-6">
+                        <h3 className="text-sm font-semibold text-surface-900 border-b border-surface-200 pb-4 mb-5 flex items-center gap-2">
+                            <Key className="w-4 h-4 text-amber-500" /> API Credentials Configuration
+                        </h3>
+
+                        {/* Current status */}
+                        {lsConfigStatus && (
+                            <div className="mb-5 p-4 bg-surface-50 border border-surface-200 rounded-xl space-y-2">
+                                <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-3">Current Configuration</p>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-surface-600">API Key</span>
+                                    <span className="flex items-center gap-2">
+                                        {lsConfigStatus.api_key_configured ? (
+                                            <>
+                                                <code className="text-[11px] font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-slate-700">
+                                                    {lsConfigStatus.api_key_masked}
+                                                </code>
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                                    lsConfigStatus.source === 'database'
+                                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                }`}>
+                                                    {lsConfigStatus.source === 'database' ? '📦 DB' : '🔐 .env'}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span className="text-rose-600 font-semibold text-xs">❌ Not Configured</span>
+                                        )}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-surface-600">Signing Secret</span>
+                                    <span className="flex items-center gap-2">
+                                        {lsConfigStatus.signing_secret_configured ? (
+                                            <>
+                                                <code className="text-[11px] font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-slate-700">
+                                                    {lsConfigStatus.signing_secret_masked}
+                                                </code>
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                                    lsConfigStatus.signing_in_db
+                                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                }`}>
+                                                    {lsConfigStatus.signing_in_db ? '📦 DB' : '🔐 .env'}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span className="text-rose-600 font-semibold text-xs">❌ Not Configured</span>
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl mb-5 flex items-start gap-2.5">
+                            <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                            <div>
+                                <p className="text-xs font-bold text-blue-800">Update credentials without redeploying</p>
+                                <p className="text-[11px] text-blue-700 mt-1 leading-relaxed">
+                                    Values saved here are stored in the database and override your server environment variables.
+                                    Leave a field empty to keep the current value.
+                                </p>
+                            </div>
+                        </div>
+
+                        {lsConfigError && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4 shrink-0" />{lsConfigError}
+                            </div>
+                        )}
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2">New API Key</label>
+                                <input
+                                    type="password"
+                                    value={lsConfig.api_key}
+                                    onChange={e => setLsConfig(prev => ({ ...prev, api_key: e.target.value }))}
+                                    placeholder="eyJ0eXAiOiJKV1QiLCJhbGci..."
+                                    className="input font-mono text-xs"
+                                    dir="ltr"
+                                    autoComplete="off"
+                                />
+                                <p className="text-[10px] text-surface-400 mt-1">Get it from Lemon Squeezy → Settings → API Keys</p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-surface-500 uppercase tracking-wider mb-2">New Signing Secret</label>
+                                <input
+                                    type="password"
+                                    value={lsConfig.signing_secret}
+                                    onChange={e => setLsConfig(prev => ({ ...prev, signing_secret: e.target.value }))}
+                                    placeholder="YourWebhookSigningSecret"
+                                    className="input font-mono text-xs"
+                                    dir="ltr"
+                                    autoComplete="off"
+                                />
+                                <p className="text-[10px] text-surface-400 mt-1">Get it from Lemon Squeezy → Settings → Webhooks → Signing Secret</p>
+                            </div>
+
+                            <button
+                                onClick={saveLsConfig}
+                                disabled={savingLsConfig || (!lsConfig.api_key.trim() && !lsConfig.signing_secret.trim())}
+                                className="btn btn-brand w-full justify-center"
+                            >
+                                {savingLsConfig ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                                 savedLsConfig ? <CheckCircle2 className="w-4 h-4" /> :
+                                 <Save className="w-4 h-4" />}
+                                {savingLsConfig ? 'Saving to Database...' :
+                                 savedLsConfig ? 'Saved Successfully!' :
+                                 'Save Credentials to Database'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
+
 
             {/* ── TAB: Automations ── */}
             {activeTab === 'automations' && (
