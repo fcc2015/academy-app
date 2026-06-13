@@ -1020,6 +1020,114 @@ def payment_status():
     }
 
 
+@router.get("/lemonsqueezy/status", dependencies=[])
+async def lemonsqueezy_status():
+    """Verify Lemon Squeezy integration status, fetches stores and products dynamically."""
+    api_key = settings.LEMON_SQUEEZY_API_KEY
+    signing_secret = settings.LEMON_SQUEEZY_SIGNING_SECRET
+    
+    if not api_key:
+        return {
+            "configured": False,
+            "message": "Lemon Squeezy API Key is not set in backend environment variables.",
+            "mode": "test"
+        }
+        
+    headers = {
+        "Accept": "application/vnd.api+json",
+        "Content-Type": "application/vnd.api+json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+            # Fetch stores
+            res = await client.get("https://api.lemonsqueezy.com/v1/stores", headers=headers)
+            if res.status_code != 200:
+                return {
+                    "configured": False,
+                    "message": f"Failed to authenticate with Lemon Squeezy: Status {res.status_code}",
+                    "mode": "test"
+                }
+            
+            stores_data = res.json().get("data", [])
+            if not stores_data:
+                return {
+                    "configured": False,
+                    "message": "Authenticated successfully, but no stores found on this account.",
+                    "mode": "test"
+                }
+                
+            first_store = stores_data[0]
+            store_id = str(first_store["id"])
+            store_name = first_store["attributes"]["name"]
+            
+            # Try to fetch products and variants
+            products_res = await client.get("https://api.lemonsqueezy.com/v1/products", headers=headers)
+            variants_list = []
+            if products_res.status_code == 200:
+                products_data = products_res.json().get("data", [])
+                for p in products_data:
+                    p_id = p["id"]
+                    p_name = p["attributes"]["name"]
+                    
+                    # Fetch variants for this product
+                    v_res = await client.get(f"https://api.lemonsqueezy.com/v1/variants?filter[product_id]={p_id}", headers=headers)
+                    if v_res.status_code == 200:
+                        v_data = v_res.json().get("data", [])
+                        for v in v_data:
+                            v_id = v["id"]
+                            v_name = v["attributes"]["name"]
+                            v_status = v["attributes"]["status"]
+                            v_price = float(v["attributes"].get("price", 0)) / 100.0
+                            variants_list.append({
+                                "product_name": p_name,
+                                "variant_name": v_name,
+                                "variant_id": v_id,
+                                "status": v_status,
+                                "price": v_price
+                            })
+            
+            # Fetch configured webhooks (handle gracefully if token scope is restricted)
+            webhooks_res = await client.get("https://api.lemonsqueezy.com/v1/webhooks", headers=headers)
+            webhooks_configured = []
+            webhooks_scope_error = False
+            if webhooks_res.status_code == 200:
+                webhooks_data = webhooks_res.json().get("data", [])
+                for w in webhooks_data:
+                    url = w["attributes"]["url"]
+                    status = w["attributes"]["status"]
+                    events = w["attributes"]["events"]
+                    webhooks_configured.append({
+                        "id": w["id"],
+                        "url": url,
+                        "status": status,
+                        "events": events
+                    })
+            else:
+                webhooks_scope_error = True
+                
+            return {
+                "configured": True,
+                "store_name": store_name,
+                "store_id": store_id,
+                "mode": "sandbox" if (len(api_key) > 400 or "test" in api_key.lower()) else "live",
+                "signing_secret_configured": bool(signing_secret),
+                "variants": variants_list,
+                "webhooks": webhooks_configured,
+                "webhooks_scope_error": webhooks_scope_error,
+                "webhook_target_url": "https://elghazali1987-academy-backend.hf.space/api/v1/payments/gateway/lemonsqueezy/webhook"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error checking Lemon Squeezy status: {e}")
+        return {
+            "configured": False,
+            "message": f"Connection error: {str(e)}",
+            "mode": "test"
+        }
+
+
 
 
 

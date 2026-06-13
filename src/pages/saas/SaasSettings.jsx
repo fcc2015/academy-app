@@ -100,6 +100,8 @@ export default function SaasSettings() {
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState('general');
     const [paypalStatus, setPaypalStatus] = useState(null);
+    const [lemonsqueezyStatus, setLemonsqueezyStatus] = useState(null);
+    const [loadingLs, setLoadingLs] = useState(false);
 
     const [config, setConfig] = useState({
         platform_name: 'Academy SaaS Platform',
@@ -159,6 +161,7 @@ export default function SaasSettings() {
     useEffect(() => {
         fetchSettings();
         fetchPaypalStatus();
+        fetchLemonsqueezyStatus();
         fetchLanding();
     }, []);
 
@@ -242,6 +245,21 @@ export default function SaasSettings() {
         }
     }
 
+    async function fetchLemonsqueezyStatus() {
+        setLoadingLs(true);
+        try {
+            const res = await fetch(`${API_URL}/payments/gateway/lemonsqueezy/status`);
+            if (res.ok) {
+                const data = await res.json();
+                setLemonsqueezyStatus(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch Lemon Squeezy status:", err);
+        } finally {
+            setLoadingLs(false);
+        }
+    }
+
     const handleSave = async () => {
         setSaving(true);
         setError('');
@@ -275,6 +293,7 @@ export default function SaasSettings() {
         { id: 'landing', label: 'Landing Page', icon: Layout },
         { id: 'plans', label: 'Plans & Limits', icon: Crown },
         { id: 'paypal', label: 'PayPal', icon: CreditCard },
+        { id: 'lemonsqueezy', label: 'Lemon Squeezy', icon: Star },
         { id: 'automations', label: 'Automations', icon: RefreshCw },
     ];
 
@@ -758,6 +777,191 @@ export default function SaasSettings() {
                             <div className="py-8 text-center text-surface-400">
                                 <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                                 <p className="text-xs">Loading PayPal status...</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── TAB: Lemon Squeezy ── */}
+            {activeTab === 'lemonsqueezy' && (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="premium-card p-6">
+                            <h3 className="text-sm font-semibold text-surface-900 border-b border-surface-200 pb-4 mb-5 flex items-center gap-2">
+                                <Star className="w-4 h-4 text-amber-500 animate-pulse" /> Lemon Squeezy Integration
+                            </h3>
+
+                            {lemonsqueezyStatus ? (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl text-center">
+                                            <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-2">Connection Status</p>
+                                            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${lemonsqueezyStatus.configured ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-600 border border-rose-200'}`}>
+                                                <div className={`w-2.5 h-2.5 rounded-full ${lemonsqueezyStatus.configured ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                                                {lemonsqueezyStatus.configured ? 'Connected' : 'Disconnected'}
+                                            </div>
+                                        </div>
+                                        <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl text-center">
+                                            <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-2">Active Mode</p>
+                                            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${lemonsqueezyStatus.mode === 'sandbox' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                                                {lemonsqueezyStatus.mode === 'sandbox' ? '🧪 Sandbox / Test' : '🔴 Live / Production'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {lemonsqueezyStatus.configured && (
+                                        <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl space-y-3">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-surface-500 font-medium">Store Name:</span>
+                                                <span className="text-surface-900 font-bold">{lemonsqueezyStatus.store_name}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-surface-500 font-medium">Store ID:</span>
+                                                <span className="text-surface-900 font-mono font-bold">{lemonsqueezyStatus.store_id}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-surface-500 font-medium">Signing Secret:</span>
+                                                <span className={`font-semibold ${lemonsqueezyStatus.signing_secret_configured ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    {lemonsqueezyStatus.signing_secret_configured ? '✅ Configured' : '❌ Not Configured'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="p-4 bg-surface-50 border border-surface-200 rounded-xl">
+                                        <p className="text-xs text-surface-600 leading-relaxed">
+                                            <strong className="text-surface-800">💡 Security Notice:</strong> Lemon Squeezy API keys and webhook secret signing keys are loaded securely from environment variables (Secrets) to protect your financial credentials.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="py-8 text-center text-surface-400">
+                                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                                    <p className="text-xs">Checking Lemon Squeezy status...</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Webhook Info */}
+                        <div className="premium-card p-6">
+                            <h3 className="text-sm font-semibold text-surface-900 border-b border-surface-200 pb-4 mb-5 flex items-center gap-2">
+                                <Shield className="w-4 h-4 text-emerald-500" /> Webhook Integration
+                            </h3>
+
+                            {lemonsqueezyStatus ? (
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                                        <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wide mb-1">Target Webhook URL</h4>
+                                        <p className="text-xs text-indigo-700 leading-relaxed mb-3">
+                                            Configure this webhook URL inside your Lemon Squeezy dashboard to sync active subscription states automatically.
+                                        </p>
+                                        <code className="block w-full p-2.5 bg-slate-900 text-slate-100 rounded text-[11px] font-mono select-all overflow-x-auto border border-slate-800">
+                                            {lemonsqueezyStatus.webhook_target_url}
+                                        </code>
+                                    </div>
+
+                                    {lemonsqueezyStatus.webhooks && lemonsqueezyStatus.webhooks.length > 0 ? (
+                                        <div className="space-y-2">
+                                            <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Active Webhooks on Store</p>
+                                            {lemonsqueezyStatus.webhooks.map((wh, idx) => (
+                                                <div key={idx} className="p-3 bg-surface-50 border border-surface-200 rounded-xl flex flex-col gap-1.5">
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="font-mono font-semibold text-surface-900 overflow-hidden text-ellipsis whitespace-nowrap max-w-[70%]">{wh.url}</span>
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${wh.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'} border`}>
+                                                            {wh.status}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[9px] text-surface-500 font-medium">Events: {wh.events.join(', ')}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-amber-800">
+                                            <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                                            <div>
+                                                <p className="text-xs font-bold">No Active Webhook Found</p>
+                                                <p className="text-[11px] text-amber-700 mt-1 leading-relaxed">
+                                                    Please configure the webhook target URL in your Lemon Squeezy dashboard settings to ensure subscriptions renew correctly.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    <button
+                                        onClick={fetchLemonsqueezyStatus}
+                                        className="btn btn-secondary w-full justify-center"
+                                        disabled={loadingLs}
+                                    >
+                                        {loadingLs ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                        Refresh Webhooks Status
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="py-8 text-center text-surface-400">
+                                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                                    <p className="text-xs">Checking webhooks...</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Products and Variants */}
+                    <div className="premium-card p-6">
+                        <h3 className="text-sm font-semibold text-surface-900 border-b border-surface-200 pb-4 mb-5 flex items-center gap-2">
+                            <Crown className="w-4 h-4 text-violet-500" /> Store Products & Variant Configuration
+                        </h3>
+
+                        {lemonsqueezyStatus ? (
+                            lemonsqueezyStatus.variants && lemonsqueezyStatus.variants.length > 0 ? (
+                                <div className="overflow-x-auto">
+                                    <table className="table-premium w-full text-left">
+                                        <thead>
+                                            <tr>
+                                                <th>Product Name</th>
+                                                <th>Variant Name</th>
+                                                <th className="text-center">Variant ID</th>
+                                                <th className="text-center">Price</th>
+                                                <th className="text-center">SaaS Config Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {lemonsqueezyStatus.variants.map((v, idx) => {
+                                                const SYSTEM_IDS = ["1748453", "1748330", "1748483", "1748646", "1748545"];
+                                                const matchesSystem = SYSTEM_IDS.includes(String(v.variant_id));
+                                                return (
+                                                    <tr key={idx}>
+                                                        <td className="font-semibold text-surface-800">{v.product_name}</td>
+                                                        <td className="text-surface-600">{v.variant_name}</td>
+                                                        <td className="text-center font-mono font-medium">{v.variant_id}</td>
+                                                        <td className="text-center font-bold text-surface-700">${v.price.toFixed(2)}</td>
+                                                        <td className="text-center">
+                                                            {matchesSystem ? (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Matches SaaS
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-surface-100 text-surface-500 border border-surface-200">
+                                                                    Custom Variant
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="p-6 text-center text-surface-400">
+                                    <Zap className="w-8 h-8 text-surface-300 mx-auto mb-2" />
+                                    <p className="text-sm font-medium">No products or variants found in this store.</p>
+                                </div>
+                            )
+                        ) : (
+                            <div className="py-8 text-center text-surface-400">
+                                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                                <p className="text-xs">Checking variants...</p>
                             </div>
                         )}
                     </div>
