@@ -46,6 +46,7 @@ import PlayerMatchesModal from './components/PlayerMatchesModal';
 import PlayerModal from './components/PlayerModal';
 import PendingRequestsTable from './components/PendingRequestsTable';
 import PlayersTable from './components/PlayersTable';
+import WhatsAppBlastModal from './components/WhatsAppBlastModal';
 
 const PlayersManagement = () => {
     const { t, isRTL, dir } = useLanguage();
@@ -76,6 +77,7 @@ const PlayersManagement = () => {
     const [resolvingRequestId, setResolvingRequestId] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null, type: '' });
+    const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
     const toast = useToast();
 
     useEffect(() => {
@@ -679,6 +681,12 @@ const PlayersManagement = () => {
                             {isRTL ? 'تجميد' : 'Suspend'}
                         </button>
                         <button
+                            onClick={() => setIsWhatsAppModalOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                        >
+                            WhatsApp
+                        </button>
+                        <button
                             onClick={handleBulkDelete}
                             disabled={isSubmitting}
                             className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
@@ -733,6 +741,16 @@ const PlayersManagement = () => {
                 isRTL={isRTL}
                 title={isRTL ? 'حذف الطلب' : 'Delete Request'}
                 message={isRTL ? 'هل أنت متأكد من حذف هذا الطلب نهائياً؟' : 'Are you sure you want to permanently delete this request?'}
+            />
+
+            <WhatsAppBlastModal
+                isOpen={isWhatsAppModalOpen}
+                onClose={() => setIsWhatsAppModalOpen(false)}
+                selectedPlayerIds={selectedPlayerIds}
+                players={players}
+                t={t}
+                isRTL={isRTL}
+                dir={dir}
             />
         </div>
     );

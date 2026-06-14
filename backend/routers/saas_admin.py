@@ -1105,8 +1105,9 @@ async def get_saas_analytics():
                 f"{supabase.url}/rest/v1/academies?select=id,created_at,plan_id,city,status",
                 headers=supabase.admin_headers
             ),
+            # Filter out cash payments for SaaS revenue calculation
             client.get(
-                f"{supabase.url}/rest/v1/payments_gateway?select=amount,created_at,status",
+                f"{supabase.url}/rest/v1/payments?select=amount,created_at,status&payment_method=neq.Cash",
                 headers=supabase.admin_headers
             ),
             return_exceptions=True
@@ -1123,7 +1124,7 @@ async def get_saas_analytics():
         else []
     )
 
-    PLAN_PRICES = {"free": 0, "pro": 499, "enterprise": 999}
+    PLAN_PRICES = {"free": 0, "basic": 199, "pro": 499, "enterprise": 999}
 
     # Monthly academy growth
     monthly_academies: dict[str, int] = defaultdict(int)
@@ -1137,7 +1138,7 @@ async def get_saas_analytics():
     # Monthly revenue from completed payments
     monthly_revenue: dict[str, float] = defaultdict(float)
     for p in payments:
-        if p.get("status") == "completed":
+        if p.get("status") in ("completed", "Completed"):
             try:
                 dt = datetime.fromisoformat(p["created_at"].replace("Z", "+00:00"))
                 monthly_revenue[dt.strftime("%Y-%m")] += float(p.get("amount", 0))

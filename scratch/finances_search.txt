@@ -1,0 +1,733 @@
+--- MATCH AT LINE 13 ---
+3: from core.auth_middleware import verify_token, assert_parent_owns_player
+4: from typing import List
+5: 
+6: logger = logging.getLogger("finances")
+7: from datetime import date, timedelta
+8: from schemas.finances import PaymentCreate, PaymentResponse, SubscriptionCreate, SubscriptionResponse
+9: from services.supabase_client import supabase
+10: from services.billing_engine import (
+11: calculate_prorata,
+12: get_next_due_date,
+13: get_alert_status,
+14: get_alert_notification,
+15: generate_invoice_number
+16: )
+17: from services.email_service import send_payment_reminder
+18: from core.auth_middleware import verify_token, require_role
+19: from core.context import user_id_ctx, role_ctx
+20: 
+21: router = APIRouter(prefix="/finances", tags=["Finances"], dependencies=[Depends(verify_token)])
+22: 
+23: 
+24: # =========================================================
+25: # PAYMENTS (Legacy + Enhanced)
+26: # =========================================================
+27: 
+28: @router.get("/payments")
+29: async def get_all_payments(user: dict = Depends(require_role("admin", "coach", "super_admin"))):
+30: """كل الدفعات — فقط الأدمين والمدرب يقدر يشوفها"""
+31: try:
+32: return await supabase.get_payments()
+33: except Exception as e:
+34: logger.error("خطأ في جلب الدفعات: %s", e, exc_info=True)
+35: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+36: 
+37: 
+--- MATCH AT LINE 17 ---
+7: from datetime import date, timedelta
+8: from schemas.finances import PaymentCreate, PaymentResponse, SubscriptionCreate, SubscriptionResponse
+9: from services.supabase_client import supabase
+10: from services.billing_engine import (
+11: calculate_prorata,
+12: get_next_due_date,
+13: get_alert_status,
+14: get_alert_notification,
+15: generate_invoice_number
+16: )
+17: from services.email_service import send_payment_reminder
+18: from core.auth_middleware import verify_token, require_role
+19: from core.context import user_id_ctx, role_ctx
+20: 
+21: router = APIRouter(prefix="/finances", tags=["Finances"], dependencies=[Depends(verify_token)])
+22: 
+23: 
+24: # =========================================================
+25: # PAYMENTS (Legacy + Enhanced)
+26: # =========================================================
+27: 
+28: @router.get("/payments")
+29: async def get_all_payments(user: dict = Depends(require_role("admin", "coach", "super_admin"))):
+30: """كل الدفعات — فقط الأدمين والمدرب يقدر يشوفها"""
+31: try:
+32: return await supabase.get_payments()
+33: except Exception as e:
+34: logger.error("خطأ في جلب الدفعات: %s", e, exc_info=True)
+35: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+36: 
+37: 
+38: @router.get("/payments/player/{player_id}")
+39: async def get_payments_by_player(player_id: str):
+40: current_role = role_ctx.get()
+41: current_user = user_id_ctx.get()
+--- MATCH AT LINE 297 ---
+287: 
+288: @router.get("/subscriptions")
+289: async def get_all_subscriptions(user: dict = Depends(require_role("admin", "coach", "super_admin"))):
+290: try:
+291: subs = await supabase.get_subscriptions()
+292: academy_settings = await supabase.get_academy_settings() or {}
+293: season_end_str = academy_settings.get("season_end")
+294: season_end = date.fromisoformat(season_end_str) if season_end_str else None
+295: 
+296: today = date.today()
+297: # Compute alert_status dynamically for display
+298: for s in subs:
+299: if s.get("next_due_date"):
+300: nd = date.fromisoformat(s["next_due_date"])
+301: s["days_until_due"] = (nd - today).days
+302: s["alert_status_realtime"] = get_alert_status(nd, season_end)
+303: return subs
+304: except Exception as e:
+305: logger.error("Error fetching subscriptions: %s", e, exc_info=True)
+306: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+307: 
+308: 
+309: @router.get("/subscriptions/player/{player_id}")
+310: async def get_subscription_by_player(player_id: str):
+311: current_role = role_ctx.get()
+312: current_user = user_id_ctx.get()
+313: if current_role == "parent":
+314: await assert_parent_owns_player(current_user, player_id)
+315: try:
+316: sub = await supabase.get_subscription_by_player(player_id)
+317: if sub and sub.get("next_due_date"):
+318: nd = date.fromisoformat(sub["next_due_date"])
+319: sub["days_until_due"] = (nd - date.today()).days
+320: return sub or {}
+321: except Exception as e:
+--- MATCH AT LINE 302 ---
+292: academy_settings = await supabase.get_academy_settings() or {}
+293: season_end_str = academy_settings.get("season_end")
+294: season_end = date.fromisoformat(season_end_str) if season_end_str else None
+295: 
+296: today = date.today()
+297: # Compute alert_status dynamically for display
+298: for s in subs:
+299: if s.get("next_due_date"):
+300: nd = date.fromisoformat(s["next_due_date"])
+301: s["days_until_due"] = (nd - today).days
+302: s["alert_status_realtime"] = get_alert_status(nd, season_end)
+303: return subs
+304: except Exception as e:
+305: logger.error("Error fetching subscriptions: %s", e, exc_info=True)
+306: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+307: 
+308: 
+309: @router.get("/subscriptions/player/{player_id}")
+310: async def get_subscription_by_player(player_id: str):
+311: current_role = role_ctx.get()
+312: current_user = user_id_ctx.get()
+313: if current_role == "parent":
+314: await assert_parent_owns_player(current_user, player_id)
+315: try:
+316: sub = await supabase.get_subscription_by_player(player_id)
+317: if sub and sub.get("next_due_date"):
+318: nd = date.fromisoformat(sub["next_due_date"])
+319: sub["days_until_due"] = (nd - date.today()).days
+320: return sub or {}
+321: except Exception as e:
+322: logger.error("Error: %s", e, exc_info=True)
+323: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+324: 
+325: 
+326: @router.post("/subscriptions")
+--- MATCH AT LINE 381 ---
+371: "player_id": sub.player_id,
+372: "user_id": sub.user_id,
+373: "billing_type": sub.billing_type,
+374: "start_date": start.isoformat(),
+375: "next_due_date": next_due.isoformat(),
+376: "monthly_amount": monthly_amount,
+377: "annual_amount": annual_amount,
+378: "prorata_days": prorata_days,
+379: "prorata_amount": prorata_amount,
+380: "status": "active",
+381: "alert_status": "none",
+382: "notes": sub.notes
+383: }
+384: 
+385: result = await supabase.insert_subscription(sub_data)
+386: 
+387: # Auto-create a prorata payment invoice for the first month
+388: if prorata_days < 28:
+389: try:
+390: await supabase.insert_payment({
+391: "player_id": sub.player_id,
+392: "user_id": sub.user_id,
+393: "amount": prorata_amount,
+394: "amount_due": prorata_amount,
+395: "billing_type": "prorata",
+396: "status": "Pending",
+397: "payment_method": "Cash",
+398: "due_date": next_due.isoformat(),
+399: "period_start": start.isoformat(),
+400: "period_end": (next_due - timedelta(days=1)).isoformat(),
+401: "invoice_number": invoice_number,
+402: "notes": f"Prorata {prorata_days} jours"
+403: })
+404: except Exception as e:
+405: logger.warning(f"Prorata payment creation error: {e}")
+--- MATCH AT LINE 501 ---
+491: 
+492: # =========================================================
+493: # SMART ALERT CHECK — Run manually or via CRON
+494: # =========================================================
+495: 
+496: @router.post("/alert-check")
+497: async def run_alert_check():
+498: """
+499: PRO Alert Check — يعمل يومياً (يدوي أو تلقائي).
+500: المراحل:
+501: - reminder    → قبل يوم من الموعد
+502: - due_today   → في الموعد المحدد
+503: - late_2d     → بعد يومين
+504: - late_5d     → بعد 5 أيام
+505: - suspended   → بعد 10 أيام (تعليق + إزالة من المجموعة)
+506: - terminated  → بعد 30 يوم (إيقاف نهائي)
+507: """
+508: import httpx
+509: from core.config import settings
+510: 
+511: try:
+512: subs = await supabase.get_subscriptions()
+513: academy_settings = await supabase.get_academy_settings() or {}
+514: season_end_str = academy_settings.get("season_end")
+515: season_end = date.fromisoformat(season_end_str) if season_end_str else None
+516: 
+517: alerts_sent = []
+518: players_suspended = []
+519: players_reactivated = []
+520: 
+521: for sub in subs:
+522: if sub.get("status") not in ("active", "terminated"):
+523: continue
+524: 
+525: sub_id = sub["id"]
+--- MATCH AT LINE 531 ---
+521: for sub in subs:
+522: if sub.get("status") not in ("active", "terminated"):
+523: continue
+524: 
+525: sub_id = sub["id"]
+526: next_due_raw = sub.get("next_due_date")
+527: if not next_due_raw:
+528: continue
+529: 
+530: next_due = date.fromisoformat(next_due_raw)
+531: alert = get_alert_status(next_due, season_end)
+532: prev_alert = sub.get("alert_status", "none")
+533: 
+534: # Only send if alert level changed (avoid spam)
+535: if alert == prev_alert:
+536: continue
+537: 
+538: # If alert went back to "none" (paid), reactivate player
+539: if alert == "none" and prev_alert in ("suspended", "terminated"):
+540: player_id = sub.get("player_id")
+541: if player_id:
+542: try:
+543: await _update_player_account_status(player_id, "Active", settings)
+544: players_reactivated.append(player_id)
+545: if sub.get("status") == "terminated":
+546: await supabase.update_subscription(sub_id, {"status": "active", "alert_status": "none"})
+547: else:
+548: await supabase.update_subscription_alert_status(sub_id, "none")
+549: except Exception as e:
+550: logger.warning(f"Reactivation error for player {player_id}: {e}")
+551: continue
+552: 
+553: if alert == "none":
+554: continue
+555: 
+--- MATCH AT LINE 532 ---
+522: if sub.get("status") not in ("active", "terminated"):
+523: continue
+524: 
+525: sub_id = sub["id"]
+526: next_due_raw = sub.get("next_due_date")
+527: if not next_due_raw:
+528: continue
+529: 
+530: next_due = date.fromisoformat(next_due_raw)
+531: alert = get_alert_status(next_due, season_end)
+532: prev_alert = sub.get("alert_status", "none")
+533: 
+534: # Only send if alert level changed (avoid spam)
+535: if alert == prev_alert:
+536: continue
+537: 
+538: # If alert went back to "none" (paid), reactivate player
+539: if alert == "none" and prev_alert in ("suspended", "terminated"):
+540: player_id = sub.get("player_id")
+541: if player_id:
+542: try:
+543: await _update_player_account_status(player_id, "Active", settings)
+544: players_reactivated.append(player_id)
+545: if sub.get("status") == "terminated":
+546: await supabase.update_subscription(sub_id, {"status": "active", "alert_status": "none"})
+547: else:
+548: await supabase.update_subscription_alert_status(sub_id, "none")
+549: except Exception as e:
+550: logger.warning(f"Reactivation error for player {player_id}: {e}")
+551: continue
+552: 
+553: if alert == "none":
+554: continue
+555: 
+556: # Get player name + billing context
+--- MATCH AT LINE 546 ---
+536: continue
+537: 
+538: # If alert went back to "none" (paid), reactivate player
+539: if alert == "none" and prev_alert in ("suspended", "terminated"):
+540: player_id = sub.get("player_id")
+541: if player_id:
+542: try:
+543: await _update_player_account_status(player_id, "Active", settings)
+544: players_reactivated.append(player_id)
+545: if sub.get("status") == "terminated":
+546: await supabase.update_subscription(sub_id, {"status": "active", "alert_status": "none"})
+547: else:
+548: await supabase.update_subscription_alert_status(sub_id, "none")
+549: except Exception as e:
+550: logger.warning(f"Reactivation error for player {player_id}: {e}")
+551: continue
+552: 
+553: if alert == "none":
+554: continue
+555: 
+556: # Get player name + billing context
+557: player_info = sub.get("players") or {}
+558: player_name = player_info.get("full_name", "لاعب")
+559: player_id = sub.get("player_id")
+560: billing_type = sub.get("billing_type") or sub.get("subscription_type") or "monthly"
+561: amount = sub.get("amount") or sub.get("monthly_amount")
+562: 
+563: # ── Send notification ──
+564: notif = get_alert_notification(alert, player_name, billing_type=billing_type, amount=amount)
+565: if notif:
+566: try:
+567: await supabase.insert_notification({**notif, "target_role": "Admin"})
+568: if sub.get("user_id"):
+569: await supabase.insert_notification({**notif, "user_id": sub["user_id"]})
+570: except Exception as e:
+--- MATCH AT LINE 548 ---
+538: # If alert went back to "none" (paid), reactivate player
+539: if alert == "none" and prev_alert in ("suspended", "terminated"):
+540: player_id = sub.get("player_id")
+541: if player_id:
+542: try:
+543: await _update_player_account_status(player_id, "Active", settings)
+544: players_reactivated.append(player_id)
+545: if sub.get("status") == "terminated":
+546: await supabase.update_subscription(sub_id, {"status": "active", "alert_status": "none"})
+547: else:
+548: await supabase.update_subscription_alert_status(sub_id, "none")
+549: except Exception as e:
+550: logger.warning(f"Reactivation error for player {player_id}: {e}")
+551: continue
+552: 
+553: if alert == "none":
+554: continue
+555: 
+556: # Get player name + billing context
+557: player_info = sub.get("players") or {}
+558: player_name = player_info.get("full_name", "لاعب")
+559: player_id = sub.get("player_id")
+560: billing_type = sub.get("billing_type") or sub.get("subscription_type") or "monthly"
+561: amount = sub.get("amount") or sub.get("monthly_amount")
+562: 
+563: # ── Send notification ──
+564: notif = get_alert_notification(alert, player_name, billing_type=billing_type, amount=amount)
+565: if notif:
+566: try:
+567: await supabase.insert_notification({**notif, "target_role": "Admin"})
+568: if sub.get("user_id"):
+569: await supabase.insert_notification({**notif, "user_id": sub["user_id"]})
+570: except Exception as e:
+571: logger.warning(f"Notification error for sub {sub_id}: {e}")
+572: 
+--- MATCH AT LINE 573 ---
+563: # ── Send notification ──
+564: notif = get_alert_notification(alert, player_name, billing_type=billing_type, amount=amount)
+565: if notif:
+566: try:
+567: await supabase.insert_notification({**notif, "target_role": "Admin"})
+568: if sub.get("user_id"):
+569: await supabase.insert_notification({**notif, "user_id": sub["user_id"]})
+570: except Exception as e:
+571: logger.warning(f"Notification error for sub {sub_id}: {e}")
+572: 
+573: # Email reminder for early stages
+574: if alert in ("reminder", "due_today", "late_2d", "late_5d"):
+575: parent_email = (player_info.get("parent_email")
+576: or sub.get("parent_email")
+577: or sub.get("contact_email"))
+578: if parent_email and amount:
+579: try:
+580: send_payment_reminder(
+581: to=parent_email,
+582: player_name=player_name,
+583: amount=float(amount),
+584: due_date=str(next_due),
+585: )
+586: except Exception as e:
+587: logger.warning(f"Email reminder failed for {parent_email}: {e}")
+588: 
+589: # Automated WhatsApp Alert
+590: parent_phone = player_info.get("parent_whatsapp") or player_info.get("phone")
+591: if parent_phone and amount:
+592: try:
+593: from services.whatsapp_service import send_whatsapp_message
+594: wa_text = (
+595: f"⚽ *Rappel de paiement — Casablanca Football Academy*\n\n"
+596: f"Bonjour,\n"
+597: f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
+--- MATCH AT LINE 574 ---
+564: notif = get_alert_notification(alert, player_name, billing_type=billing_type, amount=amount)
+565: if notif:
+566: try:
+567: await supabase.insert_notification({**notif, "target_role": "Admin"})
+568: if sub.get("user_id"):
+569: await supabase.insert_notification({**notif, "user_id": sub["user_id"]})
+570: except Exception as e:
+571: logger.warning(f"Notification error for sub {sub_id}: {e}")
+572: 
+573: # Email reminder for early stages
+574: if alert in ("reminder", "due_today", "late_2d", "late_5d"):
+575: parent_email = (player_info.get("parent_email")
+576: or sub.get("parent_email")
+577: or sub.get("contact_email"))
+578: if parent_email and amount:
+579: try:
+580: send_payment_reminder(
+581: to=parent_email,
+582: player_name=player_name,
+583: amount=float(amount),
+584: due_date=str(next_due),
+585: )
+586: except Exception as e:
+587: logger.warning(f"Email reminder failed for {parent_email}: {e}")
+588: 
+589: # Automated WhatsApp Alert
+590: parent_phone = player_info.get("parent_whatsapp") or player_info.get("phone")
+591: if parent_phone and amount:
+592: try:
+593: from services.whatsapp_service import send_whatsapp_message
+594: wa_text = (
+595: f"⚽ *Rappel de paiement — Casablanca Football Academy*\n\n"
+596: f"Bonjour,\n"
+597: f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
+598: f"d'un montant de *{float(amount):.2f} MAD* est dû (Échéance: {next_due}).\n\n"
+--- MATCH AT LINE 580 ---
+570: except Exception as e:
+571: logger.warning(f"Notification error for sub {sub_id}: {e}")
+572: 
+573: # Email reminder for early stages
+574: if alert in ("reminder", "due_today", "late_2d", "late_5d"):
+575: parent_email = (player_info.get("parent_email")
+576: or sub.get("parent_email")
+577: or sub.get("contact_email"))
+578: if parent_email and amount:
+579: try:
+580: send_payment_reminder(
+581: to=parent_email,
+582: player_name=player_name,
+583: amount=float(amount),
+584: due_date=str(next_due),
+585: )
+586: except Exception as e:
+587: logger.warning(f"Email reminder failed for {parent_email}: {e}")
+588: 
+589: # Automated WhatsApp Alert
+590: parent_phone = player_info.get("parent_whatsapp") or player_info.get("phone")
+591: if parent_phone and amount:
+592: try:
+593: from services.whatsapp_service import send_whatsapp_message
+594: wa_text = (
+595: f"⚽ *Rappel de paiement — Casablanca Football Academy*\n\n"
+596: f"Bonjour,\n"
+597: f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
+598: f"d'un montant de *{float(amount):.2f} MAD* est dû (Échéance: {next_due}).\n\n"
+599: f"Merci de régulariser la situation.\n"
+600: f"L'Administration"
+601: )
+602: await send_whatsapp_message(parent_phone, wa_text)
+603: except Exception as wa_err:
+604: logger.warning(f"WhatsApp alert failed for {parent_phone}: {wa_err}")
+--- MATCH AT LINE 587 ---
+577: or sub.get("contact_email"))
+578: if parent_email and amount:
+579: try:
+580: send_payment_reminder(
+581: to=parent_email,
+582: player_name=player_name,
+583: amount=float(amount),
+584: due_date=str(next_due),
+585: )
+586: except Exception as e:
+587: logger.warning(f"Email reminder failed for {parent_email}: {e}")
+588: 
+589: # Automated WhatsApp Alert
+590: parent_phone = player_info.get("parent_whatsapp") or player_info.get("phone")
+591: if parent_phone and amount:
+592: try:
+593: from services.whatsapp_service import send_whatsapp_message
+594: wa_text = (
+595: f"⚽ *Rappel de paiement — Casablanca Football Academy*\n\n"
+596: f"Bonjour,\n"
+597: f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
+598: f"d'un montant de *{float(amount):.2f} MAD* est dû (Échéance: {next_due}).\n\n"
+599: f"Merci de régulariser la situation.\n"
+600: f"L'Administration"
+601: )
+602: await send_whatsapp_message(parent_phone, wa_text)
+603: except Exception as wa_err:
+604: logger.warning(f"WhatsApp alert failed for {parent_phone}: {wa_err}")
+605: 
+606: # ── Actions based on alert level ──
+607: if alert == "suspended" and player_id:
+608: # تعليق اللاعب: تغيير account_status + إزالة من مجموعات الشات
+609: try:
+610: await _update_player_account_status(player_id, "Suspended", settings)
+611: await _remove_player_from_chat_groups(player_id, settings)
+--- MATCH AT LINE 616 ---
+606: # ── Actions based on alert level ──
+607: if alert == "suspended" and player_id:
+608: # تعليق اللاعب: تغيير account_status + إزالة من مجموعات الشات
+609: try:
+610: await _update_player_account_status(player_id, "Suspended", settings)
+611: await _remove_player_from_chat_groups(player_id, settings)
+612: players_suspended.append(player_id)
+613: except Exception as e:
+614: logger.warning(f"Suspend actions error for {player_id}: {e}")
+615: try:
+616: await supabase.update_subscription_alert_status(sub_id, alert)
+617: except Exception as e:
+618: logger.warning(f"Alert status update error: {e}")
+619: 
+620: elif alert == "terminated":
+621: # إيقاف نهائي
+622: if player_id:
+623: try:
+624: await _update_player_account_status(player_id, "Suspended", settings)
+625: await _remove_player_from_chat_groups(player_id, settings)
+626: players_suspended.append(player_id)
+627: except Exception as e:
+628: logger.warning(f"Terminate actions error for {player_id}: {e}")
+629: try:
+630: await supabase.update_subscription(sub_id, {"status": "terminated", "alert_status": "terminated"})
+631: except Exception as e:
+632: logger.warning(f"Auto-terminate error: {e}")
+633: else:
+634: try:
+635: await supabase.update_subscription_alert_status(sub_id, alert)
+636: except Exception as e:
+637: logger.warning(f"Alert status update error: {e}")
+638: 
+639: alerts_sent.append({"sub_id": sub_id, "player": player_name, "new_alert": alert})
+640: 
+--- MATCH AT LINE 630 ---
+620: elif alert == "terminated":
+621: # إيقاف نهائي
+622: if player_id:
+623: try:
+624: await _update_player_account_status(player_id, "Suspended", settings)
+625: await _remove_player_from_chat_groups(player_id, settings)
+626: players_suspended.append(player_id)
+627: except Exception as e:
+628: logger.warning(f"Terminate actions error for {player_id}: {e}")
+629: try:
+630: await supabase.update_subscription(sub_id, {"status": "terminated", "alert_status": "terminated"})
+631: except Exception as e:
+632: logger.warning(f"Auto-terminate error: {e}")
+633: else:
+634: try:
+635: await supabase.update_subscription_alert_status(sub_id, alert)
+636: except Exception as e:
+637: logger.warning(f"Alert status update error: {e}")
+638: 
+639: alerts_sent.append({"sub_id": sub_id, "player": player_name, "new_alert": alert})
+640: 
+641: return {
+642: "success": True,
+643: "alerts_sent": len(alerts_sent),
+644: "players_suspended": len(players_suspended),
+645: "players_reactivated": len(players_reactivated),
+646: "details": alerts_sent
+647: }
+648: except Exception as e:
+649: logger.error("Alert check failed: %s", e, exc_info=True)
+650: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+651: 
+652: 
+653: async def _update_player_account_status(player_id: str, status: str, settings):
+654: """Update player account_status in the players table."""
+--- MATCH AT LINE 635 ---
+625: await _remove_player_from_chat_groups(player_id, settings)
+626: players_suspended.append(player_id)
+627: except Exception as e:
+628: logger.warning(f"Terminate actions error for {player_id}: {e}")
+629: try:
+630: await supabase.update_subscription(sub_id, {"status": "terminated", "alert_status": "terminated"})
+631: except Exception as e:
+632: logger.warning(f"Auto-terminate error: {e}")
+633: else:
+634: try:
+635: await supabase.update_subscription_alert_status(sub_id, alert)
+636: except Exception as e:
+637: logger.warning(f"Alert status update error: {e}")
+638: 
+639: alerts_sent.append({"sub_id": sub_id, "player": player_name, "new_alert": alert})
+640: 
+641: return {
+642: "success": True,
+643: "alerts_sent": len(alerts_sent),
+644: "players_suspended": len(players_suspended),
+645: "players_reactivated": len(players_reactivated),
+646: "details": alerts_sent
+647: }
+648: except Exception as e:
+649: logger.error("Alert check failed: %s", e, exc_info=True)
+650: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+651: 
+652: 
+653: async def _update_player_account_status(player_id: str, status: str, settings):
+654: """Update player account_status in the players table."""
+655: import httpx
+656: _key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
+657: headers = {
+658: "apikey": _key,
+659: "Authorization": f"Bearer {_key}",
+--- MATCH AT LINE 733 ---
+723: "status": "Pending",
+724: "payment_method": "Cash",
+725: "due_date": next_due.isoformat(),
+726: "period_start": next_due.isoformat(),
+727: "period_end": period_end.isoformat(),
+728: "invoice_number": invoice_number,
+729: })
+730: 
+731: # Advance the next_due_date in subscription
+732: new_next_due = get_next_due_date(sub["billing_type"], next_due)
+733: await supabase.update_subscription(sub_id, {"next_due_date": new_next_due.isoformat(), "alert_status": "none"})
+734: 
+735: return {"success": True, "invoice_number": invoice_number, "amount": amount, "due_date": next_due.isoformat()}
+736: except HTTPException:
+737: raise
+738: except Exception as e:
+739: logger.error("Error generating invoice: %s", e, exc_info=True)
+740: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+741: 
+742: 
+743: @router.post("/test-notification/{user_id}")
+744: async def send_test_notification(user_id: str):
+745: """Send a dummy notification for testing the alert system."""
+746: try:
+747: await supabase.insert_notification({
+748: "user_id": user_id,
+749: "title": "🔔 اختبار تنبيه الأداء",
+750: "message": "هذا مثال على تنبيه اقتراب موعد الأداء (تذكير). يرجى التحقق من وضعيتكم المالية.",
+751: "type": "alert"
+752: })
+753: return {"success": True}
+754: except Exception as e:
+755: logger.error("Error sending test notification: %s", e, exc_info=True)
+756: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+757: 
+--- MATCH AT LINE 759 ---
+749: "title": "🔔 اختبار تنبيه الأداء",
+750: "message": "هذا مثال على تنبيه اقتراب موعد الأداء (تذكير). يرجى التحقق من وضعيتكم المالية.",
+751: "type": "alert"
+752: })
+753: return {"success": True}
+754: except Exception as e:
+755: logger.error("Error sending test notification: %s", e, exc_info=True)
+756: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+757: 
+758: 
+759: @router.post("/payments/{payment_id}/whatsapp-reminder")
+760: async def trigger_whatsapp_payment_reminder(
+761: payment_id: str,
+762: user: dict = Depends(require_role("admin", "super_admin"))
+763: ):
+764: """Generate a WhatsApp click-to-chat web link and send an automated notification for a payment."""
+765: from services.whatsapp_service import generate_whatsapp_link, send_whatsapp_message
+766: from core.config import settings
+767: 
+768: # 1. Fetch payment details
+769: res = await supabase.client.get(
+770: f"{settings.SUPABASE_URL}/rest/v1/payments?id=eq.{payment_id}&select=*,players(*)"
+771: )
+772: if res.status_code != 200 or not res.json():
+773: raise HTTPException(status_code=404, detail="Payment not found")
+774: 
+775: payment = res.json()[0]
+776: player = payment.get("players") or {}
+777: 
+778: player_name = player.get("full_name", "Player")
+779: parent_whatsapp = player.get("parent_whatsapp")
+780: amount = payment.get("amount", 0.0)
+781: due_date = payment.get("due_date", "—")
+782: 
+783: if not parent_whatsapp:
+--- MATCH AT LINE 760 ---
+750: "message": "هذا مثال على تنبيه اقتراب موعد الأداء (تذكير). يرجى التحقق من وضعيتكم المالية.",
+751: "type": "alert"
+752: })
+753: return {"success": True}
+754: except Exception as e:
+755: logger.error("Error sending test notification: %s", e, exc_info=True)
+756: raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
+757: 
+758: 
+759: @router.post("/payments/{payment_id}/whatsapp-reminder")
+760: async def trigger_whatsapp_payment_reminder(
+761: payment_id: str,
+762: user: dict = Depends(require_role("admin", "super_admin"))
+763: ):
+764: """Generate a WhatsApp click-to-chat web link and send an automated notification for a payment."""
+765: from services.whatsapp_service import generate_whatsapp_link, send_whatsapp_message
+766: from core.config import settings
+767: 
+768: # 1. Fetch payment details
+769: res = await supabase.client.get(
+770: f"{settings.SUPABASE_URL}/rest/v1/payments?id=eq.{payment_id}&select=*,players(*)"
+771: )
+772: if res.status_code != 200 or not res.json():
+773: raise HTTPException(status_code=404, detail="Payment not found")
+774: 
+775: payment = res.json()[0]
+776: player = payment.get("players") or {}
+777: 
+778: player_name = player.get("full_name", "Player")
+779: parent_whatsapp = player.get("parent_whatsapp")
+780: amount = payment.get("amount", 0.0)
+781: due_date = payment.get("due_date", "—")
+782: 
+783: if not parent_whatsapp:
+784: raise HTTPException(
+--- MATCH AT LINE 809 ---
+799: # Generate direct link
+800: web_link = generate_whatsapp_link(parent_whatsapp, message_text)
+801: 
+802: # Try sending automated message
+803: automated_sent = await send_whatsapp_message(parent_whatsapp, message_text)
+804: 
+805: return {
+806: "success": True,
+807: "automated_sent": automated_sent,
+808: "whatsapp_web_link": web_link,
+809: "message": f"WhatsApp reminder generated for {player_name}"
+810: }

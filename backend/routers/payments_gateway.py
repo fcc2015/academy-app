@@ -854,7 +854,9 @@ async def paypal_webhook(request: Request):
     if event_type == "PAYMENT.CAPTURE.COMPLETED":
         resource = body.get("resource", {})
         custom_id = resource.get("custom_id", "")
+
         if custom_id.startswith("parent|"):
+            # ── Parent payment (academy player fee) ──
             user_id = custom_id.split("|")[1]
             try:
                 async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
@@ -863,23 +865,93 @@ async def paypal_webhook(request: Request):
                         json={"account_status": "Active"},
                         headers=supabase.admin_headers
                     )
+                logger.info(f"PayPal webhook: activated parent user {user_id}")
             except Exception as e:
-                logger.error(f"Parent Webhook handler error: {e}")
+                logger.error(f"PayPal webhook parent handler error: {e}")
+
         elif "|" in custom_id:
-            academy_id, plan_id = custom_id.split("|", 1)
-            try:
-                async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
-                    await client.patch(
-                        f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
-                        json={
-                            "subscription_status": "active",
-                            "plan_id": plan_id,
-                            "last_payment_at": datetime.now(timezone.utc).isoformat()
-                        },
-                        headers=supabase.admin_headers
-                    )
-            except Exception as e:
-                logger.error(f"Webhook handler error: {e}")
+            # ── SaaS / Academy subscription payment ──
+            # custom_id format: "saas|academy_id|plan_id|billing_cycle_type"
+            #                or: "academy|academy_id|plan_id|billing_cycle_type"
+            parts = custom_id.split("|")
+            academy_id       = parts[1] if len(parts) > 1 else parts[0]
+            plan_id          = parts[2] if len(parts) > 2 else "pro"
+            billing_cycle_type = parts[3] if len(parts) > 3 else "monthly"
+
+            if not academy_id or academy_id.startswith("temp_") or academy_id.startswith("pending_"):
+                logger.warning(f"PayPal webhook: skipping temp/pending academy_id={academy_id}")
+            else:
+                try:
+                    from datetime import timedelta
+                    now      = datetime.now(timezone.utc)
+                    now_iso  = now.isoformat()
+                    cycle_days = 365 if billing_cycle_type == "yearly" else 30
+                    end_dt   = now + timedelta(days=cycle_days)
+                    grace_dt = end_dt + timedelta(days=7)
+
+                    # Record the transaction if not already saved
+                    order_id = resource.get("supplementary_data", {}).get("related_ids", {}).get("order_id", "")
+                    capture_id = resource.get("id", "")
+                    amount_val = float((resource.get("amount") or {}).get("value") or 0)
+                    currency_val = (resource.get("amount") or {}).get("currency_code", "USD")
+
+                    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+                        # Upsert transaction record
+                        if order_id:
+                            tx_check = await client.get(
+                                f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{order_id}",
+                                headers=supabase.admin_headers
+                            )
+                            if tx_check.status_code == 200 and tx_check.json():
+                                await client.patch(
+                                    f"{supabase.url}/rest/v1/payment_transactions?paypal_order_id=eq.{order_id}",
+                                    json={
+                                        "status": "completed",
+                                        "completed_at": now_iso,
+                                        "paypal_capture_id": capture_id
+                                    },
+                                    headers=supabase.admin_headers
+                                )
+                            else:
+                                await client.post(
+                                    f"{supabase.url}/rest/v1/payment_transactions",
+                                    json={
+                                        "paypal_order_id": order_id,
+                                        "academy_id": academy_id,
+                                        "plan_id": plan_id if is_valid_uuid(plan_id) else None,
+                                        "amount": amount_val,
+                                        "currency": currency_val,
+                                        "status": "completed",
+                                        "created_at": now_iso,
+                                        "completed_at": now_iso,
+                                        "paypal_capture_id": capture_id,
+                                        "billing_cycle_type": billing_cycle_type
+                                    },
+                                    headers=supabase.admin_headers
+                                )
+
+                        # Fully activate the academy
+                        patch_res = await client.patch(
+                            f"{supabase.url}/rest/v1/academies?id=eq.{academy_id}",
+                            json={
+                                "subscription_status": "active",
+                                "status": "active",
+                                "plan_id": plan_id,
+                                "last_payment_at": now_iso,
+                                "billing_cycle_start": now_iso,
+                                "billing_cycle_end": end_dt.isoformat(),
+                                "billing_cycle_type": billing_cycle_type,
+                                "grace_period_end": grace_dt.isoformat()
+                            },
+                            headers=supabase.admin_headers
+                        )
+                        logger.info(
+                            f"PayPal webhook: academy {academy_id} activated "
+                            f"plan={plan_id} cycle={billing_cycle_type} "
+                            f"until={end_dt.date()} (HTTP {patch_res.status_code})"
+                        )
+                except Exception as e:
+                    logger.error(f"PayPal webhook SaaS handler error: {e}")
 
     return {"status": "ok"}
 
