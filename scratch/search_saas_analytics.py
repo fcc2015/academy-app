@@ -1,23 +1,21 @@
 import os
 
-def search_frontend(query):
+def search_files(directory, query):
     results = []
-    frontend_dir = "src"
-    for root, dirs, files in os.walk(frontend_dir):
+    for root, dirs, files in os.walk(directory):
         for file in files:
-            if file.endswith(('.js', '.jsx', '.ts', '.tsx', '.html', '.css')):
+            if file.endswith('.py'):
                 path = os.path.join(root, file)
                 try:
                     with open(path, 'r', encoding='utf-8') as f:
-                        if query.lower() in f.read().lower():
+                        if query in f.read():
                             results.append(path)
                 except Exception:
                     pass
     return results
 
 if __name__ == "__main__":
-    import sys
-    q = sys.argv[1] if len(sys.argv) > 1 else "Failed to load analytics"
-    res = search_frontend(q)
+    res = search_files("backend", "/analytics")
+    print("Files containing '/analytics':")
     for r in res:
         print(r)

@@ -230,12 +230,23 @@ def test_webhook_rejects_invalid_json(client, mocker):
 
 
 def test_webhook_processes_capture_completed(client, mocker, respx_mock):
-    """Valid signature + PAYMENT.CAPTURE.COMPLETED → updates academy subscription."""
+    """Valid signature + PAYMENT.CAPTURE.COMPLETED → updates academy subscription.
+
+    custom_id is now in 4-part format: source|academy_id|plan_id|billing_cycle
+    """
     mocker.patch(
         "routers.payments_gateway.verify_paypal_webhook_signature",
         return_value=True,
     )
-    # Mock the academy update
+    # Mock the transaction check (GET) — returns empty list so webhook creates new record
+    respx_mock.get(url__regex=r".*/rest/v1/payment_transactions.*").mock(
+        return_value=Response(200, json=[])
+    )
+    # Mock the transaction insert (POST)
+    respx_mock.post(url__regex=r".*/rest/v1/payment_transactions.*").mock(
+        return_value=Response(201, json={})
+    )
+    # Mock the academy subscription update (PATCH)
     update_route = respx_mock.patch(url__regex=r".*/rest/v1/academies\?id=eq\.academy-99.*").mock(
         return_value=Response(200, json=[{}])
     )
@@ -244,7 +255,8 @@ def test_webhook_processes_capture_completed(client, mocker, respx_mock):
         "/api/v1/payments/gateway/webhook",
         json={
             "event_type": "PAYMENT.CAPTURE.COMPLETED",
-            "resource": {"custom_id": "academy-99|premium"},
+            # New 4-part format: source|academy_id|plan_id|billing_cycle_type
+            "resource": {"custom_id": "academy|academy-99|premium|monthly"},
         },
     )
     assert res.status_code == 200
