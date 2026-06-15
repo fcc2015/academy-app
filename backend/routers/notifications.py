@@ -154,7 +154,7 @@ async def send_whatsapp_blast(req: WhatsAppBlastRequest, user: dict = Depends(ve
     if user.get("role") not in ["admin", "super_admin"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can send WhatsApp blasts")
 
-    from services.whatsapp_service import send_whatsapp_message
+    from services.queue_service import enqueue_task
     import httpx
     
     academy_id = user.get("academy_id")
@@ -182,22 +182,16 @@ async def send_whatsapp_blast(req: WhatsAppBlastRequest, user: dict = Depends(ve
                 phone_to_name[clean_phone] = p.get("full_name")
                 
     if not phone_to_name:
-        return {"success": True, "sent_count": 0, "message": "No valid parent phone numbers found."}
+        return {"success": True, "queued_count": 0, "message": "No valid parent phone numbers found."}
         
-    sent_count = 0
-    failed_count = 0
     for phone, name in phone_to_name.items():
         msg_text = req.message.replace("{player_name}", name)
-        success = await send_whatsapp_message(phone, msg_text)
-        if success:
-            sent_count += 1
-        else:
-            failed_count += 1
+        await enqueue_task("send_whatsapp_message", phone, msg_text)
             
     return {
         "success": True,
-        "sent_count": sent_count,
-        "failed_count": failed_count,
+        "queued": True,
         "total_targets": len(phone_to_name)
     }
+
 

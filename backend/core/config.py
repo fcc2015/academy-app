@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     LEMON_SQUEEZY_API_KEY: Optional[str] = None
     LEMON_SQUEEZY_SIGNING_SECRET: Optional[str] = None
 
+    # Redis Configuration
+    REDIS_URL: Optional[str] = None
+
     # DEV_MODE=true في .env يفعّل الـ bypass للتطوير المحلي فقط
     # في الإنتاج يجب أن يكون DEV_MODE=false أو غير موجود
     DEV_MODE: bool = False

@@ -112,6 +112,42 @@ CREATE TABLE IF NOT EXISTS public.parent_signup_requests (
 
 
 -- ════════════════════════════════════════════════════════════
+-- 5. TABLE: notification_preferences
+-- ════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.notification_preferences (
+    id                  uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id             uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    academy_id          uuid,
+    email_enabled       boolean DEFAULT true,
+    whatsapp_enabled    boolean DEFAULT true,
+    push_enabled        boolean DEFAULT true,
+    attendance_alerts   boolean DEFAULT true,
+    payment_reminders   boolean DEFAULT true,
+    evaluation_ready    boolean DEFAULT true,
+    new_event_alerts    boolean DEFAULT true,
+    created_at          timestamptz DEFAULT now(),
+    updated_at          timestamptz DEFAULT now(),
+    UNIQUE(user_id)
+);
+
+-- RLS للـ notification_preferences
+ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE tablename = 'notification_preferences'
+        AND policyname = 'Allow all for service role'
+    ) THEN
+        CREATE POLICY "Allow all for service role"
+        ON public.notification_preferences
+        FOR ALL USING (true) WITH CHECK (true);
+    END IF;
+END $$;
+
+
+-- ════════════════════════════════════════════════════════════
 -- ✅ تحقق — شوف الأعمدة ديال academies
 -- ════════════════════════════════════════════════════════════
 SELECT column_name, data_type, column_default
@@ -125,3 +161,4 @@ WHERE table_name = 'academies'
     'logo_url','primary_color','secondary_color'
   )
 ORDER BY column_name;
+
