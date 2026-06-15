@@ -291,7 +291,7 @@ class PlayerPatch(BaseModel):
     """Partial update schema — all fields optional, for inline editing."""
     full_name: Optional[str] = Field(None, max_length=100)
     parent_name: Optional[str] = Field(None, max_length=100)
-    parent_whatsapp: Optional[str] = Field(None, pattern=r"^\+?[0-9]{8,15}$")
+    parent_whatsapp: Optional[str] = Field(None)
     technical_level: Optional[Literal['A', 'B']] = None
     subscription_type: Optional[str] = Field(None, max_length=50)
     account_status: Optional[Literal['Pending', 'Active', 'Inactive', 'Suspended']] = None
