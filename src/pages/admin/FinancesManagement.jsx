@@ -6,7 +6,9 @@ import {
     PlusCircle,
     RefreshCw,
     FileText,
-    X
+    X,
+    DollarSign,
+    MinusCircle
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
