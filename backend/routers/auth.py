@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr
 from fastapi import APIRouter, HTTPException, status, Depends, Request, Response
 from schemas.auth import UserLogin, UserCreate, LoginResponse
 from services.supabase_client import supabase
-from services.email_service import send_otp_email, send_welcome_email
+from services.queue_service import enqueue_task
 from services.totp_service import generate_totp_secret, get_totp_uri, verify_totp_code, generate_qr_base64
 from core.auth_middleware import verify_token
 from core.config import settings
@@ -497,11 +497,11 @@ async def register(user: UserCreate):
             data={"role": user.role, "full_name": user.full_name}
         )
 
-        # Welcome email — non-blocking: registration must succeed even if SMTP fails
+        # Welcome email — queued in background
         try:
-            send_welcome_email(user.email, user.full_name or user.email.split("@")[0])
+            await enqueue_task("send_welcome_email", user.email, user.full_name or user.email.split("@")[0])
         except Exception as mail_err:
-            logger.warning(f"Welcome email failed for {user.email}: {mail_err}")
+            logger.warning(f"Welcome email queueing failed for {user.email}: {mail_err}")
 
         return {"message": "User created successfully. Please verify email.", "user_id": response["user"]["id"]}
     except Exception as e:
@@ -529,7 +529,7 @@ class PasswordReset(BaseModel):
 
 
 @router.post("/send-otp")
-def send_otp(req: OTPRequest):
+async def send_otp(req: OTPRequest):
     """Send a 6-digit OTP code to the given email."""
     email = req.email.strip().lower()
 
@@ -547,16 +547,14 @@ def send_otp(req: OTPRequest):
         "attempts": 0,
     }
 
-    sent = send_otp_email(email, code, purpose=req.purpose)
-    if not sent:
-        logger.warning(f"OTP email not sent to {email} (SMTP not configured)")
+    await enqueue_task("send_otp_email", email, code, req.purpose)
 
     # Always return success (don't reveal if email exists)
     return {"message": "If this email is registered, a verification code has been sent."}
 
 
 @router.post("/verify-otp")
-def verify_otp(req: OTPVerify):
+async def verify_otp(req: OTPVerify):
     """Verify a 6-digit OTP code."""
     email = req.email.strip().lower()
     entry = _otp_store.get(email)
@@ -791,9 +789,9 @@ async def parent_signup(req: ParentSignupRequest):
             "user_id": user_id,
         }
         try:
-            send_otp_email(req.email.strip().lower(), code, purpose="verify_email")
+            await enqueue_task("send_otp_email", req.email.strip().lower(), code, "verify_email")
         except Exception as email_err:
-            logger.warning(f"Failed to send verification email: {email_err}")
+            logger.warning(f"Failed to queue verification email: {email_err}")
 
         return {
             "message": "تم إنشاء حسابك بنجاح. يرجى التحقق من بريدك الإلكتروني.",

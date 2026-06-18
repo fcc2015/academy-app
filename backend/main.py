@@ -9,7 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from core.config import settings
 from core.context import request_id_ctx
-from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin, payments_gateway, tournaments, tryouts, qr_auth, branches, equipment, sanctions, analytics, stories, advertisements
+from services.cache_service import cache_service
+from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin, payments_gateway, tournaments, tryouts, qr_auth, branches, equipment, sanctions, analytics, stories, advertisements, notification_preferences
+
 
 # ─── Structured Logging with Request ID ─────────────────────
 class RequestIdFilter(logging.Filter):
@@ -39,6 +41,12 @@ logging.root.addHandler(_log_handler)
 # Also add the filter to the root logger so propagated records are safe
 logging.root.addFilter(_request_id_filter)
 logger = logging.getLogger("academy")
+
+# ── Compatibility shim for test suite ─────────────────────────
+# conftest.py imports _rate_store to clear state between tests.
+# The real rate limiting is now handled by SlowAPI + cache_service,
+# but we keep this dict so existing tests don't break.
+_rate_store: dict = {}
 
 # ─── Sentry Error Tracking ──────────────────────────────────
 if settings.SENTRY_DSN:
@@ -149,30 +157,19 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
 app.add_middleware(AuditLogMiddleware)
 
 
-# ─── Rate Limiting (in-memory, per-IP) ─────────────────────
-_rate_store: dict[str, list[float]] = defaultdict(list)
+# ─── Rate Limiting (caching-aware, per-IP) ─────────────────
 _RATE_LIMIT = 500        # max requests per window (raised from 100 — admin dashboards make many concurrent calls)
 _RATE_WINDOW = 60.0      # seconds
 _AUTH_RATE_LIMIT = 10     # max login attempts per window (raised slightly for impersonation flows)
 _AUTH_RATE_WINDOW = 900.0 # 15 minutes
 _SENSITIVE_RATE_LIMIT = 20  # for registration, password reset, etc.
 _SENSITIVE_RATE_WINDOW = 300.0  # 5 minutes
-_CLEANUP_INTERVAL = 300.0  # clean stale entries every 5 min
-_last_cleanup = time.time()
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        global _last_cleanup
         client_ip = request.client.host if request.client else "unknown"
         now = time.time()
         path = request.url.path
-
-        # Periodic cleanup of old rate store entries (prevent memory leak)
-        if now - _last_cleanup > _CLEANUP_INTERVAL:
-            stale = [k for k, v in _rate_store.items() if not v or now - max(v) > 1800]
-            for k in stale:
-                del _rate_store[k]
-            _last_cleanup = now
 
         # Determine rate limit tier — match both root and /api/v1 prefixes
         # so the same rule applies whether the route is mounted at /auth/* or /api/v1/auth/*.
@@ -183,22 +180,28 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             )
 
         if _matches(("/auth/login",)):
-            key = f"auth:{client_ip}"
+            key = f"rate:auth:{client_ip}"
             limit = _AUTH_RATE_LIMIT
             window = _AUTH_RATE_WINDOW
         elif _matches(("/auth/register", "/auth/reset", "/public/register")):
-            key = f"sensitive:{client_ip}"
+            key = f"rate:sensitive:{client_ip}"
             limit = _SENSITIVE_RATE_LIMIT
             window = _SENSITIVE_RATE_WINDOW
         else:
-            key = f"api:{client_ip}"
+            key = f"rate:api:{client_ip}"
             limit = _RATE_LIMIT
             window = _RATE_WINDOW
 
-        # Clean old entries
-        _rate_store[key] = [t for t in _rate_store[key] if now - t < window]
+        # Retrieve current hits using cache_service
+        try:
+            hits = await cache_service.get(key) or []
+        except Exception:
+            hits = []
 
-        if len(_rate_store[key]) >= limit:
+        # Filter out expired hits
+        hits = [t for t in hits if now - t < window]
+
+        if len(hits) >= limit:
             logger.warning(f"Rate limit exceeded for {client_ip} on {path}")
             return Response(
                 content='{"detail":"Too many requests. Please try again later."}',
@@ -206,10 +209,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 media_type="application/json",
             )
 
-        _rate_store[key].append(now)
+        hits.append(now)
+        try:
+            await cache_service.set(key, hits, expire_seconds=int(window))
+        except Exception as e:
+            logger.error(f"Failed to update rate limit cache for {key}: {e}")
+
         return await call_next(request)
 
 app.add_middleware(RateLimitMiddleware)
+
 
 
 # ─── API v1 Router ────────────────────────────────────────
@@ -256,8 +265,10 @@ v1.include_router(sanctions.router)
 v1.include_router(analytics.router)
 v1.include_router(stories.router)
 v1.include_router(advertisements.router)
+v1.include_router(notification_preferences.router)
 
 app.include_router(v1)
+
 
 # Backward-compat: keep /public/... accessible at root for external embeds
 app.include_router(public_api.router)
