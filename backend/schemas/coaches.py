@@ -10,6 +10,7 @@ class CoachBase(BaseModel):
     status: Literal['Active', 'Inactive', 'Suspended'] = "Active"
     branch_id: Optional[str] = None
     u_category: Optional[str] = Field(None, max_length=50, description="U category this coach is responsible for")
+    video_ai_allowed: bool = True
 
 class CoachCreate(CoachBase):
     pass

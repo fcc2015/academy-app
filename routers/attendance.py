@@ -102,29 +102,15 @@ async def bulk_upsert_attendance(payload: AttendanceBulkCreate):
                         enable_absence_alert = settings.get("whatsapp_absence_alert", True) if settings else True
                         if parent_whatsapp and enable_absence_alert:
                             try:
-                                from services.whatsapp_service import send_whatsapp_message
+                                from services.whatsapp_service import send_whatsapp_message, build_absence_alert_text
                                 academy_name = settings.get("academy_name") if settings else "Academy"
                                 wa_lang = settings.get("whatsapp_language", "ar") if settings else "ar"
-
-                                if wa_lang == "ar":
-                                    wa_text = (
-                                        f"⚽ *تنبيه غياب — {academy_name}*\n\n"
-                                        f"السلام عليكم،\n"
-                                        f"نود إخباركم بأنه تم تسجيل غياب اللاعب *{player_name}* في حصة التدريب بتاريخ *{date_str}*.\n\n"
-                                        f"إذا كان هذا الغياب مبرراً، يرجى إرسال التبرير للإدارة.\n\n"
-                                        f"مع تحياتنا،\n"
-                                        f"إدارة الأكاديمية"
-                                    )
-                                else:
-                                    wa_text = (
-                                        f"⚽ *Alerte Absence — {academy_name}*\n\n"
-                                        f"Bonjour,\n"
-                                        f"Nous vous informons que le joueur *{player_name}* a été enregistré *absent* "
-                                        f"à la séance d'entraînement du *{date_str}*.\n\n"
-                                        f"Si cette absence est justifiée, merci d'en informer l'administration.\n\n"
-                                        f"Sportivement,\n"
-                                        f"L'Administration"
-                                    )
+                                wa_text = build_absence_alert_text(
+                                    player_name=player_name,
+                                    date_str=date_str,
+                                    academy_name=academy_name or "Academy",
+                                    lang=wa_lang,
+                                )
                                 await send_whatsapp_message(parent_whatsapp, wa_text)
                             except Exception as wa_err:
                                 logger.warning(f"WhatsApp absence alert failed for {parent_whatsapp}: {wa_err}")

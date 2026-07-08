@@ -2,16 +2,16 @@ import React from 'react';
 import { Calendar, MapPin, Trophy, AlertTriangle } from 'lucide-react';
 
 export default function ParentMatchesSection({
-    child,
+    child = {},
     activeTab,
-    upcomingMatches,
-    pastMatches,
+    upcomingMatches = [],
+    pastMatches = [],
     isRTL,
     t
 }) {
     const today = new Date();
 
-    if (child.account_status === 'Suspended' && activeTab === 'upcoming') {
+    if (child?.account_status === 'Suspended' && activeTab === 'upcoming') {
         return (
             <div className="bg-red-50 border-2 border-red-200 rounded-[2.5rem] p-12 text-center animate-slide-up">
                 <AlertTriangle size={48} className="mx-auto text-red-400 mb-4" />

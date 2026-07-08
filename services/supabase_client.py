@@ -107,14 +107,31 @@ class InjectClient:
             return f"{self.base_url}{url_str}"
         return url_str
 
+    def _should_exclude(self, url_str):
+        exclusions = [
+            "/rpc/",
+            "/auth/v1/",
+            "/storage/v1/",
+            "/rest/v1/advertisements",
+            "/rest/v1/academies",
+            "/rest/v1/saas_landing_settings",
+            "/rest/v1/subscription_plans"
+        ]
+        return any(ex in url_str for ex in exclusions)
+
     def _inject(self, url):
         from core.context import academy_id_ctx
         academy_id = academy_id_ctx.get(None)
         url_str = self._resolve(url)
-        if not academy_id or "/rpc/" in url_str or "/auth/v1/" in url_str or "/storage/v1/" in url_str or "/rest/v1/advertisements" in url_str:
+        if not academy_id or self._should_exclude(url_str):
             return url_str
         separator = "&" if "?" in url_str else "?"
         return f"{url_str}{separator}academy_id=eq.{academy_id}"
+
+    def get(self, url, **kwargs):
+        # We need this to support both sync and async client calls if needed, 
+        # but the project seems to be async-only now. Let's make sure it's correct.
+        pass
 
     async def get(self, url, **kwargs):
         res = await self.client.get(self._inject(url), **kwargs)
@@ -133,7 +150,8 @@ class InjectClient:
         json_data = kwargs.get("json")
         from core.context import academy_id_ctx
         academy_id = academy_id_ctx.get(None)
-        if academy_id and json_data and isinstance(json_data, dict) and "academy_id" not in json_data:
+        url_str = self._resolve(url)
+        if academy_id and json_data and isinstance(json_data, dict) and "academy_id" not in json_data and not self._should_exclude(url_str):
             kwargs["json"] = copy.deepcopy(json_data)
             kwargs["json"]["academy_id"] = academy_id
             
@@ -153,7 +171,7 @@ class InjectClient:
         import copy
         academy_id = academy_id_ctx.get(None)
         url_str = self._resolve(url)
-        if academy_id and "/rpc/" not in url_str and "/auth/v1/" not in url_str and "/storage/v1/" not in url_str:
+        if academy_id and not self._should_exclude(url_str):
             data = kwargs.get("json")
             if isinstance(data, dict) and "academy_id" not in data:
                 kwargs["json"] = copy.deepcopy(data)

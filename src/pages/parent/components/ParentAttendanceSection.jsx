@@ -3,8 +3,8 @@ import { CalendarCheck, CheckCircle2, XCircle, Clock, AlertTriangle } from 'luci
 import AttendanceHeatmap from '../../../components/AttendanceHeatmap';
 
 export default function ParentAttendanceSection({
-    attendance,
-    attendPct,
+    attendance = [],
+    attendPct = 0,
     isRTL,
     t
 }) {

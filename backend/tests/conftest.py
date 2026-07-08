@@ -13,6 +13,7 @@ Strategy:
 import os
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 # ── 1. Make backend/ importable and inject test env BEFORE app import ──
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -45,12 +46,17 @@ from routers import auth as auth_router
 @pytest.fixture
 def reset_state():
     """Clear in-memory stores between tests so rate limits and OTPs don't leak."""
+    from services.cache_service import cache_service
     _rate_store.clear()
+    cache_service._local_cache.clear()
+    cache_service._local_expiry.clear()
     auth_router._otp_store.clear()
     auth_router._pending_2fa.clear()
     auth_router._pending_totp_setup.clear()
     yield
     _rate_store.clear()
+    cache_service._local_cache.clear()
+    cache_service._local_expiry.clear()
     auth_router._otp_store.clear()
     auth_router._pending_2fa.clear()
     auth_router._pending_totp_setup.clear()

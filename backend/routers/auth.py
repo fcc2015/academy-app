@@ -8,7 +8,7 @@ from schemas.auth import UserLogin, UserCreate, LoginResponse
 from services.supabase_client import supabase
 from services.queue_service import enqueue_task
 from services.totp_service import generate_totp_secret, get_totp_uri, verify_totp_code, generate_qr_base64
-from core.auth_middleware import verify_token
+from core.auth_middleware import verify_token, invalidate_token_cache
 from core.config import settings
 from core.csrf import generate_csrf_token, CSRF_COOKIE_NAME
 
@@ -196,8 +196,16 @@ async def login(credentials: UserLogin, request: Request, response: Response):
 
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
     """Clear the auth, refresh, and CSRF cookies to log out the user."""
+    # Invalidate token cache immediately so the token can't be reused
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header[7:] if auth_header.startswith("Bearer ") else None
+    if not token:
+        token = request.cookies.get("access_token")
+    if token:
+        invalidate_token_cache(token)
+
     is_dev = settings.DEV_MODE
     delete_kwargs = dict(
         path="/",

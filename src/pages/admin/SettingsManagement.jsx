@@ -41,6 +41,7 @@ import MembershipPlansSection from './components/MembershipPlansSection';
 import CouponsSection from './components/CouponsSection';
 import SecuritySection from './components/SecuritySection';
 import WhatsAppNotificationsSection from './components/WhatsAppNotificationsSection';
+import AiVideoAnalysisSection from './components/AiVideoAnalysisSection';
 
 const SettingsManagement = () => {
     const { refreshBranding } = useBranding();
@@ -579,6 +580,12 @@ const SettingsManagement = () => {
                     <WhatsAppNotificationsSection
                         settings={settings}
                         handleInputChange={handleInputChange}
+                    />
+
+                    <AiVideoAnalysisSection
+                        settings={settings}
+                        handleInputChange={handleInputChange}
+                        setSettings={setSettings}
                     />
                 </div>
 

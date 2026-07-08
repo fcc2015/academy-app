@@ -2,7 +2,7 @@ import React from 'react';
 import { Shirt, Shield, Star, CheckCircle2, Clock } from 'lucide-react';
 import UpgradeModal from '../../../components/UpgradeModal';
 
-const ParentEquipmentSection = ({ equipment, plans, child, isRTL, isUpgradeModalOpen, setIsUpgradeModalOpen }) => {
+const ParentEquipmentSection = ({ equipment, plans = [], child = {}, isRTL, isUpgradeModalOpen, setIsUpgradeModalOpen }) => {
     return (
         <div className="animate-slide-up">
             <div className={`bg-white rounded-[2.5rem] border border-slate-200 premium-shadow overflow-hidden ${isRTL ? 'text-right' : 'text-left'}`}>

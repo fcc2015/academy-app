@@ -67,7 +67,7 @@ async def get_payments_by_user(user_id: str):
         
         from core.config import settings
         res = await supabase.client.get(
-            f"{settings.SUPABASE_URL}/rest/v1/payments?user_id=eq.{user_id}&select=*&order=payment_date.desc"
+            f"{settings.SUPABASE_URL}/rest/v1/finances_payments?user_id=eq.{user_id}&select=*&order=payment_date.desc"
         )
         res.raise_for_status()
         return res.json()
@@ -87,7 +87,7 @@ async def get_payment_by_id(payment_id: str):
         
         from core.config import settings
         res = await supabase.client.get(
-            f"{settings.SUPABASE_URL}/rest/v1/payments?id=eq.{payment_id}&select=*"
+            f"{settings.SUPABASE_URL}/rest/v1/finances_payments?id=eq.{payment_id}&select=*"
         )
         if res.status_code != 200 or not res.json():
             raise HTTPException(status_code=404, detail="Payment not found")
@@ -781,7 +781,7 @@ async def trigger_whatsapp_payment_reminder(
     
     # 1. Fetch payment details
     res = await supabase.client.get(
-        f"{settings.SUPABASE_URL}/rest/v1/payments?id=eq.{payment_id}&select=*,users(full_name,players!players_user_id_fkey(parent_name,parent_whatsapp))"
+        f"{settings.SUPABASE_URL}/rest/v1/finances_payments?id=eq.{payment_id}&select=*,users(full_name,players!players_user_id_fkey(parent_name,parent_whatsapp))"
     )
     if res.status_code != 200 or not res.json():
         raise HTTPException(status_code=404, detail="Payment not found")

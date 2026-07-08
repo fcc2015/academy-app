@@ -40,6 +40,12 @@ class AcademySettingsBase(BaseModel):
     whatsapp_absence_alert: bool = True
     whatsapp_payment_reminder: bool = True
     whatsapp_language: str = "ar"
+    # AI Video Analysis Settings
+    video_ai_enabled: bool = True
+    video_ai_coach_max_tests: int = 1
+    video_ai_blocked_until: Optional[datetime] = None
+    video_ai_message_ok: Optional[str] = None
+    video_ai_message_blocked: Optional[str] = None
 
 class AcademySettingsUpdate(BaseModel):
     academy_name: Optional[str] = None
@@ -76,6 +82,12 @@ class AcademySettingsUpdate(BaseModel):
     whatsapp_absence_alert: Optional[bool] = None
     whatsapp_payment_reminder: Optional[bool] = None
     whatsapp_language: Optional[str] = None
+    # AI Video Analysis Settings
+    video_ai_enabled: Optional[bool] = None
+    video_ai_coach_max_tests: Optional[int] = None
+    video_ai_blocked_until: Optional[datetime] = None
+    video_ai_message_ok: Optional[str] = None
+    video_ai_message_blocked: Optional[str] = None
 
 class AcademySettingsResponse(AcademySettingsBase):
     id: str

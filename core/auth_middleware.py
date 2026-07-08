@@ -3,6 +3,7 @@ Auth middleware for FastAPI — verifies JWT tokens from Supabase.
 Use as a dependency on any protected route.
 """
 import logging
+import time
 import httpx
 from fastapi import Depends, HTTPException, status, Request
 from core.config import settings
@@ -11,6 +12,40 @@ from core.csrf import validate_csrf
 from services.supabase_client import supabase
 
 logger = logging.getLogger("auth")
+
+# ─── Token Cache (TTL = 5 minutes) ────────────────────────────────────────────
+# Avoids 4 Supabase HTTP calls on every request for the same token.
+# Key: Bearer token string
+# Value: {"result": dict, "expires_at": float}
+_TOKEN_CACHE: dict[str, dict] = {}
+_TOKEN_CACHE_TTL = 300  # 5 minutes
+_TOKEN_CACHE_MAX = 500  # max entries to prevent unbounded memory growth
+
+
+def _cache_get(token: str, impersonated_academy: str | None, impersonated_user: str | None) -> dict | None:
+    """Return cached auth result if still valid, else None."""
+    key = f"{token}:{impersonated_academy or ''}:{impersonated_user or ''}"
+    entry = _TOKEN_CACHE.get(key)
+    if entry and time.time() < entry["expires_at"]:
+        return entry["result"]
+    return None
+
+
+def _cache_set(token: str, impersonated_academy: str | None, impersonated_user: str | None, result: dict) -> None:
+    """Store auth result in cache with TTL."""
+    key = f"{token}:{impersonated_academy or ''}:{impersonated_user or ''}"
+    # Evict oldest entries if at capacity
+    if len(_TOKEN_CACHE) >= _TOKEN_CACHE_MAX:
+        oldest = min(_TOKEN_CACHE, key=lambda k: _TOKEN_CACHE[k]["expires_at"])
+        _TOKEN_CACHE.pop(oldest, None)
+    _TOKEN_CACHE[key] = {"result": result, "expires_at": time.time() + _TOKEN_CACHE_TTL}
+
+
+def invalidate_token_cache(token: str) -> None:
+    """Remove all cache entries starting with the token prefix (call on logout)."""
+    keys_to_remove = [k for k in _TOKEN_CACHE if k.startswith(f"{token}:")]
+    for k in keys_to_remove:
+        _TOKEN_CACHE.pop(k, None)
 
 async def verify_token(request: Request):
     """
@@ -39,6 +74,46 @@ async def verify_token(request: Request):
     # CSRF validation — only for cookie-based auth (Bearer tokens are inherently CSRF-safe)
     if using_cookie:
         validate_csrf(request)
+
+    # ─── Cache check — skip Supabase calls if token was recently verified ──────
+    # Note: impersonation headers bypass cache (they change the effective identity)
+    x_imp_acad = request.headers.get("X-Impersonate-Academy")
+    x_imp_user = request.headers.get("X-Impersonate-User")
+    has_impersonation = bool(x_imp_acad or x_imp_user)
+    
+    # Write debug log to scratch file to diagnose cache misses
+    try:
+        import os
+        os.makedirs("scratch", exist_ok=True)
+        with open("scratch/auth_debug.log", "a", encoding="utf-8") as f:
+            f.write(
+                f"[auth_debug] Time: {time.time()} | "
+                f"Token: {token[:15]}... | "
+                f"X-Impersonate-Academy: {x_imp_acad} | "
+                f"X-Impersonate-User: {x_imp_user} | "
+                f"Has Impersonation: {has_impersonation}\n"
+            )
+    except Exception as log_err:
+        pass
+
+    cached = _cache_get(token, x_imp_acad, x_imp_user)
+    if cached is not None:
+        try:
+            with open("scratch/auth_debug.log", "a", encoding="utf-8") as f:
+                f.write(f"[auth_debug] Cache HIT for token {token[:15]}...\n")
+        except Exception:
+            pass
+        # Re-inject context vars from cached result
+        academy_id_ctx.set(cached.get("academy_id"))
+        user_id_ctx.set(cached.get("user_id"))
+        role_ctx.set(cached.get("role"))
+        return cached
+    else:
+        try:
+            with open("scratch/auth_debug.log", "a", encoding="utf-8") as f:
+                f.write(f"[auth_debug] Cache MISS for token {token[:15]}...\n")
+        except Exception:
+            pass
 
     try:
         async with httpx.AsyncClient(timeout=20.0, trust_env=False) as client:
@@ -174,13 +249,18 @@ async def verify_token(request: Request):
                                 detail="Your academy subscription is suspended. Please renew your plan f-settings/plan to restore access."
                             )
 
-            return {
+            result = {
                 "user_id": user_id,
                 "email": user.get("email"),
                 "role": role,
                 "academy_id": academy_id,
                 "impersonating": impersonating,
             }
+
+            # Cache the result
+            _cache_set(token, x_imp_acad, x_imp_user, result)
+
+            return result
     except HTTPException:
         raise
     except httpx.RequestError as exc:

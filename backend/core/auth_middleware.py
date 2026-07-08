@@ -3,20 +3,57 @@ Auth middleware for FastAPI — verifies JWT tokens from Supabase.
 Use as a dependency on any protected route.
 """
 import logging
+import time
 import httpx
 from fastapi import Depends, HTTPException, status, Request
 from core.config import settings
 from core.context import academy_id_ctx, user_id_ctx, role_ctx
 from core.csrf import validate_csrf
 from services.supabase_client import supabase
+import contextlib
 
 logger = logging.getLogger("auth")
+
+# ─── Token Cache (TTL = 5 minutes) ────────────────────────────────────────────
+# Avoids 4 Supabase HTTP calls on every request for the same token.
+# Key: Bearer token string
+# Value: {"result": dict, "expires_at": float}
+_TOKEN_CACHE: dict[str, dict] = {}
+_TOKEN_CACHE_TTL = 300  # 5 minutes
+_TOKEN_CACHE_MAX = 500  # max entries to prevent unbounded memory growth
+
+
+def _cache_get(token: str) -> dict | None:
+    """Return cached auth result if still valid, else None."""
+    entry = _TOKEN_CACHE.get(token)
+    if entry and time.time() < entry["expires_at"]:
+        return entry["result"]
+    return None
+
+
+def _cache_set(token: str, result: dict) -> None:
+    """Store auth result in cache with TTL."""
+    # Evict oldest entries if at capacity
+    if len(_TOKEN_CACHE) >= _TOKEN_CACHE_MAX:
+        oldest = min(_TOKEN_CACHE, key=lambda k: _TOKEN_CACHE[k]["expires_at"])
+        _TOKEN_CACHE.pop(oldest, None)
+    _TOKEN_CACHE[token] = {"result": result, "expires_at": time.time() + _TOKEN_CACHE_TTL}
+
+
+def invalidate_token_cache(token: str) -> None:
+    """Remove a specific token from the cache (call on logout)."""
+    _TOKEN_CACHE.pop(token, None)
+
+@contextlib.asynccontextmanager
+async def get_client():
+    yield supabase.client.client
 
 async def verify_token(request: Request):
     """
     Verifies the JWT token by calling Supabase's /auth/v1/user endpoint.
     Reads token from httpOnly cookie first, falls back to Authorization header.
     Resolves role from the database (public.users + admins table), NOT user_metadata.
+    Results are cached in memory for 5 minutes to reduce Supabase API load.
     """
     # 1. Try Authorization header first (cross-domain safe, works with Vercel+Render)
     token = None
@@ -40,8 +77,26 @@ async def verify_token(request: Request):
     if using_cookie:
         validate_csrf(request)
 
+    # ─── Cache check — skip Supabase calls if token was recently verified ──────
+    # Note: impersonation headers bypass cache (they change the effective identity)
+    has_impersonation = (
+        request.headers.get("X-Impersonate-Academy")
+        or request.headers.get("X-Impersonate-User")
+    )
+    if not has_impersonation:
+        cached = _cache_get(token)
+        if cached is not None:
+            print(f"[auth_cache] Cache HIT for token (prefix: {token[:10]}...)", flush=True)
+            # Re-inject context vars from cached result
+            academy_id_ctx.set(cached.get("academy_id"))
+            user_id_ctx.set(cached.get("user_id"))
+            role_ctx.set(cached.get("role"))
+            return cached
+        else:
+            print(f"[auth_cache] Cache MISS for token (prefix: {token[:10]}...)", flush=True)
+
     try:
-        async with httpx.AsyncClient(timeout=20.0, trust_env=False) as client:
+        async with get_client() as client:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/auth/v1/user",
                 headers={
@@ -174,13 +229,19 @@ async def verify_token(request: Request):
                                 detail="Your academy subscription is suspended. Please renew your plan f-settings/plan to restore access."
                             )
 
-            return {
+            result = {
                 "user_id": user_id,
                 "email": user.get("email"),
                 "role": role,
                 "academy_id": academy_id,
                 "impersonating": impersonating,
             }
+
+            # Cache the result (skip if impersonating — identity is ephemeral)
+            if not impersonating:
+                _cache_set(token, result)
+
+            return result
     except HTTPException:
         raise
     except httpx.RequestError as exc:
@@ -223,7 +284,7 @@ async def assert_parent_owns_player(parent_user_id: str, player_user_id: str) ->
         
     import httpx
     try:
-        async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
+        async with get_client() as client:
             res = await client.get(
                 f"{settings.SUPABASE_URL}/rest/v1/players"
                 f"?parent_id=eq.{parent_user_id}&user_id=eq.{player_user_id}&select=user_id",

@@ -67,10 +67,26 @@ async def create_coach(coach: CoachCreate):
         
         temp_password = generate_temp_password()
 
-        # user_id is a foreign key to users table. Since we bypass Supabase Auth
-        # and it's nullable, we just don't set it to avoid FK constraint errors.
-        if "user_id" in coach_dict:
-            del coach_dict["user_id"]
+        # Create user in Supabase Auth so they can log in
+        from core.context import academy_id_ctx
+        academy_id = academy_id_ctx.get(None)
+        
+        try:
+            auth_user = await supabase.admin_create_user(
+                email=email,
+                password=temp_password,
+                role="coach",
+                full_name=coach_dict.get("full_name"),
+                academy_id=academy_id
+            )
+            coach_dict["user_id"] = auth_user["id"]
+            logger.info("Created coach auth user %s for %s", auth_user["id"], email)
+        except Exception as auth_err:
+            logger.error("Failed to create coach auth user: %s", auth_err, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create auth account for coach: {str(auth_err)}"
+            )
 
         # Insert directly into coaches table — gracefully drop u_category if
         # the column doesn't exist yet (admin hasn't run the migration).

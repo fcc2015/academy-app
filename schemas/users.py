@@ -20,7 +20,7 @@ class PlayerCreate(BaseModel):
     discount_value: Optional[float] = Field(None, ge=0)
     u_category: str = Field(..., min_length=1, max_length=20)
     parent_name: str = Field(..., min_length=2, max_length=100)
-    parent_whatsapp: str = Field(..., pattern=r"^\+?[0-9]{8,15}$", description="Valid phone number")
+    parent_whatsapp: str = Field(..., description="Valid phone number")
     parent_email: Optional[str] = Field(None, max_length=200, description="Parent email – if provided, an auth account is auto-created")
     address: Optional[str] = Field(None, max_length=300)
     account_status: Literal['Pending', 'Active', 'Inactive', 'Suspended'] = "Pending"

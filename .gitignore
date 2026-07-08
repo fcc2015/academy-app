@@ -57,3 +57,14 @@ FootballAcademy-release.aab
 android/keystore.properties
 *.jks
 *.keystore
+
+# Scratch & temporary files
+backend/scratch_*
+backend/run_*
+backend/test_*
+backend/search_*
+backend/*.sql
+scratch/
+.env.production
+.env.local
+

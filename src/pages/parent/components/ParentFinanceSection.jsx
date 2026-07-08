@@ -1,7 +1,7 @@
 import React from 'react';
 import { CheckCircle2, Clock, CreditCard, Wallet, Calendar, TrendingUp, AlertTriangle } from 'lucide-react';
 
-const ParentFinanceSection = ({ payments, child, isRTL }) => {
+const ParentFinanceSection = ({ payments = [], child = {}, isRTL }) => {
     const totalPaid = payments.filter(p => p.status === 'confirmed').reduce((s, p) => s + (p.amount || 0), 0);
     const pendingAmount = payments.filter(p => p.status === 'pending').reduce((s, p) => s + (p.amount || 0), 0);
     const monthlyFee = child.monthly_fee || 0;

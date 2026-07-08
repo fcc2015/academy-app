@@ -10,7 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from core.config import settings
 from core.context import request_id_ctx
 from services.cache_service import cache_service
-from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin, payments_gateway, tournaments, tryouts, qr_auth, branches, equipment, sanctions, analytics, stories, advertisements, notification_preferences
+from routers import auth, players, finances, coaches, events, stats, settings as settings_router, evaluations, squads, attendance, notifications, public_api, coupons, plans, admins, chat, inventory, matches, injuries, training, kits, medical, expenses, storage, exports, saas_admin, payments_gateway, tournaments, tryouts, qr_auth, branches, equipment, sanctions, analytics, stories, advertisements, notification_preferences, video_analysis
 
 
 # ─── Structured Logging with Request ID ─────────────────────
@@ -266,6 +266,7 @@ v1.include_router(analytics.router)
 v1.include_router(stories.router)
 v1.include_router(advertisements.router)
 v1.include_router(notification_preferences.router)
+v1.include_router(video_analysis.router)
 
 app.include_router(v1)
 

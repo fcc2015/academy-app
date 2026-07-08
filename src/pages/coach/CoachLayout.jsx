@@ -12,7 +12,8 @@ import {
     Star,
     MessageCircle,
     Trophy,
-    UserPlus
+    UserPlus,
+    Brain
 } from 'lucide-react';
 import NotificationsDropdown from '../../components/NotificationsDropdown';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
@@ -82,6 +83,7 @@ const CoachLayout = () => {
         { path: '/coach/matches', name: t('sidebar.matches') || (isRTL ? 'المباريات' : 'Matches'), icon: Trophy },
         { path: '/coach/tryouts', name: t('sidebar.tryouts') || (isRTL ? 'الاختبارات' : 'Tryouts'), icon: UserPlus },
         { path: '/coach/chat', name: t('sidebar.chat') || 'Chat', icon: MessageCircle },
+        { path: '/coach/video-analysis', name: isRTL ? 'تحليل الفيديو AI' : 'Video Analysis AI', icon: Brain },
     ];
 
     return (
@@ -156,20 +158,35 @@ const CoachLayout = () => {
             {/* Main Content */}
             <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
                 <header className="h-20 bg-white border-b border-slate-200 flex items-center px-4 lg:px-8 justify-between shrink-0 transition-all">
-                    <button
-                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 shadow-sm bg-white"
-                    >
-                        {isSidebarOpen ? <X size={20} className="lg:hidden" /> : <Menu size={20} />}
-                        {isSidebarOpen && <Menu size={20} className="hidden lg:block" />}
-                    </button>
+                    <div className="flex items-center">
+                        <button
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 shadow-sm bg-white"
+                        >
+                            {isSidebarOpen ? <X size={20} className="lg:hidden" /> : <Menu size={20} />}
+                            {isSidebarOpen && <Menu size={20} className="hidden lg:block" />}
+                        </button>
+
+                        {/* Academy Active Link Badge */}
+                        {academyName && (
+                            <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100/80 shadow-sm ${isRTL ? 'mr-4' : 'ml-4'}`}>
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                <span className="text-xs font-bold tracking-wide uppercase">{academyName}</span>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="flex items-center gap-4 ml-auto">
                         <LanguageSwitcher />
                         <NotificationsDropdown />
                         <div className="hidden sm:flex flex-col items-end">
                             <span className="text-sm font-bold text-slate-800">{coachName}</span>
-                            <span className="text-[11px] font-medium text-emerald-600 uppercase tracking-widest">Coach</span>
+                            <span className="text-[11px] font-medium text-emerald-600 uppercase tracking-widest">
+                                Coach {academyName ? `• ${academyName}` : ''}
+                            </span>
                         </div>
                         <div className="w-11 h-11 bg-slate-100 rounded-full border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
                             <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(coachName)}&background=10b981&color=fff`} alt="Coach" className="w-full h-full object-cover" />

@@ -786,7 +786,7 @@ async def update_typing(req: TypingRequest):
     headers = {**supabase.headers, "Prefer": "resolution=merge-duplicates,return=minimal"}
     async with httpx.AsyncClient(trust_env=False) as client:
         res = await client.post(
-            f"{settings.SUPABASE_URL}/rest/v1/chat_typing",
+            f"{settings.SUPABASE_URL}/rest/v1/chat_typing?on_conflict=group_id,user_id",
             json=data,
             headers=headers
         )

@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 
-const ParentSanctionsSection = ({ sanctions, isRTL }) => {
+const ParentSanctionsSection = ({ sanctions = [], isRTL }) => {
     const typeLabels = {
         Warning:    { ar: 'إنذار',              color: 'text-amber-600 bg-amber-50 border-amber-100' },
         Suspension: { ar: 'توقيف عن اللعب',    color: 'text-red-600 bg-red-50 border-red-100' },

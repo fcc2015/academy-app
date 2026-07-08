@@ -107,14 +107,31 @@ class InjectClient:
             return f"{self.base_url}{url_str}"
         return url_str
 
+    def _should_exclude(self, url_str):
+        exclusions = [
+            "/rpc/",
+            "/auth/v1/",
+            "/storage/v1/",
+            "/rest/v1/advertisements",
+            "/rest/v1/academies",
+            "/rest/v1/saas_landing_settings",
+            "/rest/v1/subscription_plans"
+        ]
+        return any(ex in url_str for ex in exclusions)
+
     def _inject(self, url):
         from core.context import academy_id_ctx
         academy_id = academy_id_ctx.get(None)
         url_str = self._resolve(url)
-        if not academy_id or "/rpc/" in url_str or "/auth/v1/" in url_str or "/storage/v1/" in url_str or "/rest/v1/advertisements" in url_str:
+        if not academy_id or self._should_exclude(url_str):
             return url_str
         separator = "&" if "?" in url_str else "?"
         return f"{url_str}{separator}academy_id=eq.{academy_id}"
+
+    def get(self, url, **kwargs):
+        # We need this to support both sync and async client calls if needed, 
+        # but the project seems to be async-only now. Let's make sure it's correct.
+        pass
 
     async def get(self, url, **kwargs):
         res = await self.client.get(self._inject(url), **kwargs)
@@ -133,7 +150,8 @@ class InjectClient:
         json_data = kwargs.get("json")
         from core.context import academy_id_ctx
         academy_id = academy_id_ctx.get(None)
-        if academy_id and json_data and isinstance(json_data, dict) and "academy_id" not in json_data:
+        url_str = self._resolve(url)
+        if academy_id and json_data and isinstance(json_data, dict) and "academy_id" not in json_data and not self._should_exclude(url_str):
             kwargs["json"] = copy.deepcopy(json_data)
             kwargs["json"]["academy_id"] = academy_id
             
@@ -153,7 +171,7 @@ class InjectClient:
         import copy
         academy_id = academy_id_ctx.get(None)
         url_str = self._resolve(url)
-        if academy_id and "/rpc/" not in url_str and "/auth/v1/" not in url_str and "/storage/v1/" not in url_str:
+        if academy_id and not self._should_exclude(url_str):
             data = kwargs.get("json")
             if isinstance(data, dict) and "academy_id" not in data:
                 kwargs["json"] = copy.deepcopy(data)
@@ -226,14 +244,15 @@ class SupabaseHttpClient:
                 raise
         raise last_exc  # Should not reach here
 
-    async def _post(self, endpoint: str, data: dict, headers: dict = None):
+    async def _post(self, endpoint: str, data: dict = None, headers: dict = None, json: dict = None):
         """POST with automatic retry on transient failures."""
         h = {**self.headers, **(headers or {})}
         url = f"{self.url}{endpoint}"
+        payload = json if json is not None else data
         last_exc = None
         for attempt in range(_MAX_RETRIES):
             try:
-                res = await self.client.post(url, json=data, headers=h)
+                res = await self.client.post(url, json=payload, headers=h)
                 if res.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES - 1:
                     logger.warning("Retryable %d on POST %s (attempt %d)", res.status_code, endpoint[:80], attempt + 1)
                     await asyncio.sleep(_RETRY_BACKOFF * (2 ** attempt))
@@ -249,7 +268,54 @@ class SupabaseHttpClient:
                 raise
         raise last_exc  # Should not reach here
 
-        
+    async def _patch(self, endpoint: str, data: dict = None, headers: dict = None, json: dict = None):
+        """PATCH with automatic retry on transient failures."""
+        h = {**self.headers, **(headers or {})}
+        url = f"{self.url}{endpoint}"
+        payload = json if json is not None else data
+        last_exc = None
+        for attempt in range(_MAX_RETRIES):
+            try:
+                res = await self.client.patch(url, json=payload, headers=h)
+                if res.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES - 1:
+                    logger.warning("Retryable %d on PATCH %s (attempt %d)", res.status_code, endpoint[:80], attempt + 1)
+                    await asyncio.sleep(_RETRY_BACKOFF * (2 ** attempt))
+                    continue
+                res.raise_for_status()
+                return res.json()
+            except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout) as e:
+                last_exc = e
+                if attempt < _MAX_RETRIES - 1:
+                    logger.warning("Network error on PATCH %s (attempt %d): %s", endpoint[:80], attempt + 1, type(e).__name__)
+                    await asyncio.sleep(_RETRY_BACKOFF * (2 ** attempt))
+                    continue
+                raise
+        raise last_exc  # Should not reach here
+
+    async def _delete(self, endpoint: str, headers: dict = None):
+        """DELETE with automatic retry on transient failures."""
+        h = {**self.headers, **(headers or {})}
+        url = f"{self.url}{endpoint}"
+        last_exc = None
+        for attempt in range(_MAX_RETRIES):
+            try:
+                res = await self.client.delete(url, headers=h)
+                if res.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES - 1:
+                    logger.warning("Retryable %d on DELETE %s (attempt %d)", res.status_code, endpoint[:80], attempt + 1)
+                    await asyncio.sleep(_RETRY_BACKOFF * (2 ** attempt))
+                    continue
+                if res.status_code not in [200, 201, 204]:
+                    res.raise_for_status()
+                return {"success": True}
+            except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout) as e:
+                last_exc = e
+                if attempt < _MAX_RETRIES - 1:
+                    logger.warning("Network error on DELETE %s (attempt %d): %s", endpoint[:80], attempt + 1, type(e).__name__)
+                    await asyncio.sleep(_RETRY_BACKOFF * (2 ** attempt))
+                    continue
+                raise
+        raise last_exc  # Should not reach here
+
     async def sign_in_with_password(self, email, password):
         async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
             res = await client.post(
@@ -333,7 +399,7 @@ class SupabaseHttpClient:
 
     # New method to fetch child directly
     async def get_player_by_user_id(self, user_id: str):
-        url = f"/rest/v1/players?or=(user_id.eq.{user_id},parent_id.eq.{user_id})&select=*,users(full_name)&limit=1"
+        url = f"/rest/v1/players?or=(user_id.eq.{user_id},parent_id.eq.{user_id})&select=*,users!user_id(full_name)&limit=1"
         data = await self._get(url)
         return data[0] if data else None
 
@@ -373,18 +439,18 @@ class SupabaseHttpClient:
         return res.json()
 
     async def get_payments(self):
-        return await self._get("/rest/v1/payments?select=*,users(full_name)&order=created_at.desc")
+        return await self._get("/rest/v1/finances_payments?select=*,users!user_id(full_name)&order=created_at.desc")
 
     async def insert_payment(self, payment_data):
-        return await self._post("/rest/v1/payments", payment_data)
+        return await self._post("/rest/v1/finances_payments", payment_data)
 
     async def update_payment(self, payment_id: str, payment_data: dict):
-        res = await self.client.patch(f"/rest/v1/payments?id=eq.{payment_id}", json=payment_data)
+        res = await self.client.patch(f"/rest/v1/finances_payments?id=eq.{payment_id}", json=payment_data)
         res.raise_for_status()
         return res.json()
 
     async def delete_payment(self, payment_id: str):
-        res = await self.client.delete(f"/rest/v1/payments?id=eq.{payment_id}")
+        res = await self.client.delete(f"/rest/v1/finances_payments?id=eq.{payment_id}")
         if res.status_code not in [200, 201, 204]:
             res.raise_for_status()
         return {"success": True}
@@ -420,7 +486,7 @@ class SupabaseHttpClient:
         # Parallel fetching using persistent client
         tasks = [
             self.client.get(f"{self.url}/rest/v1/players?select=id"),
-            self.client.get(f"{self.url}/rest/v1/payments?select=amount"),
+            self.client.get(f"{self.url}/rest/v1/finances_payments?select=amount"),
             self.client.get(f"{self.url}/rest/v1/coaches?select=id&status=eq.Active"),
             self.client.get(f"{self.url}/rest/v1/events?select=id&status=eq.Scheduled")
         ]
@@ -441,19 +507,22 @@ class SupabaseHttpClient:
 
     async def get_recent_activity(self):
         tasks = [
-            self.client.get(f"{self.url}/rest/v1/players?select=full_name,category,created_at&order=created_at.desc&limit=3"),
-            self.client.get(f"{self.url}/rest/v1/payments?select=amount,users(full_name),created_at&order=created_at.desc&limit=3"),
+            self.client.get(f"{self.url}/rest/v1/players?select=created_at,users!user_id(full_name),u_category&order=created_at.desc&limit=3"),
+            self.client.get(f"{self.url}/rest/v1/finances_payments?select=amount,users!user_id(full_name),created_at&order=created_at.desc&limit=3"),
             self.client.get(f"{self.url}/rest/v1/events?select=title,event_date,created_at&order=created_at.desc&limit=3")
         ]
         responses = await asyncio.gather(*tasks)
         
         players = responses[0].json() if responses[0].status_code == 200 else []
-        for p in players: p['type'] = 'registration'
+        for p in players: 
+            p['type'] = 'registration'
+            p['full_name'] = p.get('users', {}).get('full_name', 'Unknown Player') if p.get('users') else 'Unknown Player'
+            p['category'] = p.get('u_category', 'N/A')
 
         payments = responses[1].json() if responses[1].status_code == 200 else []
         for p in payments: 
             p['type'] = 'payment'
-            p['name'] = p.get('users', {}).get('full_name', 'Unknown Player')
+            p['name'] = p.get('users', {}).get('full_name', 'Unknown Player') if p.get('users') else 'Unknown Player'
 
         events = responses[2].json() if responses[2].status_code == 200 else []
         for e in events: e['type'] = 'event'
@@ -521,7 +590,7 @@ class SupabaseHttpClient:
 
     # Attendance Management
     async def get_attendance(self, squad_id: str, date: str):
-        url = f"/rest/v1/attendance?squad_id=eq.{squad_id}&date=eq.{date}&select=*,players(users(full_name))"
+        url = f"/rest/v1/attendance?squad_id=eq.{squad_id}&date=eq.{date}&select=*,players(users!user_id(full_name))"
         return await self._get(url)
 
     async def get_player_attendance(self, player_id: str):
@@ -599,7 +668,7 @@ class SupabaseHttpClient:
 
     # Evaluations Management
     async def get_evaluations(self, player_id: str = None, limit: int = 100, coach_id: str = None):
-        url = f"/rest/v1/evaluations?select=*,players(users(full_name))&order=evaluation_date.desc&limit={limit}"
+        url = f"/rest/v1/evaluations?select=*,players(users!user_id(full_name))&order=evaluation_date.desc&limit={limit}"
         if player_id:
             url += f"&player_id=eq.{player_id}"
         if coach_id:
@@ -780,7 +849,7 @@ class SupabaseHttpClient:
         return int(time.time() * 10) % 100000  # 5-digit unique-ish number
 
     async def get_payments_by_player(self, player_id: str):
-        return await self._get(f"/rest/v1/payments?player_id=eq.{player_id}&order=created_at.desc")
+        return await self._get(f"/rest/v1/finances_payments?player_id=eq.{player_id}&order=created_at.desc")
 
     # =========================================================
     # Admins Management
@@ -845,7 +914,7 @@ class SupabaseHttpClient:
     # Injuries Management
     # =========================================================
     async def get_injuries(self):
-        return await self._get("/rest/v1/injuries?select=*,players(user_id,full_name)&order=injury_date.desc")
+        return await self._get("/rest/v1/injuries?select=*,players(user_id,users!user_id(full_name))&order=injury_date.desc")
 
     async def insert_injury(self, data: dict):
         return await self._post("/rest/v1/injuries", data)
@@ -1032,11 +1101,13 @@ class SupabaseHttpClient:
     # =========================================================
     async def get_stories(self):
         """Return active (non-expired) stories for the current academy."""
+        import datetime
+        now_str = datetime.datetime.utcnow().isoformat()
         return await self._get(
-            "/rest/v1/stories"
-            "?select=*,users(full_name,photo_url)"
-            "&expires_at=gt.now()"
-            "&order=created_at.desc"
+            f"/rest/v1/stories"
+            f"?select=*,users!user_id(full_name,photo_url)"
+            f"&expires_at=gt.{now_str}"
+            f"&order=created_at.desc"
         )
 
     async def get_story_by_id(self, story_id: str):
@@ -1159,6 +1230,25 @@ class SupabaseHttpClient:
         if res.status_code not in [200, 201, 204]:
             res.raise_for_status()
         return {"success": True}
+
+    # =========================================================
+    # Storage — File Upload
+    # =========================================================
+
+    async def upload_file(self, bucket: str, path: str, content: bytes, content_type: str = "application/octet-stream") -> str:
+        """Upload a file to Supabase Storage and return its public URL."""
+        storage_url = f"{self.url}/storage/v1/object/{bucket}/{path}"
+        upload_headers = {
+            "apikey": self.service_role_key or self.key,
+            "Authorization": f"Bearer {self.service_role_key or self.key}",
+            "Content-Type": content_type,
+        }
+        async with httpx.AsyncClient(trust_env=False, timeout=120.0) as client:
+            res = await client.post(storage_url, content=content, headers=upload_headers)
+            if res.status_code not in (200, 201):
+                raise Exception(f"Storage upload failed ({res.status_code}): {res.text}")
+        # Return public URL
+        return f"{self.url}/storage/v1/object/public/{bucket}/{path}"
 
 
 

@@ -7,7 +7,7 @@ We do NOT actually send email in tests. Instead:
   with the right arguments.
 """
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 
 from services import email_service
 
@@ -170,7 +170,7 @@ class TestRegisterWiring:
             return {"user": {"id": "new-user-1"}}
 
         mocker.patch("services.supabase_client.supabase.sign_up", side_effect=fake_signup)
-        spy = mocker.patch("routers.auth.send_welcome_email", return_value=True)
+        spy = mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
 
         res = client.post(
             "/api/v1/auth/register",
@@ -183,11 +183,11 @@ class TestRegisterWiring:
         )
         assert res.status_code == 200
         spy.assert_called_once()
-        # Check positional / keyword args contain the email + name
-        call_kwargs = spy.call_args.kwargs
+        # enqueue_task("send_welcome_email", email, name)
         call_args = spy.call_args.args
-        assert "newcomer@test.com" in (list(call_args) + list(call_kwargs.values()))
-        assert "Hassan" in (list(call_args) + list(call_kwargs.values()))
+        assert call_args[0] == "send_welcome_email"
+        assert "newcomer@test.com" in call_args
+        assert "Hassan" in call_args
 
     def test_register_does_not_fail_when_welcome_email_raises(self, client, mocker):
         """Email failure must not break registration."""
@@ -195,7 +195,7 @@ class TestRegisterWiring:
             return {"user": {"id": "new-user-2"}}
 
         mocker.patch("services.supabase_client.supabase.sign_up", side_effect=fake_signup)
-        mocker.patch("routers.auth.send_welcome_email", side_effect=Exception("SMTP down"))
+        mocker.patch("routers.auth.enqueue_task", side_effect=Exception("Queue down"))
 
         res = client.post(
             "/api/v1/auth/register",
@@ -208,15 +208,15 @@ class TestRegisterWiring:
             return {"user": {"id": "new-user-3"}}
 
         mocker.patch("services.supabase_client.supabase.sign_up", side_effect=fake_signup)
-        spy = mocker.patch("routers.auth.send_welcome_email", return_value=True)
+        spy = mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
 
         client.post(
             "/api/v1/auth/register",
             json={"email": "anonymous@test.com", "password": "validpass123", "role": "parent"},
         )
-        # No full_name → falls back to email prefix
-        all_args = list(spy.call_args.args) + list(spy.call_args.kwargs.values())
-        assert "anonymous" in all_args
+        # No full_name → falls back to email prefix "anonymous"
+        call_args = spy.call_args.args
+        assert "anonymous" in call_args
 
 
 # ─── Wiring: PayPal capture triggers receipt email ─────────────

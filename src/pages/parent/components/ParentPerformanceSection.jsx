@@ -3,15 +3,16 @@ import { Star, TrendingUp, Lightbulb, Award, Shield, CalendarCheck, Heart, Alert
 import FUTCard from '../../../components/FUTCard';
 
 export default function ParentPerformanceSection({
-    child,
+    child = {},
     activeTab,
-    evaluations,
-    levelBars,
-    tips,
+    evaluations = [],
+    levelBars = [],
+    tips = [],
+    injuries = [],
     isRTL,
     t
 }) {
-    if (child.account_status === 'Suspended') {
+    if (child?.account_status === 'Suspended') {
         return (
             <div className="bg-red-50 border-2 border-red-200 rounded-[2.5rem] p-12 text-center animate-slide-up">
                 <AlertTriangle size={48} className="mx-auto text-red-400 mb-4" />

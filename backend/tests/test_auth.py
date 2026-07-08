@@ -11,6 +11,7 @@ Covers:
 import time
 import pytest
 from httpx import Response
+from unittest.mock import AsyncMock
 
 
 # ─── /auth/login validation ───────────────────────────────────
@@ -192,7 +193,7 @@ def test_register_failure_returns_400(client, mocker):
 
 
 def test_send_otp_creates_entry(client, mocker):
-    mocker.patch("routers.auth.send_otp_email", return_value=True)
+    mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
 
     res = client.post(
         "/api/v1/auth/send-otp",
@@ -210,7 +211,7 @@ def test_send_otp_creates_entry(client, mocker):
 
 def test_send_otp_rate_limited_60s(client, mocker):
     """Same email cannot request a new OTP within 60s."""
-    mocker.patch("routers.auth.send_otp_email", return_value=True)
+    mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
 
     payload = {"email": "spam@test.com", "purpose": "verify"}
     res1 = client.post("/api/v1/auth/send-otp", json=payload)
@@ -221,7 +222,7 @@ def test_send_otp_rate_limited_60s(client, mocker):
 
 
 def test_verify_otp_wrong_code(client, mocker):
-    mocker.patch("routers.auth.send_otp_email", return_value=True)
+    mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
     client.post("/api/v1/auth/send-otp", json={"email": "u@test.com", "purpose": "verify"})
 
     res = client.post(
@@ -232,7 +233,7 @@ def test_verify_otp_wrong_code(client, mocker):
 
 
 def test_verify_otp_correct_code(client, mocker):
-    mocker.patch("routers.auth.send_otp_email", return_value=True)
+    mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
     client.post("/api/v1/auth/send-otp", json={"email": "u@test.com", "purpose": "verify"})
 
     from routers.auth import _otp_store
@@ -257,7 +258,7 @@ def test_verify_otp_no_code_present(client):
 
 
 def test_verify_otp_expired(client, mocker):
-    mocker.patch("routers.auth.send_otp_email", return_value=True)
+    mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
     client.post("/api/v1/auth/send-otp", json={"email": "u@test.com", "purpose": "verify"})
 
     # Force expiry
@@ -272,7 +273,7 @@ def test_verify_otp_expired(client, mocker):
 
 
 def test_verify_otp_locks_after_5_attempts(client, mocker):
-    mocker.patch("routers.auth.send_otp_email", return_value=True)
+    mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
     client.post("/api/v1/auth/send-otp", json={"email": "u@test.com", "purpose": "verify"})
 
     # 5 wrong attempts → still 400, 6th → 429 lockout
@@ -540,7 +541,7 @@ def test_reset_password_no_otp_stored(client):
 
 
 def test_reset_password_wrong_purpose(client, mocker):
-    mocker.patch("routers.auth.send_otp_email", return_value=True)
+    mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
     # Send OTP for "verify" purpose, not "reset"
     client.post("/api/v1/auth/send-otp", json={"email": "u@test.com", "purpose": "verify"})
 
@@ -554,7 +555,7 @@ def test_reset_password_wrong_purpose(client, mocker):
 
 
 def test_reset_password_wrong_code(client, mocker):
-    mocker.patch("routers.auth.send_otp_email", return_value=True)
+    mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
     client.post("/api/v1/auth/send-otp", json={"email": "reset@test.com", "purpose": "reset"})
 
     res = client.post("/api/v1/auth/reset-password", json={
@@ -564,7 +565,7 @@ def test_reset_password_wrong_code(client, mocker):
 
 
 def test_reset_password_too_short_password(client, mocker):
-    mocker.patch("routers.auth.send_otp_email", return_value=True)
+    mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
     client.post("/api/v1/auth/send-otp", json={"email": "reset@test.com", "purpose": "reset"})
 
     from routers.auth import _otp_store
@@ -578,7 +579,7 @@ def test_reset_password_too_short_password(client, mocker):
 
 def test_reset_password_success(client, mocker, respx_mock):
     from core.config import settings
-    mocker.patch("routers.auth.send_otp_email", return_value=True)
+    mocker.patch("routers.auth.enqueue_task", new=AsyncMock())
     client.post("/api/v1/auth/send-otp", json={"email": "reset@test.com", "purpose": "reset"})
 
     from routers.auth import _otp_store

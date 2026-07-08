@@ -591,28 +591,16 @@ async def run_alert_check():
                     parent_phone = player_info.get("parent_whatsapp") or player_info.get("phone")
                     if parent_phone and amount and enable_wa_reminders:
                         try:
-                            from services.whatsapp_service import send_whatsapp_message
+                            from services.whatsapp_service import send_whatsapp_message, build_payment_reminder_text
                             academy_name = academy_settings.get("academy_name") or "Academy"
                             wa_lang = academy_settings.get("whatsapp_language", "ar")
-
-                            if wa_lang == "ar":
-                                wa_text = (
-                                    f"⚽ *تذكير بالأداء — {academy_name}*\n\n"
-                                    f"السلام عليكم،\n"
-                                    f"نذكركم بأن أداء الاشتراك للاعب *{player_name}* بمبلغ *{float(amount):.2f} MAD* قد حل موعده (تاريخ الاستحقاق: {next_due}).\n\n"
-                                    f"يرجى تسوية الوضعية في أقرب وقت.\n\n"
-                                    f"مع تحياتنا،\n"
-                                    f"إدارة الأكاديمية"
-                                )
-                            else:
-                                wa_text = (
-                                    f"⚽ *Rappel de paiement — {academy_name}*\n\n"
-                                    f"Bonjour,\n"
-                                    f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
-                                    f"d'un montant de *{float(amount):.2f} MAD* est dû (Échéance: {next_due}).\n\n"
-                                    f"Merci de régulariser la situation.\n\n"
-                                    f"L'Administration"
-                                )
+                            wa_text = build_payment_reminder_text(
+                                player_name=player_name,
+                                amount=float(amount),
+                                due_date=str(next_due),
+                                academy_name=academy_name,
+                                lang=wa_lang,
+                            )
                             await send_whatsapp_message(parent_phone, wa_text)
                         except Exception as wa_err:
                             logger.warning(f"WhatsApp alert failed for {parent_phone}: {wa_err}")
@@ -776,7 +764,7 @@ async def trigger_whatsapp_payment_reminder(
     user: dict = Depends(require_role("admin", "super_admin"))
 ):
     """Generate a WhatsApp click-to-chat web link and send an automated notification for a payment."""
-    from services.whatsapp_service import generate_whatsapp_link, send_whatsapp_message
+    from services.whatsapp_service import generate_whatsapp_link, send_whatsapp_message, build_payment_reminder_text
     from core.config import settings
     
     # 1. Fetch payment details
@@ -817,23 +805,20 @@ async def trigger_whatsapp_payment_reminder(
         pass
 
     if wa_lang == "ar":
-        message_text = (
-            f"⚽ *تذكير بالأداء — {ac_name}*\n\n"
-            f"السلام عليكم،\n"
-            f"نذكركم بأن أداء الاشتراك للاعب *{player_name}* بمبلغ *{amount:.2f} MAD* قد حل موعده (تاريخ الاستحقاق: {due_date}).\n\n"
-            f"يرجى تسوية الوضعية في أقرب وقت.\n\n"
-            f"مع تحياتنا،\n"
-            f"إدارة الأكاديمية"
+        message_text = build_payment_reminder_text(
+            player_name=player_name,
+            amount=float(amount),
+            due_date=str(due_date),
+            academy_name=ac_name,
+            lang="ar",
         )
     else:
-        message_text = (
-            f"⚽ *Rappel de paiement — {ac_name}*\n\n"
-            f"Bonjour,\n"
-            f"Nous vous rappelons que le paiement de l'abonnement pour *{player_name}* "
-            f"d'un montant de *{amount:.2f} MAD* est en attente (Échéance: {due_date}).\n\n"
-            f"Merci de régulariser la situation au plus vite.\n\n"
-            f"Sportivement,\n"
-            f"L'Administration"
+        message_text = build_payment_reminder_text(
+            player_name=player_name,
+            amount=float(amount),
+            due_date=str(due_date),
+            academy_name=ac_name,
+            lang="fr",
         )
     
     # Generate direct link

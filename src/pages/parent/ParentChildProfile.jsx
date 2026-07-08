@@ -293,41 +293,44 @@ const ParentChildProfile = () => {
             {/* ── Tab Content ── */}
             <div className="transition-all duration-500">
 
-                {activeTab === 'sessions'  && <ParentAttendanceSection  attendance={attendance} isRTL={isRTL} />}
+                {activeTab === 'sessions'  && <ParentAttendanceSection  attendance={attendance} attendPct={attendPct} isRTL={isRTL} />}
 
-                {activeTab === 'upcoming'  && <ParentMatchesSection type="upcoming" matches={upcomingMatches} child={child} isRTL={isRTL} />}
-                {activeTab === 'past'      && <ParentMatchesSection type="past"     matches={pastMatches}     child={child} isRTL={isRTL} />}
+                {activeTab === 'upcoming'  && <ParentMatchesSection activeTab="upcoming" upcomingMatches={upcomingMatches} pastMatches={pastMatches} child={child} isRTL={isRTL} />}
+                {activeTab === 'past'      && <ParentMatchesSection activeTab="past"     upcomingMatches={upcomingMatches} pastMatches={pastMatches} child={child} isRTL={isRTL} />}
 
                 {activeTab === 'badge'     && (
                     <ParentPerformanceSection
-                        mode="badge"
-                        child={child} latestEval={latestEval} evaluations={evaluations}
-                        matches={matches} attendPct={attendPct} isRTL={isRTL}
+                        activeTab="badge"
+                        child={child} evaluations={evaluations}
+                        levelBars={levelBars} tips={tips} isRTL={isRTL}
                     />
                 )}
                 {activeTab === 'level'     && (
                     <ParentPerformanceSection
-                        mode="level"
-                        child={child} latestEval={latestEval} evaluations={evaluations}
-                        levelBars={levelBars} isRTL={isRTL}
+                        activeTab="level"
+                        child={child} evaluations={evaluations}
+                        levelBars={levelBars} tips={tips} isRTL={isRTL}
                     />
                 )}
                 {activeTab === 'tips'      && (
                     <ParentPerformanceSection
-                        mode="tips"
-                        tips={tips} isRTL={isRTL}
+                        activeTab="tips"
+                        child={child} evaluations={evaluations}
+                        levelBars={levelBars} tips={tips} isRTL={isRTL}
                     />
                 )}
                 {activeTab === 'nutrition' && (
                     <ParentPerformanceSection
-                        mode="nutrition"
-                        isRTL={isRTL}
+                        activeTab="nutrition"
+                        child={child} evaluations={evaluations}
+                        levelBars={levelBars} tips={tips} isRTL={isRTL}
                     />
                 )}
                 {activeTab === 'injuries'  && (
                     <ParentPerformanceSection
-                        mode="injuries"
-                        injuries={injuries} isRTL={isRTL}
+                        activeTab="injuries"
+                        child={child} evaluations={evaluations}
+                        levelBars={levelBars} tips={tips} injuries={injuries} isRTL={isRTL}
                     />
                 )}
 

@@ -2,25 +2,61 @@ services:
   - type: web
     name: academy-backend
     env: python
-    buildCommand: "cd backend && pip install -r requirements.txt"
+    region: frankfurt
+    plan: free
+    buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
     envVars:
+      # ── Core Supabase ─────────────────────────────────────────
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      # ── Security ─────────────────────────────────────────────
       - key: ENCRYPTION_KEY
         sync: false
+      - key: DEV_MODE
+        value: "false"
+      - key: FRONTEND_URL
+        value: "https://academy-app-mu.vercel.app"
+      # ── PayPal ───────────────────────────────────────────────
       - key: PAYPAL_CLIENT_ID
         sync: false
       - key: PAYPAL_CLIENT_SECRET
         sync: false
       - key: PAYPAL_SANDBOX
         value: "true"
-      - key: FRONTEND_URL
-        value: "https://academy-app-mu.vercel.app"
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      # ── Lemon Squeezy ─────────────────────────────────────────
+      - key: LEMON_SQUEEZY_API_KEY
+        sync: false
+      - key: LEMON_SQUEEZY_SIGNING_SECRET
+        sync: false
+      # ── Web Push (VAPID) ──────────────────────────────────────
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_CLAIMS_EMAIL
+        value: "mailto:admin@academy.com"
+      # ── WhatsApp ─────────────────────────────────────────────
+      - key: WHATSAPP_PROVIDER
+        value: "mock"
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+      - key: META_WHATSAPP_TOKEN
+        sync: false
+      - key: META_PHONE_NUMBER_ID
+        sync: false
+      - key: META_API_VERSION
+        value: "v19.0"
       # ── Email (SMTP) ──────────────────────────────────────────
       - key: SMTP_HOST
         sync: false

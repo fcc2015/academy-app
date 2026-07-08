@@ -104,48 +104,67 @@ const PlayersManagement = () => {
         setLoading(true);
         setFetchError(null);
 
-        // Players (critical)
+        // Run all API calls in parallel
+        const promises = [
+            authFetch(`${API_URL}/players/`),
+            authFetch(`${API_URL}/plans/`).catch(() => null),
+            authFetch(`${API_URL}/public/admin/requests?request_status=active`).catch(() => null),
+            authFetch(`${API_URL}/settings/`).catch(() => null),
+            authFetch(`${API_URL}/branches/`).catch(() => null),
+        ];
+
         try {
-            const res = await authFetch(`${API_URL}/players/`);
-            if (res.ok) {
-                const data = await res.json();
+            const [playersRes, plansRes, requestsRes, settingsRes, branchesRes] = await Promise.all(promises);
+
+            // Handle Players (critical)
+            if (playersRes && playersRes.ok) {
+                const data = await playersRes.json();
                 setPlayers(Array.isArray(data) ? data : []);
-            } else {
-                if (res.status === 401) {
-                    // Unauthorized – likely token expired; force logout
+            } else if (playersRes) {
+                if (playersRes.status === 401) {
                     logout();
                 }
                 setFetchError(isRTL ? 'فشل تحميل اللاعبين من الخادم' : 'Failed to load players from server');
+            } else {
+                setFetchError(isRTL ? 'فشل تحميل اللاعبين من الخادم' : 'Failed to load players from server');
+            }
+
+            // Handle Plans (non-critical)
+            if (plansRes && plansRes.ok) {
+                try {
+                    const data = await plansRes.json();
+                    setSubscriptionPlans(data);
+                } catch { /* ignore */ }
+            }
+
+            // Handle Pending requests (non-critical)
+            if (requestsRes && requestsRes.ok) {
+                try {
+                    const data = await requestsRes.json();
+                    setPendingRequests(data || []);
+                } catch { /* ignore */ }
+            }
+
+            // Handle Settings (non-critical)
+            if (settingsRes && settingsRes.ok) {
+                try {
+                    const data = await settingsRes.json();
+                    setSettings(data);
+                } catch { /* ignore */ }
+            }
+
+            // Handle Branches (non-critical)
+            if (branchesRes && branchesRes.ok) {
+                try {
+                    const data = await branchesRes.json();
+                    setBranches(data || []);
+                } catch { /* ignore */ }
             }
         } catch {
             setFetchError(isRTL ? 'تعذر الاتصال بالخادم. تأكد من أن السيرفر شغال.' : 'Cannot connect to server. Make sure the backend is running on port 8000.');
+        } finally {
+            setLoading(false);
         }
-
-        // Plans (non-critical)
-        try {
-            const res = await authFetch(`${API_URL}/plans/`);
-            if (res.ok) setSubscriptionPlans(await res.json());
-        } catch { /* ignore */ }
-
-        // Pending requests (non-critical)
-        try {
-            const res = await authFetch(`${API_URL}/public/admin/requests?request_status=active`);
-            if (res.ok) setPendingRequests(await res.json() || []);
-        } catch { /* ignore */ }
-
-        // Settings (non-critical)
-        try {
-            const res = await authFetch(`${API_URL}/settings/`);
-            if (res.ok) setSettings(await res.json());
-        } catch { /* ignore */ }
-
-        // Branches (non-critical)
-        try {
-            const res = await authFetch(`${API_URL}/branches/`);
-            if (res.ok) setBranches(await res.json() || []);
-        } catch { /* ignore */ }
-
-        setLoading(false);
     };
 
     useEffect(() => {

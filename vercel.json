@@ -3,7 +3,11 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://elghazali1987-academy-backend.hf.space/api/$1" },
+    {
+      "source": "/api/(.*)",
+      "destination": "https://academy-backend.onrender.com/api/$1",
+      "comment": "⚠️  UPDATE THIS URL after your first Render deploy — use your actual Render service URL"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
@@ -14,6 +18,13 @@
       ]
     },
     {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },
@@ -21,5 +32,12 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
       ]
     }
-  ]
+  ],
+  "env": {
+    "VITE_API_URL": "",
+    "VITE_SUPABASE_URL": "https://kbhnqntteexatihidhkn.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiaG5xbnR0ZWV4YXRpaGlkaGtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NDk2MDksImV4cCI6MjA4ODMyNTYwOX0.dwF2cxTuH7tCjDQv_IXsQNzWQmol6FbvWV17hBSyl94",
+    "VITE_VAPID_PUBLIC_KEY": "BI04-ovK5PuGyPwVPTuTg3hqpAGgYpFxxrn-vAzUM3_v5_S1o07TDRErrhDh2MGkzkkUfYGFYcxx1WRLkWXLopY"
+  }
 }
+

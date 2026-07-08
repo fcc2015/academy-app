@@ -40,10 +40,25 @@ class Settings(BaseSettings):
     LEMON_SQUEEZY_API_KEY: Optional[str] = None
     LEMON_SQUEEZY_SIGNING_SECRET: Optional[str] = None
 
+    # ─── WhatsApp Integration ───────────────────────────────────────────────────
+    # Set WHATSAPP_PROVIDER to "twilio" or "meta" to activate automated messages.
+    # Leave unset (or "mock") to use click-to-chat links only (no API needed).
+    WHATSAPP_PROVIDER: Optional[str] = None   # "twilio" | "meta" | "mock"
+
+    # Twilio WhatsApp (https://www.twilio.com/docs/whatsapp)
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_WHATSAPP_FROM: Optional[str] = None   # e.g. "whatsapp:+14155238886"
+
+    # Meta Cloud API (https://developers.facebook.com/docs/whatsapp/cloud-api)
+    META_WHATSAPP_TOKEN: Optional[str] = None    # System user permanent token
+    META_PHONE_NUMBER_ID: Optional[str] = None   # From Meta developer portal
+    META_API_VERSION: str = "v19.0"
+
     # DEV_MODE=true في .env يفعّل الـ bypass للتطوير المحلي فقط
     # في الإنتاج يجب أن يكون DEV_MODE=false أو غير موجود
     DEV_MODE: bool = False
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=(".env", "backend/.env"), extra="ignore")
 
 settings = Settings()

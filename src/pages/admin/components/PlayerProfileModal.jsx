@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { User, Activity, Heart, CreditCard, Shirt, Clock, CheckCircle2, X, Loader2, Flame, Trophy, Target } from 'lucide-react';
+import { User, Activity, Heart, CreditCard, Shirt, Clock, CheckCircle2, X, Loader2, Flame, Trophy, Target, Brain } from 'lucide-react';
 import { API_URL } from '../../../config';
 import { authFetch } from '../../../api';
 import AttendanceHeatmap from '../../../components/AttendanceHeatmap';
 import MedicalCard from '../../../components/MedicalCard';
 import PaymentTimeline from '../../../components/PaymentTimeline';
+import VideoAnalysis from '../../../components/VideoAnalysis';
 
 const PlayerProfileModal = ({ isOpen, onClose, player, isRTL, dir }) => {
     const [activeTab, setActiveTab] = useState('profile');
@@ -44,6 +45,7 @@ const PlayerProfileModal = ({ isOpen, onClose, player, isRTL, dir }) => {
         { id: 'medical',    label: isRTL ? 'الطبي'      : 'Medical',    icon: Heart },
         { id: 'payments',   label: isRTL ? 'المدفوعات'  : 'Payments',   icon: CreditCard },
         { id: 'equipment',  label: isRTL ? 'الألبسة'    : 'Equipment',  icon: Shirt },
+        { id: 'ai',         label: isRTL ? 'AI'         : 'AI',         icon: Brain },
     ];
 
     const TIER_COLORS = {
@@ -84,20 +86,20 @@ const PlayerProfileModal = ({ isOpen, onClose, player, isRTL, dir }) => {
                 </div>
 
                 {/* Tabs */}
-                <div className={`flex border-b border-slate-100 shrink-0 ${isRTL ? 'flex-row-reverse' : ''}`}>
+                <div className={`flex border-b border-slate-100 shrink-0 overflow-x-auto scrollbar-hide ${isRTL ? 'flex-row-reverse' : ''}`}>
                     {tabs.map(tab => {
                         const Icon = tab.icon;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex-1 flex items-center justify-center gap-1.5 py-3.5 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${
+                                className={`flex-shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 py-3 px-2 text-[9px] font-black uppercase tracking-widest transition-all border-b-2 ${
                                     activeTab === tab.id
                                         ? 'border-indigo-500 text-indigo-600 bg-indigo-50/50'
                                         : 'border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50'
                                 }`}
                             >
-                                <Icon size={13} />
+                                <Icon size={14} />
                                 {tab.label}
                             </button>
                         );
@@ -286,6 +288,14 @@ const PlayerProfileModal = ({ isOpen, onClose, player, isRTL, dir }) => {
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {/* AI Video Analysis tab */}
+                    {activeTab === 'ai' && (
+                        <VideoAnalysis
+                            playerId={player.user_id || player.id}
+                            playerName={player.full_name}
+                        />
                     )}
                 </div>
             </div>

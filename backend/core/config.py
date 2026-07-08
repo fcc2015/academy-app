@@ -40,6 +40,18 @@ class Settings(BaseSettings):
     LEMON_SQUEEZY_API_KEY: Optional[str] = None
     LEMON_SQUEEZY_SIGNING_SECRET: Optional[str] = None
 
+    # AI Video Analysis (Gemini)
+    GEMINI_API_KEY: Optional[str] = None
+
+    # WhatsApp Provider
+    WHATSAPP_PROVIDER: str = "mock"
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_WHATSAPP_FROM: Optional[str] = None
+    META_WHATSAPP_TOKEN: Optional[str] = None
+    META_PHONE_NUMBER_ID: Optional[str] = None
+    META_API_VERSION: str = "v19.0"
+
     # Redis Configuration
     REDIS_URL: Optional[str] = None
 
