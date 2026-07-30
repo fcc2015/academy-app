@@ -366,9 +366,35 @@ async def _daily_alert_scheduler():
             await asyncio.sleep(3600)
 
 
+async def _supabase_keepalive_scheduler():
+    """
+    Background task: Runs every 12 hours to ping Supabase REST API.
+    Prevents the Supabase project from automatically pausing due to inactivity.
+    """
+    from services.supabase_client import supabase
+    logger.info("[Scheduler] Supabase Keep-Alive scheduler started (every 12h)")
+    # Wait 10 seconds after boot before first ping
+    await asyncio.sleep(10)
+
+    while True:
+        try:
+            logger.info("[Keep-Alive] Pinging Supabase to prevent project pause...")
+            res = await supabase._get("/rest/v1/academies?select=id&limit=1")
+            logger.info("[Keep-Alive] ✅ Supabase ping successful")
+        except Exception as e:
+            logger.warning(f"[Keep-Alive] ⚠️ Supabase ping error: {e}")
+
+        # Sleep 12 hours (43200 seconds)
+        await asyncio.sleep(43200)
+
+
 @app.on_event("startup")
 async def start_daily_scheduler():
-    """Launch the daily alert-check background task."""
+    """Launch background tasks (daily alert check + Supabase keep-alive)."""
     asyncio.create_task(_daily_alert_scheduler())
     logger.info("[Scheduler] Daily alert scheduler registered")
+
+    asyncio.create_task(_supabase_keepalive_scheduler())
+    logger.info("[Scheduler] Supabase Keep-Alive scheduler registered")
+
 
