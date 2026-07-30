@@ -1,22 +1,34 @@
-FROM python:3.10-slim
+# Use official lightweight Python image
+FROM python:3.11-slim
 
-# Create a non-root user (required by Hugging Face Spaces)
-RUN useradd -m -u 1000 user
+# Prevent Python from writing .pyc files and buffer stdout/stderr
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=8000
+
+# Install system dependencies required by OpenCV, PyAV, and YOLO
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy requirements and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application files
-COPY --chown=user:user . .
+# Copy backend source code
+COPY . .
 
-# Expose the default Hugging Face port
-ENV PORT=7860
-EXPOSE 7860
+# Expose port
+EXPOSE 8000
 
-# Switch to non-root user
-USER user
-
-# Start the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Start command using Gunicorn with Uvicorn async workers for Cloud Run
+CMD ["sh", "-c", "exec gunicorn main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT --workers 2 --timeout 120"]
