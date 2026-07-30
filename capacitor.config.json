@@ -1,6 +1,6 @@
 {
-  "appId": "com.dbadmin.academy",
-  "appName": "Football Academy",
+  "appId": "com.fccacademy.app",
+  "appName": "FCC Academy",
   "webDir": "dist",
   "server": {
     "androidScheme": "https",
@@ -15,7 +15,11 @@
       "showSpinner": false
     },
     "PushNotifications": {
-      "presentationOptions": ["badge", "sound", "alert"]
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
     },
     "StatusBar": {
       "style": "Dark",
