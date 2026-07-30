@@ -1,15 +1,12 @@
-# Use official lightweight Python image
 FROM python:3.11-slim
 
-# Prevent Python from writing .pyc files and buffer stdout/stderr
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000
 
-# Install system dependencies required by OpenCV, PyAV, and YOLO
+# System dependencies (use libgl1 for Debian trixie)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
@@ -20,15 +17,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy requirements and install dependencies
+# 1. Install torch CPU-only FIRST (before ultralytics, to prevent GPU pull)
+RUN pip install --no-cache-dir \
+    torch==2.4.1 torchvision==0.19.1 \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# 2. Install remaining requirements (ultralytics will reuse torch-cpu already installed)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend source code
+# 3. Copy source code
 COPY . .
 
-# Expose port
 EXPOSE 8000
 
-# Start command using Gunicorn with Uvicorn async workers for Cloud Run
-CMD ["sh", "-c", "exec gunicorn main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT --workers 2 --timeout 120"]
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2"]
