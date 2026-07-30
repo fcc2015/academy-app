@@ -119,6 +119,7 @@ function getAppType() {
   const hostname = window.location.hostname.replace('www.', '');
   const mainDomains = [
     'localhost',
+    'academy-frontend-82081149217.europe-west1.run.app',
     'academy-app-mu.vercel.app',
     'dainty-speculoos-433706.netlify.app',
     'jolly-kangaroo-3c3d92.netlify.app'
