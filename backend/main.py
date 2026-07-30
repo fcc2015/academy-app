@@ -77,16 +77,17 @@ ALLOWED_ORIGINS = [
     "http://localhost:5174",
     "http://localhost:5175",
     "http://127.0.0.1:5173",
+    "https://academy-frontend-82081149217.europe-west1.run.app",
     "https://dainty-speculoos-433706.netlify.app",
     "https://jolly-kangaroo-3c3d92.netlify.app",
     "https://academy-app-mu.vercel.app",
 ]
 
-# For custom academy domains: match any *.netlify.app or *.vercel.app via regex
+# For custom academy domains: match any *.run.app, *.netlify.app or *.vercel.app via regex
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://(.*\.netlify\.app|.*\.vercel\.app)",
+    allow_origin_regex=r"https://(.*\.run\.app|.*\.netlify\.app|.*\.vercel\.app)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "X-CSRF-Token", "X-Impersonate-Academy", "X-Impersonate-User"],
@@ -106,12 +107,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Content Security Policy — restricts where resources can load from
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://www.paypal.com https://www.sandbox.paypal.com; "
+            "script-src 'self' 'unsafe-inline' https://www.paypal.com https://www.sandbox.paypal.com https://*.lemonsqueezy.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: blob: https:; "
-            "connect-src 'self' https://*.supabase.co https://api.paypal.com https://api.sandbox.paypal.com; "
-            "frame-src https://www.paypal.com https://www.sandbox.paypal.com; "
+            "connect-src 'self' https://*.supabase.co https://api.paypal.com https://api.sandbox.paypal.com https://*.lemonsqueezy.com https://*.run.app; "
+            "frame-src https://www.paypal.com https://www.sandbox.paypal.com https://*.lemonsqueezy.com; "
             "object-src 'none'; "
             "base-uri 'self';"
         )
