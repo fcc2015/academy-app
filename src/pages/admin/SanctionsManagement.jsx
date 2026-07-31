@@ -5,7 +5,7 @@ import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from '../../config.js';
 const SANCTION_TYPES = ['Warning', 'Suspension', 'Fine', 'Match_Ban'];
 
 const SanctionsManagement = () => {

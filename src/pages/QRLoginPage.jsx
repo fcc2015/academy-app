@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { QrCode, Smartphone, Wifi, Shield, RefreshCw, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import QRCode from 'qrcode';
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from '../config.js';
 
 /**
  * QRLoginPage — صفحة تسجيل الدخول عبر QR Code (بحال WhatsApp Web)

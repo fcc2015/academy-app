@@ -6,7 +6,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import { useToast } from '../../components/Toast';
 import UpgradeModal from '../../components/UpgradeModal';
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from '../../config.js';
 
 const KitsManagement = () => {
     const { isRTL, dir, t, formatDate } = useLanguage();

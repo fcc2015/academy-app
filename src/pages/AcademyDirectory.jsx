@@ -4,7 +4,7 @@ import { MapPin, Search, Globe, ArrowLeft, Loader2, Award, Shield, Trophy } from
 import { useLanguage } from '../i18n/LanguageContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/v1';
+import { API_URL } from '../config.js';
 
 const localT = {
   ar: {
