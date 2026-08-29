@@ -14,7 +14,7 @@ import AuthCallback from './pages/AuthCallback';
 import NotFound from './pages/NotFound';
 
 // Lazy-loaded pages — only loaded when navigated to
-const DownloadPage = lazy(() => import('./pages/DownloadPage'));
+import DownloadPage from './pages/DownloadPage';
 const QRLoginPage = lazy(() => import('./pages/QRLoginPage'));
 const ParentSignup = lazy(() => import('./pages/parent/ParentSignup'));
 const AcademyPublicPage = lazy(() => import('./pages/AcademyPublicPage'));
