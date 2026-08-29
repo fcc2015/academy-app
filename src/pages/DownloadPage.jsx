@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Download, Smartphone, Monitor, Wifi, Shield, ChevronRight, CheckCircle, Copy, Check, ArrowLeft } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { API_URL } from '../config';
@@ -7,7 +7,21 @@ import { API_URL } from '../config';
 const DownloadPage = () => {
     const { isRTL, dir } = useLanguage();
     const navigate = useNavigate();
-    const { subdomain } = useParams();
+    const { subdomain: paramSubdomain } = useParams();
+    const [searchParams] = useSearchParams();
+
+    // Multi-fallback subdomain resolution
+    const getSubdomain = () => {
+        if (paramSubdomain) return paramSubdomain;
+        const querySub = searchParams.get('subdomain');
+        if (querySub) return querySub;
+        const parts = window.location.pathname.split('/').filter(Boolean);
+        if (parts[0] === 'academy' && parts[1] && parts[2] === 'download') return parts[1];
+        if (parts[0] === 'download' && parts[1]) return parts[1];
+        return null;
+    };
+
+    const subdomain = getSubdomain();
     const appUrl = subdomain ? `${window.location.origin}/academy/${subdomain}` : window.location.origin;
     const [academyName, setAcademyName] = useState(subdomain ? `أكاديمية ${subdomain}` : '');
     const [copied, setCopied] = useState(false);

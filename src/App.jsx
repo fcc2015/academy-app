@@ -158,8 +158,9 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           {/* Public Academy Pages */}
           <Route path="/academies" element={<AcademyDirectory />} />
-          <Route path="/academy/:subdomain" element={<AcademyPublicPage />} />
           <Route path="/academy/:subdomain/download" element={<DownloadPage />} />
+          <Route path="/download/:subdomain" element={<DownloadPage />} />
+          <Route path="/academy/:subdomain" element={<AcademyPublicPage />} />
 
           {/* SaaS Root */}
           <Route path="/saas" element={<SaasLayout />}>
