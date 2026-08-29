@@ -11,28 +11,37 @@ import {
 
 const PLANS = [
     {
-        id: 'free', name: 'Free', price: 0, currency: 'MAD', period: '/mois',
+        id: 'free', name: 'Free (Essai)', price: 0, currency: 'MAD', period: '/toujours',
         color: '#10b981', glow: 'rgba(16,185,129,0.15)',
         icon: '🎯',
-        features: ["Jusqu'à 15 joueurs", "1 Admin", "1 Entraîneur", "Présences basiques", "Support email"],
+        features: ["Jusqu'à 15 joueurs", "1 Admin", "1 Entraîneur", "Présences & Évaluations", "Support email"],
         limits: { players: 15, admins: 1, coaches: 1 },
         cta: "Commencer Gratuitement",
         popular: false,
     },
     {
-        id: 'pro', name: 'Pro', price: 499, currency: 'MAD', period: '/mois',
+        id: 'basic', name: 'Basic', price: 299, currency: 'MAD', period: '/mois',
+        color: '#3b82f6', glow: 'rgba(59,130,246,0.15)',
+        icon: '⚡',
+        features: ["Jusqu'à 50 joueurs", "2 Admins", "3 Entraîneurs", "Gestion financière", "Exportation Excel/PDF"],
+        limits: { players: 50, admins: 2, coaches: 3 },
+        cta: "Choisir Basic",
+        popular: false,
+    },
+    {
+        id: 'premium', name: 'Premium', price: 599, currency: 'MAD', period: '/mois',
         color: '#6366f1', glow: 'rgba(99,102,241,0.2)',
         icon: '⭐',
-        features: ["Jusqu'à 100 joueurs", "4 Admins", "10 Entraîneurs", "Évaluations complètes", "Rapports financiers", "Support prioritaire"],
-        limits: { players: 100, admins: 4, coaches: 10 },
-        cta: "Choisir Pro",
+        features: ["Jusqu'à 150 joueurs", "5 Admins", "10 Entraîneurs", "Analyse vidéo AI", "Rapports avancés", "Support prioritaire"],
+        limits: { players: 150, admins: 5, coaches: 10 },
+        cta: "Choisir Premium",
         popular: true,
     },
     {
         id: 'enterprise', name: 'Enterprise', price: 999, currency: 'MAD', period: '/mois',
         color: '#f59e0b', glow: 'rgba(245,158,11,0.15)',
         icon: '👑',
-        features: ["Joueurs illimités", "Admins illimités", "Entraîneurs illimités", "Domaine personnalisé", "Analytics avancés", "Accès API", "Support 24/7"],
+        features: ["Joueurs & Admins illimités", "🏢 Création de Frou3 (Multi-Branches)", "Domaine personnalisé (.com)", "Accès API complet", "Support VIP 24/7"],
         limits: { players: -1, admins: -1, coaches: -1 },
         cta: "Choisir Enterprise",
         popular: false,
@@ -725,6 +734,11 @@ export default function SaasLanding() {
                     </div>
 
                     <div className="flex items-center gap-3">
+                        <button onClick={() => window.location.href = '/download'}
+                            className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all"
+                            style={{ color: isScrolled ? '#475569' : 'rgba(255,255,255,0.9)', border: `1.5px solid ${isScrolled ? 'rgba(148,163,184,0.3)' : 'rgba(255,255,255,0.3)'}` }}>
+                            📱 App & QR Code
+                        </button>
                         <button onClick={() => window.location.href = '/saas/login'}
                             className="hidden sm:block px-4 py-2 rounded-xl text-sm font-bold transition-all"
                             style={{ color: isScrolled ? '#475569' : 'rgba(255,255,255,0.8)', border: `1.5px solid ${isScrolled ? 'rgba(148,163,184,0.3)' : 'rgba(255,255,255,0.2)'}` }}>

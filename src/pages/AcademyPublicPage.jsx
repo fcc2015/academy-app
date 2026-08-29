@@ -262,8 +262,12 @@ export default function AcademyPublicPage() {
             }
             <span className={`font-black text-lg transition-colors ${scrolled ? 'text-slate-900' : 'text-white'}`}>{academy.name}</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {academy.city && <span className={`text-sm font-medium hidden md:block transition-colors ${scrolled ? 'text-slate-500' : 'text-white/70'}`}>{academy.city}</span>}
+            <button onClick={() => navigate(`/academy/${subdomain}/download`)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 border transition-all ${scrolled ? 'border-slate-200 text-slate-700 hover:bg-slate-50' : 'border-white/20 text-white hover:bg-white/10'}`}>
+              📱 تحميل التطبيق
+            </button>
             <button onClick={() => setShowRegister(true)}
               className="px-5 py-2 rounded-xl text-sm font-black text-white shadow-lg hover:scale-105 active:scale-95 transition-all"
               style={{ background: `linear-gradient(135deg, ${primary}, ${secondary})` }}>
@@ -558,7 +562,12 @@ export default function AcademyPublicPage() {
           </div>
           <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-white/30 text-sm">جميع الحقوق محفوظة © {new Date().getFullYear()} {academy.name}</p>
-            <p className="text-white/20 text-xs">Powered by AcademyOS</p>
+            <div className="flex items-center gap-4">
+              <a href={`/academy/${subdomain}/download`} className="text-indigo-400 hover:text-indigo-300 text-xs font-bold flex items-center gap-1.5 transition-colors">
+                📱 تحميل تطبيق {academy.name} و QR Code
+              </a>
+              <span className="text-white/20 text-xs">• Powered by AcademyOS</span>
+            </div>
           </div>
         </div>
       </footer>

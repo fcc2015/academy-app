@@ -1,16 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Download, Smartphone, Monitor, Wifi, Shield, ChevronRight, CheckCircle, Copy, Check, ArrowLeft } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
+import { API_URL } from '../config';
 
 const DownloadPage = () => {
     const { isRTL, dir } = useLanguage();
     const navigate = useNavigate();
-    const appUrl = window.location.origin;
+    const { subdomain } = useParams();
+    const appUrl = subdomain ? `${window.location.origin}/academy/${subdomain}` : window.location.origin;
+    const [academyName, setAcademyName] = useState(subdomain ? `أكاديمية ${subdomain}` : '');
     const [copied, setCopied] = useState(false);
     const [platform, setPlatform] = useState('unknown'); // android, ios, desktop
     const [deferredPrompt, setDeferredPrompt] = useState(null);
     const [installed, setInstalled] = useState(false);
+
+    useEffect(() => {
+        if (subdomain) {
+            fetch(`${API_URL}/public/academy/${subdomain}`)
+                .then(res => res.json())
+                .then(data => { if (data?.name) setAcademyName(data.name); })
+                .catch(() => {});
+        }
+    }, [subdomain]);
 
     // كشف الجهاز
     useEffect(() => {
@@ -109,12 +121,14 @@ const DownloadPage = () => {
                     </div>
 
                     <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-4">
-                        {isRTL ? 'حمّل التطبيق' : 'Download the App'}
+                        {subdomain 
+                            ? (isRTL ? `تطبيق ${academyName}` : `${academyName} Mobile App`)
+                            : (isRTL ? 'تطبيق منصة الأكاديميات' : 'Academy Platform App')}
                     </h1>
                     <p className="text-white/40 text-lg font-medium max-w-md mx-auto">
-                        {isRTL 
-                            ? 'منصة إدارة الأكاديمية — على هاتفك كتطبيق حقيقي' 
-                            : 'Academy Management — as a real app on your phone'}
+                        {subdomain
+                            ? (isRTL ? 'تطبيق الوالدين والمدربين واللاعبين — تثبيت مباشر على هاتفك' : 'Parent, Coach & Player App — Install directly on your phone')
+                            : (isRTL ? 'منصة إدارة الأكاديميات للمدراء — على هاتفك كتطبيق حقيقي' : 'Academy Management Platform — on your phone as a real app')}
                     </p>
                 </div>
 

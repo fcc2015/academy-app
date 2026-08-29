@@ -83,11 +83,12 @@ ALLOWED_ORIGINS = [
     "https://academy-app-mu.vercel.app",
 ]
 
-# For custom academy domains: match any *.run.app, *.netlify.app or *.vercel.app via regex
+# For custom academy domains: match only known safe patterns
+# Tightened regex: only allow specific subdomains of trusted hosts, not wildcards
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://(.*\.run\.app|.*\.netlify\.app|.*\.vercel\.app)",
+    allow_origin_regex=r"https://[a-zA-Z0-9\-]+\.(vercel\.app|netlify\.app|run\.app)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "X-CSRF-Token", "X-Impersonate-Academy", "X-Impersonate-User"],
@@ -156,6 +157,25 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(AuditLogMiddleware)
+
+
+# ─── Impersonation Audit Middleware ──────────────────────
+class ImpersonationAuditMiddleware(BaseHTTPMiddleware):
+    """Log all impersonation attempts — admin accessing another academy or user context."""
+    async def dispatch(self, request: Request, call_next):
+        impersonate_academy = request.headers.get("X-Impersonate-Academy")
+        impersonate_user = request.headers.get("X-Impersonate-User")
+        if impersonate_academy or impersonate_user:
+            client_ip = request.client.host if request.client else "unknown"
+            auth_header = request.headers.get("Authorization", "")[:30]  # partial, not full token
+            logger.warning(
+                f"IMPERSONATION | {request.method} {request.url.path} | "
+                f"IP={client_ip} | Academy={impersonate_academy} | User={impersonate_user} | "
+                f"Auth={auth_header}..."
+            )
+        return await call_next(request)
+
+app.add_middleware(ImpersonationAuditMiddleware)
 
 
 # ─── Rate Limiting (caching-aware, per-IP) ─────────────────

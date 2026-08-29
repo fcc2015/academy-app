@@ -111,7 +111,7 @@ export default function SaasDashboard() {
                     </h3>
                     <div className="space-y-5">
                         {[
-                            { label: 'API Server (Render)', status: 'Online', pct: 'w-full', color: 'bg-emerald-500' },
+                            { label: 'API Server (HuggingFace)', status: 'Online', pct: 'w-full', color: 'bg-emerald-500' },
                             { label: 'Database (Supabase)', status: '99.9% Uptime', pct: 'w-[99%]', color: 'bg-emerald-500' },
                             { label: 'Multi-Tenant Isolation', status: 'Enforced', pct: 'w-full', color: 'bg-blue-500' },
                             { label: 'JWT Auth Coverage', status: '100%', pct: 'w-full', color: 'bg-violet-500' },

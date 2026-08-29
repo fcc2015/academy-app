@@ -90,9 +90,10 @@ class SaasLandingSettings(BaseModel):
 
 # ── Plan limits (must match frontend PLANS) ──
 PLAN_LIMITS = {
-    "free":       {"players": 15,   "admins": 1,  "coaches": 1},
-    "pro":        {"players": 100,  "admins": 4,  "coaches": 10},
-    "enterprise": {"players": -1,   "admins": -1, "coaches": -1},
+    "free":       {"players": 15,   "admins": 1,  "coaches": 1,  "branches": False},
+    "basic":      {"players": 50,   "admins": 2,  "coaches": 3,  "branches": False},
+    "premium":    {"players": 150,  "admins": 5,  "coaches": 10, "branches": False},
+    "enterprise": {"players": -1,   "admins": -1, "coaches": -1, "branches": True},
 }
 
 # ── SaaS Landing Settings (super_admin only) ──
@@ -227,18 +228,19 @@ async def create_academy(req: AcademyProvisionRequest):
             except (ValueError, AttributeError):
                 pass  # If parsing fails, fall through to provisioning attempt
 
+        # Auto-generate subdomain if missing
+        subdomain = req.subdomain
+        if not subdomain:
+            import re
+            subdomain = re.sub(r'[^a-z0-9\-]', '', req.name.lower().replace(' ', '-')) or f"academy-{uuid.uuid4().hex[:6]}"
+
         academy_data = {
             "name": req.name,
+            "subdomain": subdomain,
             "custom_domain": req.custom_domain,
             "domain_status": "pending" if req.custom_domain else None,
             "status": "active",
         }
-        if req.city:
-            academy_data["city"] = req.city
-        if req.notes:
-            academy_data["notes"] = req.notes
-        if req.subdomain:
-            academy_data["subdomain"] = req.subdomain
         if req.plan_id and req.plan_id in PLAN_LIMITS:
             academy_data["plan_id"] = req.plan_id
 

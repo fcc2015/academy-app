@@ -121,6 +121,7 @@ function getAppType() {
     'localhost',
     'academy-frontend-82081149217.europe-west1.run.app',
     'academy-app-mu.vercel.app',
+    'academy-app-fcc.vercel.app',
     'dainty-speculoos-433706.netlify.app',
     'jolly-kangaroo-3c3d92.netlify.app'
   ];
@@ -158,6 +159,7 @@ function App() {
           {/* Public Academy Pages */}
           <Route path="/academies" element={<AcademyDirectory />} />
           <Route path="/academy/:subdomain" element={<AcademyPublicPage />} />
+          <Route path="/academy/:subdomain/download" element={<DownloadPage />} />
 
           {/* SaaS Root */}
           <Route path="/saas" element={<SaasLayout />}>

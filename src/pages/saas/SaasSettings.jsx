@@ -117,16 +117,21 @@ export default function SaasSettings() {
         auto_backup: true,
         maintenance_mode: false,
         paypal_sandbox: true,
-        plan_free_name: 'Free',
+        plan_free_name: 'Free (Essai)',
         plan_free_price: 0,
         plan_free_max_players: 15,
         plan_free_max_admins: 1,
         plan_free_max_coaches: 1,
-        plan_pro_name: 'Pro',
-        plan_pro_price: 499,
-        plan_pro_max_players: 100,
-        plan_pro_max_admins: 4,
-        plan_pro_max_coaches: 10,
+        plan_basic_name: 'Basic',
+        plan_basic_price: 299,
+        plan_basic_max_players: 50,
+        plan_basic_max_admins: 2,
+        plan_basic_max_coaches: 3,
+        plan_premium_name: 'Premium',
+        plan_premium_price: 599,
+        plan_premium_max_players: 150,
+        plan_premium_max_admins: 5,
+        plan_premium_max_coaches: 10,
         plan_enterprise_name: 'Enterprise',
         plan_enterprise_price: 999,
         plan_enterprise_max_players: -1,
@@ -696,10 +701,11 @@ export default function SaasSettings() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                         <PlanCard planKey="free" icon={Zap} colorBg="bg-emerald-50" colorBorder="border-emerald-200" colorText="text-emerald-600" config={config} handleChange={handleChange} />
-                        <PlanCard planKey="pro" icon={Star} colorBg="bg-blue-50" colorBorder="border-blue-200" colorText="text-blue-600" config={config} handleChange={handleChange} />
-                        <PlanCard planKey="enterprise" icon={Crown} colorBg="bg-violet-50" colorBorder="border-violet-200" colorText="text-violet-600" config={config} handleChange={handleChange} />
+                        <PlanCard planKey="basic" icon={Star} colorBg="bg-blue-50" colorBorder="border-blue-200" colorText="text-blue-600" config={config} handleChange={handleChange} />
+                        <PlanCard planKey="premium" icon={Crown} colorBg="bg-indigo-50" colorBorder="border-indigo-200" colorText="text-indigo-600" config={config} handleChange={handleChange} />
+                        <PlanCard planKey="enterprise" icon={Crown} colorBg="bg-amber-50" colorBorder="border-amber-200" colorText="text-amber-600" config={config} handleChange={handleChange} />
                     </div>
 
                     {/* Preview Summary */}
@@ -716,10 +722,11 @@ export default function SaasSettings() {
                                         <th className="text-center">Players</th>
                                         <th className="text-center">Admins</th>
                                         <th className="text-center">Coaches</th>
+                                        <th className="text-center">Multi-Branches (الفروع)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {['free', 'pro', 'enterprise'].map(key => {
+                                    {['free', 'basic', 'premium', 'enterprise'].map(key => {
                                         const fmt = (v) => v === -1 ? '∞' : v;
                                         return (
                                             <tr key={key}>
@@ -728,6 +735,13 @@ export default function SaasSettings() {
                                                 <td className="text-center font-mono">{fmt(config[`plan_${key}_max_players`])}</td>
                                                 <td className="text-center font-mono">{fmt(config[`plan_${key}_max_admins`])}</td>
                                                 <td className="text-center font-mono">{fmt(config[`plan_${key}_max_coaches`])}</td>
+                                                <td className="text-center">
+                                                    {key === 'enterprise' ? (
+                                                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg border border-emerald-200">✓ مسموح (الفروع)</span>
+                                                    ) : (
+                                                        <span className="text-surface-400 text-xs">—</span>
+                                                    )}
+                                                </td>
                                             </tr>
                                         );
                                     })}

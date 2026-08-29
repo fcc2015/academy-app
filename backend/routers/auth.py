@@ -11,23 +11,53 @@ from services.totp_service import generate_totp_secret, get_totp_uri, verify_tot
 from core.auth_middleware import verify_token, invalidate_token_cache
 from core.config import settings
 from core.csrf import generate_csrf_token, CSRF_COOKIE_NAME
+from services.cache_service import cache_service
 
 logger = logging.getLogger("auth")
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# ─── In-memory OTP store (key=email, value={code, expires, purpose}) ───
-_otp_store: dict[str, dict] = {}
-_OTP_EXPIRY = 600  # 10 minutes
-
-# ─── In-memory 2FA stores ─────────────────────────────────────
-# Pending login sessions awaiting TOTP verification (temp_token → session data)
-_pending_2fa: dict[str, dict] = {}
-# Pending TOTP setup secrets (user_id → secret) — not yet confirmed
-_pending_totp_setup: dict[str, str] = {}
+# ─── Cache-backed stores (persistent across restarts via Redis or in-memory fallback)
+# All auth state now uses cache_service so Hugging Face cold starts don't break 2FA / OTP
+_OTP_EXPIRY = 600        # 10 minutes
 _2FA_SESSION_EXPIRY = 300  # 5 minutes
+_LOCKOUT_EXPIRY = 900    # 15 minutes
 
-# ─── In-memory Login Rate Limiting ────────────────────────────
-_login_attempts: dict[str, dict] = {}
+# ── Helpers for cache-backed auth stores ──────────────────────
+async def _otp_get(email: str) -> dict | None:
+    return await cache_service.get(f"otp:{email}")
+
+async def _otp_set(email: str, data: dict) -> None:
+    await cache_service.set(f"otp:{email}", data, expire_seconds=_OTP_EXPIRY + 60)
+
+async def _otp_delete(email: str) -> None:
+    await cache_service.delete(f"otp:{email}")
+
+async def _2fa_get(temp_token: str) -> dict | None:
+    return await cache_service.get(f"2fa:{temp_token}")
+
+async def _2fa_set(temp_token: str, data: dict) -> None:
+    await cache_service.set(f"temp_token:{temp_token}", data, expire_seconds=_2FA_SESSION_EXPIRY + 30)
+
+async def _2fa_delete(temp_token: str) -> None:
+    await cache_service.delete(f"temp_token:{temp_token}")
+
+async def _totp_setup_get(user_id: str) -> str | None:
+    return await cache_service.get(f"totp_setup:{user_id}")
+
+async def _totp_setup_set(user_id: str, secret: str) -> None:
+    await cache_service.set(f"totp_setup:{user_id}", secret, expire_seconds=600)
+
+async def _totp_setup_delete(user_id: str) -> None:
+    await cache_service.delete(f"totp_setup:{user_id}")
+
+async def _attempts_get(ip: str) -> dict:
+    return await cache_service.get(f"login_attempts:{ip}") or {"count": 0, "lockout_until": 0}
+
+async def _attempts_set(ip: str, data: dict) -> None:
+    await cache_service.set(f"login_attempts:{ip}", data, expire_seconds=_LOCKOUT_EXPIRY)
+
+async def _attempts_delete(ip: str) -> None:
+    await cache_service.delete(f"login_attempts:{ip}")
 
 @router.post("/login", response_model=LoginResponse)
 async def login(credentials: UserLogin, request: Request, response: Response):
@@ -38,11 +68,11 @@ async def login(credentials: UserLogin, request: Request, response: Response):
     
     # Check rate limit (skip for localhost / local development)
     LOCALHOST_IPS = {"127.0.0.1", "::1", "localhost"}
-    attempt_data = _login_attempts.get(ip, {"count": 0, "lockout_until": 0})
+    attempt_data = await _attempts_get(ip)
     if ip not in LOCALHOST_IPS and attempt_data["lockout_until"] > now:
         raise HTTPException(status_code=429, detail="Too many failed attempts. Please try again later.")
     if ip in LOCALHOST_IPS:
-        _login_attempts.pop(ip, None)
+        await _attempts_delete(ip)
         
     try:
         # Authenticate user with Supabase
@@ -64,8 +94,7 @@ async def login(credentials: UserLogin, request: Request, response: Response):
             raise
         
         # Reset attempts on success
-        if ip in _login_attempts:
-            del _login_attempts[ip]
+        await _attempts_delete(ip)
             
         user_id = auth_response["user"]["id"]
         token = auth_response["access_token"]
@@ -132,15 +161,15 @@ async def login(credentials: UserLogin, request: Request, response: Response):
                     if t_res.status_code == 200 and t_res.json():
                         row = t_res.json()[0]
                         if row.get("totp_enabled") and row.get("totp_secret"):
-                            # Don't set cookie yet — store pending session
+                            # Don't set cookie yet — store pending session in cache
                             temp = secrets.token_hex(32)
-                            _pending_2fa[temp] = {
+                            await _2fa_set(temp, {
                                 "user_id": user_id,
                                 "role": role,
                                 "token": token,
                                 "refresh_token": refresh_token,
                                 "expires": time.time() + _2FA_SESSION_EXPIRY,
-                            }
+                            })
                             return LoginResponse(requires_2fa=True, temp_token=temp)
             except Exception as totp_err:
                 logger.warning(f"2FA check failed for {user_id}: {totp_err}")
@@ -197,11 +226,11 @@ async def login(credentials: UserLogin, request: Request, response: Response):
     except HTTPException:
         raise
     except Exception as e:
-        # Record failed attempt
-        attempt_data["count"] += 1
+        # Record failed attempt (persisted in cache)
+        attempt_data["count"] = attempt_data.get("count", 0) + 1
         if attempt_data["count"] >= 5:
             attempt_data["lockout_until"] = now + 900  # Lock out for 15 minutes
-        _login_attempts[ip] = attempt_data
+        await _attempts_set(ip, attempt_data)
         
         logger.error("Error: %s", e, exc_info=True)
         raise HTTPException(
@@ -318,9 +347,9 @@ def _make_cookie_kwargs(is_dev: bool) -> dict:
 async def verify_2fa_login(req: TwoFAVerifyLogin, response: Response):
     """Complete login by verifying TOTP code. Sets auth cookies on success."""
     import httpx
-    pending = _pending_2fa.get(req.temp_token)
+    pending = await _2fa_get(req.temp_token)
     if not pending or time.time() > pending["expires"]:
-        _pending_2fa.pop(req.temp_token, None)
+        await _2fa_delete(req.temp_token)
         raise HTTPException(status_code=400, detail="Session expired. Please login again.")
 
     try:
@@ -340,7 +369,7 @@ async def verify_2fa_login(req: TwoFAVerifyLogin, response: Response):
                 raise HTTPException(status_code=400, detail="Invalid code. Please try again.")
 
         # Code valid — set auth cookies and complete login
-        _pending_2fa.pop(req.temp_token, None)
+        await _2fa_delete(req.temp_token)
 
         is_dev = settings.DEV_MODE
         ck = _make_cookie_kwargs(is_dev)
@@ -376,7 +405,7 @@ async def setup_2fa(token_data: dict = Depends(verify_token)):
     email = token_data["email"]
 
     secret = generate_totp_secret()
-    _pending_totp_setup[user_id] = secret
+    await _totp_setup_set(user_id, secret)
 
     uri = get_totp_uri(secret, email)
     qr_b64 = generate_qr_base64(uri)
@@ -390,7 +419,7 @@ async def enable_2fa(req: TwoFACode, token_data: dict = Depends(verify_token)):
     import httpx
     user_id = token_data["user_id"]
 
-    secret = _pending_totp_setup.get(user_id)
+    secret = await _totp_setup_get(user_id)
     if not secret:
         raise HTTPException(status_code=400, detail="No pending setup. Please start over.")
 
@@ -407,7 +436,7 @@ async def enable_2fa(req: TwoFACode, token_data: dict = Depends(verify_token)):
             if res.status_code not in (200, 204):
                 raise Exception(f"DB update failed: {res.status_code}")
 
-        _pending_totp_setup.pop(user_id, None)
+        await _totp_setup_delete(user_id)
         return {"message": "2FA enabled successfully."}
 
     except HTTPException:
@@ -557,18 +586,18 @@ async def send_otp(req: OTPRequest):
     email = req.email.strip().lower()
 
     # Rate limit: max 1 OTP per 60 seconds per email
-    existing = _otp_store.get(email)
+    existing = await _otp_get(email)
     if existing and time.time() - existing.get("created", 0) < 60:
         raise HTTPException(status_code=429, detail="Please wait before requesting a new code.")
 
     code = f"{secrets.randbelow(900000) + 100000}"
-    _otp_store[email] = {
+    await _otp_set(email, {
         "code": code,
         "expires": time.time() + _OTP_EXPIRY,
         "created": time.time(),
         "purpose": req.purpose,
         "attempts": 0,
-    }
+    })
 
     await enqueue_task("send_otp_email", email, code, req.purpose)
 
@@ -580,25 +609,28 @@ async def send_otp(req: OTPRequest):
 async def verify_otp(req: OTPVerify):
     """Verify a 6-digit OTP code."""
     email = req.email.strip().lower()
-    entry = _otp_store.get(email)
+    entry = await _otp_get(email)
 
     if not entry:
         raise HTTPException(status_code=400, detail="No verification code found. Please request a new one.")
 
     if time.time() > entry["expires"]:
-        _otp_store.pop(email, None)
+        await _otp_delete(email)
         raise HTTPException(status_code=400, detail="Code expired. Please request a new one.")
 
     entry["attempts"] = entry.get("attempts", 0) + 1
     if entry["attempts"] > 5:
-        _otp_store.pop(email, None)
+        await _otp_delete(email)
         raise HTTPException(status_code=429, detail="Too many attempts. Please request a new code.")
+
+    # Update attempt count
+    await _otp_set(email, entry)
 
     if req.code.strip() != entry["code"]:
         raise HTTPException(status_code=400, detail="Invalid code.")
 
     # Success — remove OTP
-    _otp_store.pop(email, None)
+    await _otp_delete(email)
     return {"verified": True, "email": email}
 
 
@@ -607,20 +639,22 @@ async def reset_password(req: PasswordReset):
     """Reset password after OTP verification."""
     import httpx
     email = req.email.strip().lower()
-    entry = _otp_store.get(email)
+    entry = await _otp_get(email)
 
     # Verify OTP first
     if not entry or entry.get("purpose") != "reset":
         raise HTTPException(status_code=400, detail="No reset code found. Please request a new one.")
 
     if time.time() > entry["expires"]:
-        _otp_store.pop(email, None)
+        await _otp_delete(email)
         raise HTTPException(status_code=400, detail="Code expired.")
 
     if req.code.strip() != entry["code"]:
         entry["attempts"] = entry.get("attempts", 0) + 1
         if entry["attempts"] > 5:
-            _otp_store.pop(email, None)
+            await _otp_delete(email)
+        else:
+            await _otp_set(email, entry)
         raise HTTPException(status_code=400, detail="Invalid code.")
 
     if len(req.new_password) < 8:
@@ -665,7 +699,7 @@ async def reset_password(req: PasswordReset):
             if update_res.status_code != 200:
                 raise Exception(f"Password update failed: {update_res.status_code}")
 
-        _otp_store.pop(email, None)
+        await _otp_delete(email)
         return {"message": "Password updated successfully."}
 
     except HTTPException:

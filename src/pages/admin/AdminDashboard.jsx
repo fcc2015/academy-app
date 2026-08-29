@@ -243,7 +243,7 @@ const AdminDashboard = () => {
                         <RefreshCw size={20} />
                     </button>
                     <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center text-white font-black shadow-lg shadow-indigo-200 ring-4 ring-white">
-                        {t('dashboard.coach')}
+                        🏟️
                     </div>
                 </div>
             </div>
