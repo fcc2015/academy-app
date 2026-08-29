@@ -45,11 +45,11 @@
             navigator.serviceWorker.getRegistrations().then(function (regs) {
               var hadOld = false;
               regs.forEach(function (r) {
-                if (r.active && /v1|v2|v3/.test(r.active.scriptURL || '')) { r.unregister(); hadOld = true; }
+                if (r.active && /v[1-4]/.test(r.active.scriptURL || '')) { r.unregister(); hadOld = true; }
               });
               if ('caches' in window) {
                 caches.keys().then(function (names) {
-                  var stale = names.filter(function (n) { return /dbadmin-academy-v[123]$/.test(n); });
+                  var stale = names.filter(function (n) { return /dbadmin-academy-v[1-4]$/.test(n); });
                   Promise.all(stale.map(function (n) { return caches.delete(n); })).then(function () {
                     if (hadOld || stale.length > 0) location.reload();
                   });

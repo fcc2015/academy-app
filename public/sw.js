@@ -2,7 +2,7 @@
 // يخلي التطبيق يخدم offline + يكاشي الأصول الثابتة فقط
 // لا يكاشي HTML/JS/CSS بش متبقاش versions قديمة fl navigateur
 
-const CACHE_NAME = 'dbadmin-academy-v4';
+const CACHE_NAME = 'dbadmin-academy-v5';
 const STATIC_ASSETS = [
     '/logo.png',
     '/manifest.json'
