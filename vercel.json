@@ -1,6 +1,7 @@
 {
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://elghazali1987-academy-backend.hf.space/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "https://elghazali1987-academy-backend.hf.space/api/$1" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
