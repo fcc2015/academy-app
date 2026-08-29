@@ -438,11 +438,11 @@ const PlayersManagement = () => {
                         showCancelButton: true,
                         cancelButtonText: isRTL ? 'إغلاق' : 'Close',
                         confirmButtonColor: '#4f46e5',
+                        cancelButtonColor: '#64748b',
                         background: '#ffffff',
                         customClass: {
-                            popup: 'rounded-3xl shadow-2xl border border-slate-100',
-                            title: 'font-black text-slate-800 text-xl',
-                            confirmButton: 'px-8 py-3.5 rounded-2xl font-black tracking-widest uppercase text-sm'
+                            popup: 'swal-academy-popup',
+                            title: 'swal-academy-title'
                         }
                     }).then((result) => {
                         if (result.isConfirmed) {
@@ -463,9 +463,8 @@ const PlayersManagement = () => {
                         confirmButtonColor: '#4f46e5',
                         background: '#ffffff',
                         customClass: {
-                            popup: 'rounded-3xl shadow-2xl border border-slate-100',
-                            title: 'font-black text-slate-800 text-xl',
-                            confirmButton: 'px-8 py-3.5 rounded-2xl font-black tracking-widest uppercase text-sm'
+                            popup: 'swal-academy-popup',
+                            title: 'swal-academy-title'
                         }
                     });
                 } else {
@@ -741,7 +740,7 @@ const PlayersManagement = () => {
                     branches={branches}
                 />
             )}
-            <PlayerBadgeModal player={currentPlayer} isOpen={isBadgeModalOpen} onClose={() => setIsBadgeModalOpen(false)} academyName={settings?.academy_name} academyLogo={settings?.logo_url} branchName={currentPlayer?.branch_id ? branches.find(b => b.id === currentPlayer.branch_id)?.name : null} />
+            <PlayerBadgeModal player={currentPlayer} isOpen={isBadgeModalOpen} onClose={() => setIsBadgeModalOpen(false)} academyName={settings?.academy_name} academyLogo={settings?.logo_url} branchName={currentPlayer?.branch_id ? branches.find(b => b.id === currentPlayer.branch_id)?.name : null} settings={settings} />
             <PlayerMatchesModal player={currentPlayer} isOpen={isMatchesModalOpen} onClose={() => setIsMatchesModalOpen(false)} t={t} isRTL={isRTL} dir={dir} />
             <PlayerProfileModal player={currentPlayer} isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} isRTL={isRTL} dir={dir} />
 

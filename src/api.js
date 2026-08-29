@@ -108,8 +108,12 @@ export async function authFetch(url, options = {}) {
 
   // User-level impersonation — admin acting as a parent / player / coach.
   // Backend swaps user_id + role to the target if the caller is admin/super_admin.
+  // DO NOT attach X-Impersonate-User header when on /admin/ or /saas/ management routes.
   const impersonateUser = localStorage.getItem('impersonating_user_id');
-  if (impersonateUser && !headers['X-Impersonate-User']) {
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isAdminRoute = currentPath.startsWith('/admin') || currentPath.startsWith('/saas');
+  const isImpersonateApi = url && url.toString().includes('/admins/impersonate-user');
+  if (impersonateUser && !headers['X-Impersonate-User'] && (!isAdminRoute || isImpersonateApi)) {
     headers['X-Impersonate-User'] = impersonateUser;
   }
 

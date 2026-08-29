@@ -33,6 +33,19 @@ def generate_temp_password(length=12):
     random.shuffle(pwd)
     return "".join(pwd)
 
+async def _resolve_player_names(players_list: list):
+    if not players_list:
+        return players_list
+    try:
+        users = await supabase._get("/rest/v1/users?select=id,full_name")
+        user_map = {u["id"]: u["full_name"] for u in (users or []) if isinstance(u, dict) and u.get("id")}
+        for p in players_list:
+            if not p.get("full_name") or p.get("full_name") == "Unknown":
+                p["full_name"] = user_map.get(p.get("user_id")) or p.get("parent_name") or "Player"
+    except Exception as e:
+        logger.warning("Failed to resolve player names from users table: %s", e)
+    return players_list
+
 @router.get("/", response_model=List[PlayerResponse])
 async def get_all_players(user: dict = Depends(require_role("admin", "coach", "super_admin", "sous_admin"))):
     try:
@@ -47,11 +60,7 @@ async def get_all_players(user: dict = Depends(require_role("admin", "coach", "s
             allowed_branches = {r["branch_id"] for r in (assigned or [])}
             raw_players = [p for p in raw_players if p.get("branch_id") in allowed_branches]
 
-        # Players table now stores full_name directly – no join needed
-        for p in raw_players:
-            if not p.get('full_name'):
-                p['full_name'] = p.get('users', {}).get('full_name', 'Unknown') if isinstance(p.get('users'), dict) else 'Unknown'
-        return raw_players
+        return await _resolve_player_names(raw_players)
     except Exception as e:
         logger.error("Error fetching players: %s", e, exc_info=True)
         raise HTTPException(
@@ -222,19 +231,11 @@ async def create_player(player: PlayerCreate):
 @router.get("/{user_id}", response_model=PlayerResponse)
 async def get_player_by_id(user_id: str):
     try:
-        from core.config import settings
-        res = await supabase.client.get(
-            f"{settings.SUPABASE_URL}/rest/v1/players?user_id=eq.{user_id}&select=*,users(full_name)"
-        )
-        res.raise_for_status()
-        data = res.json()
+        data = await supabase._get(f"/rest/v1/players?user_id=eq.{user_id}&select=*")
         if not data:
             raise HTTPException(status_code=404, detail="Player not found")
+        data = await _resolve_player_names(data)
         p = data[0]
-        if 'users' in p and p['users']:
-            p['full_name'] = p['users'].get('full_name', 'Unknown')
-        else:
-            p['full_name'] = 'Unknown'
 
         # Strip coach_notes for roles that shouldn't see it
         role = role_ctx.get(None)
@@ -588,10 +589,9 @@ async def get_players_by_parent(parent_id: str):
         if not data:
             data = await supabase._get(f"/rest/v1/players?user_id=eq.{parent_id}&select=*")
 
+        data = await _resolve_player_names(data or [])
         role = role_ctx.get(None)
         for p in data:
-            if not p.get('full_name'):
-                p['full_name'] = p.get('parent_name') or p.get('users', {}).get('full_name', 'Unknown') if isinstance(p.get('users'), dict) else 'Unknown'
             # Strip coach_notes for unauthorized roles
             if role not in ("admin", "super_admin", "sous_admin", "coach"):
                 p.pop("coach_notes", None)

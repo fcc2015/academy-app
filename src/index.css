@@ -974,3 +974,49 @@ body.modal-open {
 .va-empty span { font-size: 0.78rem; color: #a1a1aa; }
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ================================================================
+   SWEETALERT2 CUSTOM STYLES — swal-academy-popup
+   ================================================================ */
+.swal-academy-popup {
+  border-radius: 24px !important;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.15) !important;
+  border: 1px solid #e2e8f0 !important;
+  font-family: 'Inter', 'Cairo', system-ui, sans-serif !important;
+}
+
+.swal-academy-title {
+  font-size: 1.1rem !important;
+  font-weight: 900 !important;
+  color: #1e293b !important;
+  letter-spacing: -0.01em !important;
+}
+
+.swal-academy-popup .swal2-actions {
+  gap: 10px !important;
+  padding: 0 20px 20px !important;
+}
+
+.swal-academy-popup .swal2-confirm,
+.swal-academy-popup .swal2-cancel {
+  border-radius: 12px !important;
+  padding: 10px 22px !important;
+  font-weight: 700 !important;
+  font-size: 0.875rem !important;
+  letter-spacing: 0.02em !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: opacity 0.15s, transform 0.15s !important;
+}
+
+.swal-academy-popup .swal2-confirm:hover,
+.swal-academy-popup .swal2-cancel:hover {
+  opacity: 0.88 !important;
+  transform: translateY(-1px) !important;
+}
+
+.swal-academy-popup .swal2-html-container {
+  margin: 0 !important;
+  padding: 0 20px !important;
+}
+

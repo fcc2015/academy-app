@@ -75,7 +75,7 @@ const AttendanceManagement = () => {
             const res = await authFetch(`${API_URL}/attendance/?squad_id=${selectedSquad}&date=${selectedDate}`);
             if (res.ok) {
                 const existingRecords = await res.json();
-                const squadPlayers = players.filter(p => p.squad_id === selectedSquad);
+                const squadPlayers = players.filter(p => String(p.squad_id) === String(selectedSquad));
                 let initialData = {};
                 squadPlayers.forEach(p => { initialData[p.user_id] = 'present'; });
                 existingRecords.forEach(record => { initialData[record.player_id] = record.status; });
@@ -103,6 +103,14 @@ const AttendanceManagement = () => {
 
     const handleStatusChange = (playerId, status) => {
         setAttendanceData(prev => ({ ...prev, [playerId]: status }));
+    };
+
+    const handleMarkAll = (status) => {
+        const squadPlayers = players.filter(p => String(p.squad_id) === String(selectedSquad));
+        const updated = { ...attendanceData };
+        squadPlayers.forEach(p => { updated[p.user_id] = status; });
+        setAttendanceData(updated);
+        showBanner(isRTL ? `تم تحديد الكل كـ ${status === 'present' ? 'حاضر' : 'غائب'}` : `Marked all ${status}`, 'success');
     };
 
     const handleSave = async () => {
@@ -136,10 +144,10 @@ const AttendanceManagement = () => {
         { id: 'excused', label: 'مبرر', short: 'م', icon: ShieldAlert, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200' }
     ];
 
-    const currentSquadPlayers = players.filter(p => p.squad_id === selectedSquad)
+    const currentSquadPlayers = players.filter(p => String(p.squad_id) === String(selectedSquad))
                                        .filter(p => p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const activeSquad = squads.find(s => s.id === selectedSquad);
+    const activeSquad = squads.find(s => String(s.id) === String(selectedSquad));
 
     const onScanResult = (decodedText) => {
         try {
@@ -304,12 +312,30 @@ const AttendanceManagement = () => {
                             </div>
                             <div className={`flex items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0 ${isRTL ? 'flex-row-reverse' : ''}`}>
                                 {selectedSquad && (
-                                    <button 
-                                        onClick={() => setIsScannerOpen(true)}
-                                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 bg-gradient-to-tr from-emerald-500 to-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all ${isRTL ? 'flex-row-reverse' : ''}`}
-                                    >
-                                        <QrCode size={16} /> {isRTL ? 'فحص البطاقة (QR)' : 'Scan QR Code'}
-                                    </button>
+                                    <>
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleMarkAll('present')}
+                                            className="px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-all flex items-center gap-1 shrink-0"
+                                            title={isRTL ? 'تحديد كل اللاعبين كحاضرين' : 'Mark all present'}
+                                        >
+                                            <CheckCircle2 size={14} /> {isRTL ? 'الكل حاضر' : 'All Present'}
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => handleMarkAll('absent')}
+                                            className="px-3 py-2 bg-red-50 text-red-700 border border-red-200 rounded-xl font-bold text-xs hover:bg-red-100 transition-all flex items-center gap-1 shrink-0"
+                                            title={isRTL ? 'تحديد كل اللاعبين كغائبين' : 'Mark all absent'}
+                                        >
+                                            <XCircle size={14} /> {isRTL ? 'الكل غائب' : 'All Absent'}
+                                        </button>
+                                        <button 
+                                            onClick={() => setIsScannerOpen(true)}
+                                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 bg-gradient-to-tr from-emerald-500 to-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all ${isRTL ? 'flex-row-reverse' : ''}`}
+                                        >
+                                            <QrCode size={16} /> {isRTL ? 'فحص البطاقة (QR)' : 'Scan QR Code'}
+                                        </button>
+                                    </>
                                 )}
                                 {selectedSquad && (
                                     <div className="relative w-full sm:w-64">

@@ -42,6 +42,7 @@ const AdminDashboard = () => {
     const role = typeof window !== 'undefined' ? localStorage.getItem('role') : null;
     const toast = useToast();
     const [allPayments, setAllPayments] = useState([]);
+    const [allPlayers, setAllPlayers] = useState([]);
     const [stats, setStats] = useState({
         totalPlayers: 0,
         totalRevenue: 0,
@@ -55,21 +56,27 @@ const AdminDashboard = () => {
     const [notifData, setNotifData] = useState({ title: '', message: '', target_role: '' });
     const [sendWhatsApp, setSendWhatsApp] = useState(false);
 
-    const fetchDashboardData = useCallback(async () => {
+    const fetchDashboardData = useCallback(async (forceRefresh = false) => {
         setIsLoading(true);
         try {
-            // 1. Check Cache (30 seconds)
+            // 1. Check Cache (30 seconds) — skip if force refresh
             const lastFetch = sessionStorage.getItem('admin_dash_last_fetch');
             const cachedData = sessionStorage.getItem('admin_dash_data');
             const now = Date.now();
 
-            if (lastFetch && cachedData && (now - parseInt(lastFetch) < 30000)) {
+            if (!forceRefresh && lastFetch && cachedData && (now - parseInt(lastFetch) < 30000)) {
                 const data = JSON.parse(cachedData);
                 setStats(data.stats);
                 setPendingPayments(data.pending);
                 setActivities(data.activities);
                 setIsLoading(false);
                 return;
+            }
+
+            // Clear cache on force refresh
+            if (forceRefresh) {
+                sessionStorage.removeItem('admin_dash_last_fetch');
+                sessionStorage.removeItem('admin_dash_data');
             }
 
             const [playersRes, paymentsRes, coachesRes, eventsRes] = await Promise.all([
@@ -90,6 +97,7 @@ const AdminDashboard = () => {
             const cArr = Array.isArray(safeCoaches) ? safeCoaches : [];
             const eArr = Array.isArray(safeEvents) ? safeEvents : [];
 
+            setAllPlayers(pArr);
             setAllPayments(payArr);
             const totalRevenue = payArr.filter(p => p && ['paid','Paid','Completed','completed'].includes(p.status)).reduce((sum, p) => sum + (p.amount || 0), 0);
             const activeCoaches = cArr.filter(c => c && (c.status === 'Active' || c.status === 'active')).length || cArr.length;
@@ -231,7 +239,7 @@ const AdminDashboard = () => {
                     )}
                 </div>
                 <div className="flex items-center gap-4">
-                    <button onClick={fetchDashboardData} className="p-3.5 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all shadow-sm active:rotate-180 duration-500 flex items-center justify-center">
+                    <button onClick={() => fetchDashboardData(true)} title={isRTL ? 'تحديث البيانات' : 'Refresh Data'} className={`p-3.5 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all shadow-sm duration-500 flex items-center justify-center ${isLoading ? 'animate-spin' : 'hover:rotate-180'}`}>
                         <RefreshCw size={20} />
                     </button>
                     <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center text-white font-black shadow-lg shadow-indigo-200 ring-4 ring-white">
@@ -484,7 +492,7 @@ const AdminDashboard = () => {
                     {!isLoading && (
                         <AcademyHealthScore
                             payments={allPayments}
-                            players={[]}
+                            players={allPlayers}
                             attendanceRate={allPayments.length > 0 ? Math.round((allPayments.filter(p => ['paid','Paid','Completed','completed'].includes(p?.status)).length / allPayments.length) * 80 + 20) : 0}
                             evaluationsCoverage={0}
                             isRTL={isRTL}

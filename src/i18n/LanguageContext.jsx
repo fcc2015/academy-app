@@ -68,20 +68,20 @@ export const LanguageProvider = ({ children }) => {
         }
     }, [locale]);
 
-    // ===== Currency Formatting (MAD) =====
-    const formatCurrency = useCallback((amount) => {
+    // ===== Currency Formatting =====
+    const formatCurrency = useCallback((amount, customCurrency = null) => {
         if (amount == null || isNaN(amount)) return '—';
         try {
             const formatted = new Intl.NumberFormat(locale, {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
             }).format(amount);
-            const unit = lang === 'ar' ? 'درهم' : 'MAD';
-            return isRTL ? `${formatted} ${unit}` : `${formatted} ${unit}`;
+            const unit = customCurrency || (lang === 'ar' ? 'درهم' : 'MAD');
+            return `${formatted} ${unit}`;
         } catch {
-            return `${amount} MAD`;
+            return `${amount} ${customCurrency || 'MAD'}`;
         }
-    }, [locale, lang, isRTL]);
+    }, [locale, lang]);
 
     // ===== Relative Time =====
     const formatRelativeTime = useCallback((dateStr) => {

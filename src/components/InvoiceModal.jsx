@@ -2,10 +2,12 @@ import React, { useRef } from 'react';
 import { X, Download, Printer } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
-const InvoiceModal = ({ isOpen, onClose, payment, academyName, academyLogo, isRTL }) => {
+const InvoiceModal = ({ isOpen, onClose, payment, academyName, academyLogo, isRTL, currency }) => {
     const invoiceRef = useRef(null);
 
     if (!isOpen || !payment) return null;
+
+    const currUnit = currency || (isRTL ? 'درهم' : 'MAD');
 
     const displayName = academyName || 'ACADEMY';
     const logoInitial = displayName.charAt(0).toUpperCase();
@@ -152,7 +154,7 @@ const InvoiceModal = ({ isOpen, onClose, payment, academyName, academyLogo, isRT
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px dashed #e2e8f0' }}>
                             <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>المبلغ</span>
-                            <span style={{ fontSize: '14px', fontWeight: 900, color: '#0f172a' }}>{payment.amount} درهم</span>
+                            <span style={{ fontSize: '14px', fontWeight: 900, color: '#0f172a' }}>{payment.amount} {currUnit}</span>
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px dashed #e2e8f0' }}>
@@ -193,7 +195,7 @@ const InvoiceModal = ({ isOpen, onClose, payment, academyName, academyLogo, isRT
                             المبلغ الإجمالي
                         </div>
                         <div style={{ fontSize: '28px', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.03em' }}>
-                            {payment.amount} <span style={{ fontSize: '14px', fontWeight: 700, opacity: 0.7 }}>MAD</span>
+                            {payment.amount} <span style={{ fontSize: '14px', fontWeight: 700, opacity: 0.7 }}>{currUnit}</span>
                         </div>
                     </div>
 

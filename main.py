@@ -72,6 +72,7 @@ ALLOWED_ORIGINS = [
     "https://dainty-speculoos-433706.netlify.app",
     "https://jolly-kangaroo-3c3d92.netlify.app",
     "https://academy-app-mu.vercel.app",
+    "https://academy-app-fcc.vercel.app",
 ]
 
 # For custom academy domains: match any *.netlify.app or *.vercel.app via regex

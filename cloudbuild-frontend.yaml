@@ -1,0 +1,5 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-f', 'Dockerfile.frontend', '-t', 'gcr.io/fcc-academy/academy-frontend:latest', '.']
+images:
+  - 'gcr.io/fcc-academy/academy-frontend:latest'

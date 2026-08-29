@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../../config';
 import { authFetch } from '../../api';
 import { impersonateUser } from '../../utils/impersonate';
@@ -360,6 +361,7 @@ const CoachCard = ({ coach, onEdit, onDelete, onLoginAs, onMetrics, isRTL }) => 
 
 // ─── Main Component ───────────────────────────────────────────────────
 const CoachesManagement = () => {
+    const navigate = useNavigate();
     const { isRTL, dir } = useLanguage();
     const [coaches, setCoaches] = useState([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -502,7 +504,7 @@ const CoachesManagement = () => {
                 // Parse specific Supabase errors to be more user-friendly
                 let errorMsg = err.detail || 'Failed to save coach';
                 if (errorMsg.includes('409 Conflict') || errorMsg.includes('duplicate key')) {
-                    errorMsg = 'HADA HISSAB DEJA MOSSAJAL';
+                    errorMsg = isRTL ? 'هذا البريد الإلكتروني مسجل مسبقاً' : 'This email is already registered';
                 }
                 
                 showBanner(errorMsg, 'error');
@@ -638,6 +640,7 @@ const CoachesManagement = () => {
                                 try {
                                     const data = await impersonateUser(c.user_id);
                                     showBanner(`Viewing as ${data.full_name || 'Coach'}`, 'success');
+                                    navigate('/coach/dashboard');
                                 }
                                 catch (e) { showBanner(e.message || 'Login as failed', 'error'); }
                             }}

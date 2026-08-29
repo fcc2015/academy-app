@@ -11,7 +11,7 @@ const playerSchema = z.object({
     birth_date: z.string().min(1, { message: 'Birth date is required' }),
     parent_whatsapp: z.string().regex(/^\+?[0-9]{8,15}$/, { message: 'Invalid phone format (e.g. +212600000000)' }),
     parent_email: z.string().email({ message: 'Invalid email format' }).or(z.literal('')).optional().nullable(),
-    address: z.string().min(3, { message: 'Must be at least 3 characters' }),
+    address: z.string().optional().nullable().or(z.literal('')),
     u_category: z.string().min(1, { message: 'Age category is required' }),
     technical_level: z.string().default('B'),
     account_status: z.string().default('Pending'),
@@ -94,7 +94,7 @@ const PlayerModal = ({
     const goNext = async (e) => {
         e.preventDefault();
         const fieldsToValidate = [
-            'full_name', 'parent_name', 'birth_date', 'parent_whatsapp', 'parent_email', 'address', 'u_category'
+            'full_name', 'parent_name', 'birth_date', 'parent_whatsapp', 'parent_email', 'u_category'
         ];
         const isValid = await trigger(fieldsToValidate);
         if (isValid) {

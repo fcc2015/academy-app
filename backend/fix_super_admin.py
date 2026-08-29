@@ -10,9 +10,11 @@ import httpx
 import sys
 import json
 
-URL = "https://kbhnqntteexatihidhkn.supabase.co"
-ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiaG5xbnR0ZWV4YXRpaGlkaGtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3NDk2MDksImV4cCI6MjA4ODMyNTYwOX0.dwF2cxTuH7tCjDQv_IXsQNzWQmol6FbvWV17hBSyl94"
-SRK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiaG5xbnR0ZWV4YXRpaGlkaGtuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mjc0OTYwOSwiZXhwIjoyMDg0MzI1NjA5fQ.3n5lrv0GNtHPBOzll8PvJlCXczzA1kKRJuNDTmW1aCE"
+from core.config import settings
+
+URL = settings.SUPABASE_URL
+ANON_KEY = settings.SUPABASE_KEY
+SRK = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY
 
 ADMIN_HEADERS = {
     "apikey": SRK,
@@ -48,7 +50,7 @@ def main():
             role = u.get("user_metadata", {}).get("role", "unknown")
             email = u.get("email", "?")
             uid = u.get("id", "?")
-            print(f"  → {email} | role={role} | id={uid}")
+            print(f"  - {email} | role={role} | id={uid}")
             if role == "super_admin":
                 super_admin_ids.append(uid)
         
@@ -106,7 +108,7 @@ def main():
         
         new_user = res.json()
         new_uid = new_user["id"]
-        print(f"✅ Created auth user: {new_uid}")
+        print(f"[OK] Created auth user: {new_uid}")
         print(f"   Email: {EMAIL}")
         print(f"   Role: super_admin")
         
@@ -128,9 +130,9 @@ def main():
         )
         
         if res.status_code in [200, 201]:
-            print(f"✅ public.users record created")
+            print(f"[OK] public.users record created")
         elif res.status_code == 409:
-            print(f"⚠️  public.users record already exists (conflict), updating...")
+            print(f"[WARN] public.users record already exists (conflict), updating...")
             res2 = client.patch(
                 f"{URL}/rest/v1/users?id=eq.{new_uid}",
                 json={"role": "super_admin", "full_name": "SaaS Super Admin"},
@@ -138,7 +140,7 @@ def main():
             )
             print(f"   Update result: {res2.status_code}")
         else:
-            print(f"⚠️  public.users insert returned: {res.status_code} {res.text[:200]}")
+            print(f"[WARN] public.users insert returned: {res.status_code} {res.text[:200]}")
         
         # Step 5: Verify login works
         print(f"\n{'=' * 60}")
@@ -154,7 +156,7 @@ def main():
         if res.status_code == 200:
             data = res.json()
             role = data["user"].get("user_metadata", {}).get("role")
-            print(f"✅ LOGIN SUCCESSFUL!")
+            print(f"[OK] LOGIN SUCCESSFUL!")
             print(f"   User ID: {data['user']['id']}")
             print(f"   Role: {role}")
             print(f"   Token: {data['access_token'][:50]}...")

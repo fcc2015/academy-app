@@ -242,6 +242,23 @@ async def get_impersonation_target(user_id: str):
                         "academy_id": player.get("academy_id"),
                     }
 
+        # Fallback: look up in coaches table (coach may not be in public.users yet if they never logged in)
+        if not target:
+            c_res = await client.get(
+                f"{_settings.SUPABASE_URL}/rest/v1/coaches?user_id=eq.{user_id}&select=user_id,full_name,email,photo_url,academy_id",
+                headers=supabase.admin_headers,
+            )
+            coaches_data = c_res.json() if c_res.status_code == 200 else []
+            if coaches_data:
+                coach_row = coaches_data[0]
+                target = {
+                    "id": user_id,
+                    "email": coach_row.get("email"),
+                    "full_name": coach_row.get("full_name", "مدرب"),
+                    "role": "coach",
+                    "academy_id": coach_row.get("academy_id"),
+                }
+
         if not target:
             raise HTTPException(status_code=404, detail="User not found")
 
