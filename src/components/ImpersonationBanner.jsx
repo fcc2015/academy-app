@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, Eye, User } from 'lucide-react';
 
 const readState = () => ({
@@ -12,6 +12,7 @@ const readState = () => ({
 
 export default function ImpersonationBanner() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [state, setState] = useState(readState);
 
     useEffect(() => {
@@ -22,6 +23,16 @@ export default function ImpersonationBanner() {
     }, []);
 
     const { academyId, academyName, userId, userName, userRole } = state;
+
+    // Do not show banner on public routes (e.g. download pages, public academy pages)
+    const isPublicRoute = location.pathname === '/' ||
+        location.pathname.startsWith('/academy/') ||
+        location.pathname.startsWith('/download') ||
+        location.pathname.startsWith('/academies') ||
+        location.pathname === '/login' ||
+        location.pathname === '/qr-login';
+
+    if (isPublicRoute) return null;
     if (!academyId && !userId) return null;
 
     const exitUser = () => {

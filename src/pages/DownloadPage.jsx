@@ -24,6 +24,7 @@ const DownloadPage = () => {
     const subdomain = getSubdomain();
     const appUrl = subdomain ? `${window.location.origin}/academy/${subdomain}` : window.location.origin;
     const [academyName, setAcademyName] = useState(subdomain ? `أكاديمية ${subdomain}` : '');
+    const [academyLogo, setAcademyLogo] = useState(null);
     const [copied, setCopied] = useState(false);
     const [platform, setPlatform] = useState('unknown'); // android, ios, desktop
     const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -33,7 +34,10 @@ const DownloadPage = () => {
         if (subdomain) {
             fetch(`${API_URL}/public/academy/${subdomain}`)
                 .then(res => res.json())
-                .then(data => { if (data?.name) setAcademyName(data.name); })
+                .then(data => {
+                    if (data?.name) setAcademyName(data.name);
+                    if (data?.logo_url) setAcademyLogo(data.logo_url);
+                })
                 .catch(() => {});
         }
     }, [subdomain]);
@@ -119,9 +123,11 @@ const DownloadPage = () => {
                     {/* App Icon */}
                     <div className="inline-block mb-8 relative">
                         <div className="w-28 h-28 rounded-[2rem] flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-indigo-600 to-purple-600 shadow-[0_20px_60px_rgba(79,70,229,0.4)]">
-                            <img src="/logo.png" alt="Logo" className="w-20 h-20 object-contain"
-                                onError={(e) => { e.target.style.display = 'none'; }} />
-                            <span className="text-5xl absolute hidden">⚽</span>
+                            {academyLogo ? (
+                                <img src={academyLogo} alt={academyName} className="w-20 h-20 object-contain p-2" />
+                            ) : (
+                                <span className="text-5xl select-none">⚽</span>
+                            )}
                         </div>
                         {/* Glow ring */}
                         <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-[2.5rem] opacity-20 blur-lg -z-10 animate-pulse" />
