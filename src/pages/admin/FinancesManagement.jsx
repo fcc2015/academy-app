@@ -8,7 +8,8 @@ import {
     FileText,
     X,
     DollarSign,
-    MinusCircle
+    MinusCircle,
+    MessageSquare
 } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -264,6 +265,25 @@ const FinancesManagement = () => {
         }
     };
 
+    const [isSendingWhatsAppReminders, setIsSendingWhatsAppReminders] = useState(false);
+
+    const runWhatsAppReminders = async () => {
+        setIsSendingWhatsAppReminders(true);
+        try {
+            const res = await authFetch(`${API_URL}/notifications/trigger-payment-reminders`, { method: 'POST' });
+            if (res.ok) {
+                const data = await res.json();
+                showBanner(`تم إرسال ${data.reminders_sent || 0} تذكير عبر الواتساب بنجاح! 📲`, 'success');
+            } else {
+                showBanner('فشل إرسال التذكيرات', 'error');
+            }
+        } catch {
+            showBanner('خطأ في الاتصال بالخادم', 'error');
+        } finally {
+            setIsSendingWhatsAppReminders(false);
+        }
+    };
+
     const handleExpenseChange = (e) => {
         const { name, value } = e.target;
         setExpenseFormData(prev => ({ ...prev, [name]: value }));
@@ -350,6 +370,15 @@ const FinancesManagement = () => {
                     >
                         <RefreshCw size={18} className={isCheckingAlerts ? 'animate-spin' : ''} />
                         <span>{t('finances.alertCheck')}</span>
+                    </button>
+                    <button
+                        onClick={runWhatsAppReminders}
+                        disabled={isSendingWhatsAppReminders}
+                        className="flex-1 md:flex-none flex items-center justify-center gap-3 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-50"
+                        title="إرسال تذكير بالواتساب لجميع المتأخرين"
+                    >
+                        <MessageSquare size={18} className={isSendingWhatsAppReminders ? 'animate-spin' : ''} />
+                        <span>{isRTL ? 'تذكير الواتساب 📲' : 'WhatsApp Reminders'}</span>
                     </button>
                     <button
                         onClick={() => navigate('/saas/analytics')}

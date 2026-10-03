@@ -195,3 +195,80 @@ async def send_whatsapp_blast(req: WhatsAppBlastRequest, user: dict = Depends(ve
     }
 
 
+class PaymentReminderRequest(BaseModel):
+    custom_note: Optional[str] = None
+
+@router.post("/trigger-payment-reminders")
+async def trigger_payment_reminders(req: Optional[PaymentReminderRequest] = None, user: dict = Depends(verify_token)):
+    """
+    Scans unpaid/due subscriptions for the academy and sends automated WhatsApp payment reminders to parents.
+    Also returns click-to-chat WhatsApp links for 1-click manual sending.
+    """
+    if user.get("role") not in ["admin", "super_admin"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can trigger payment reminders")
+
+    from services.whatsapp_service import generate_whatsapp_link
+    from services.queue_service import enqueue_task
+    import httpx
+    
+    academy_id = user.get("academy_id")
+    
+    # Query unpaid player subscriptions with parent whatsapp info
+    query = f"{settings.SUPABASE_URL}/rest/v1/player_subscriptions?status=eq.unpaid&select=id,amount,due_date,players(id,full_name,parent_whatsapp,parent_name)"
+    if academy_id:
+        query += f"&academy_id=eq.{academy_id}"
+
+    async with httpx.AsyncClient(trust_env=False, timeout=15.0) as client:
+        res = await client.get(query, headers=supabase.admin_headers)
+        if res.status_code != 200:
+            logger.error(f"Failed to fetch unpaid subscriptions: {res.text}")
+            raise HTTPException(status_code=500, detail="Failed to fetch unpaid subscriptions list")
+        unpaid = res.json()
+
+    reminders = []
+    queued_count = 0
+
+    for sub in unpaid:
+        player_data = sub.get("players") or {}
+        player_name = player_data.get("full_name") or "اللاعب"
+        parent_name = player_data.get("parent_name") or "ولي الأمر"
+        phone = player_data.get("parent_whatsapp")
+        amount = sub.get("amount") or 0
+        due_date = sub.get("due_date") or ""
+
+        if not phone:
+            continue
+
+        custom_note = (req.custom_note + "\n") if (req and req.custom_note) else ""
+        msg_text = (
+            f"مرحباً {parent_name} 👋\n"
+            f"نود تذكيركم بتجديد اشتراك اللاعب(ة) *{player_name}* للأكاديمية الرياضية.\n"
+            f"💵 المبلغ المستحق: *{amount} درهم*\n"
+            f"{f'📅 تاريخ الاستحقاق: {due_date}' if due_date else ''}\n"
+            f"{custom_note}"
+            f"نشكركم على ثقتكم بنا! ⚽"
+        )
+
+        wa_link = generate_whatsapp_link(phone, msg_text)
+        await enqueue_task("send_whatsapp_message", phone, msg_text)
+        queued_count += 1
+
+        reminders.append({
+            "player_id": player_data.get("id"),
+            "player_name": player_name,
+            "parent_name": parent_name,
+            "parent_whatsapp": phone,
+            "amount": amount,
+            "due_date": due_date,
+            "whatsapp_link": wa_link
+        })
+
+    return {
+        "success": True,
+        "total_unpaid": len(unpaid),
+        "reminders_sent": queued_count,
+        "reminders": reminders
+    }
+
+
+
