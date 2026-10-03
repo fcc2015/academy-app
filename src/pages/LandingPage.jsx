@@ -32,7 +32,9 @@ const LandingPage = () => {
                 sub = parts[0];
             }
         }
-        if (!sub) return;
+        if (!sub || sub === 'academy-app-fcc') {
+            sub = 'fcc-sidimaarouf';
+        }
         fetch(`${API_URL}/public/academy/${encodeURIComponent(sub)}`)
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data) setAcademyCtx(data); })
@@ -212,7 +214,7 @@ const LandingPage = () => {
                                 ? [{ href: '#branches', label: isRTL ? 'الفروع' : 'Branches' }]
                                 : []),
                             { href: '#pricing',  label: t('landing.pricing')  },
-                            { href: '#about',    label: isRTL ? 'من نحن' : 'About' },
+                            { href: '#about',    label: isRTL ? 'تعرف علينا' : 'About' },
                             { href: '#contact',  label: t('landing.contact')  },
                             { href: '#privacy',  label: isRTL ? 'الخصوصية' : 'Privacy' },
                         ].map(link => (
