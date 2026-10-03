@@ -36,10 +36,10 @@ async def _2fa_get(temp_token: str) -> dict | None:
     return await cache_service.get(f"2fa:{temp_token}")
 
 async def _2fa_set(temp_token: str, data: dict) -> None:
-    await cache_service.set(f"temp_token:{temp_token}", data, expire_seconds=_2FA_SESSION_EXPIRY + 30)
+    await cache_service.set(f"2fa:{temp_token}", data, expire_seconds=_2FA_SESSION_EXPIRY + 30)
 
 async def _2fa_delete(temp_token: str) -> None:
-    await cache_service.delete(f"temp_token:{temp_token}")
+    await cache_service.delete(f"2fa:{temp_token}")
 
 async def _totp_setup_get(user_id: str) -> str | None:
     return await cache_service.get(f"totp_setup:{user_id}")
@@ -839,12 +839,14 @@ async def parent_signup(req: ParentSignupRequest):
 
         # Generate and send Verification OTP
         code = str(random.randint(100000, 999999))
-        _otp_store[req.email.strip().lower()] = {
+        await _otp_set(req.email.strip().lower(), {
             "code": code,
             "expires": time.time() + _OTP_EXPIRY,
+            "created": time.time(),
             "purpose": "verify_email",
             "user_id": user_id,
-        }
+            "attempts": 0,
+        })
         try:
             await enqueue_task("send_otp_email", req.email.strip().lower(), code, "verify_email")
         except Exception as email_err:
@@ -877,12 +879,12 @@ async def verify_email(req: VerifyEmailRequest):
     """Verify email via OTP after signup."""
     import httpx
     email = req.email.strip().lower()
-    record = _otp_store.get(email)
+    record = await _otp_get(email)
 
     if not record or record.get("purpose") != "verify_email":
         raise HTTPException(status_code=400, detail="Code invalide ou expiré.")
     if time.time() > record["expires"]:
-        _otp_store.pop(email, None)
+        await _otp_delete(email)
         raise HTTPException(status_code=400, detail="Le code a expiré. Demandez un nouveau.")
     if record["code"] != req.code.strip():
         raise HTTPException(status_code=400, detail="Code incorrect.")
@@ -896,7 +898,7 @@ async def verify_email(req: VerifyEmailRequest):
                 json={"email_verified": True},
                 headers=supabase.admin_headers,
             )
-        _otp_store.pop(email, None)
+        await _otp_delete(email)
         return {"message": "Email vérifié avec succès."}
     except Exception as e:
         logger.error(f"Email verification failed: {e}", exc_info=True)
@@ -973,125 +975,5 @@ async def approve_parent(req: ParentDecision, user=Depends(verify_token)):
 
 # ─── Forgot Password / Reset Password ─────────────────────────────────────────
 
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
 
-class VerifyResetOtpRequest(BaseModel):
-    email: EmailStr
-    code: str
-
-class ResetPasswordRequest(BaseModel):
-    email: EmailStr
-    code: str
-    new_password: str
-
-@router.post("/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest):
-    """
-    Step 1: User enters email → we send a 6-digit OTP code for password reset.
-    Always returns 200 to prevent email enumeration.
-    """
-    import httpx, random
-    email = req.email.strip().lower()
-
-    try:
-        # Check if user exists (silently ignore if not)
-        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
-            u_res = await client.get(
-                f"{settings.SUPABASE_URL}/rest/v1/users?email=eq.{email}&select=id,full_name",
-                headers=supabase.admin_headers,
-            )
-            if u_res.status_code == 200 and u_res.json():
-                user_row = u_res.json()[0]
-                # Generate 6-digit OTP
-                code = str(random.randint(100000, 999999))
-                _otp_store[email] = {
-                    "code": code,
-                    "expires": time.time() + _OTP_EXPIRY,
-                    "purpose": "reset",
-                    "user_id": user_row["id"],
-                }
-                # Send OTP email
-                send_otp_email(email, code, purpose="reset")
-                logger.info(f"Password reset OTP sent to {email}")
-    except Exception as e:
-        logger.warning(f"Forgot password error (silenced): {e}")
-
-    # Always return 200 to prevent email enumeration
-    return {"message": "Si cet email existe, un code a été envoyé."}
-
-
-@router.post("/verify-reset-otp")
-async def verify_reset_otp(req: VerifyResetOtpRequest):
-    """
-    Step 2: Verify the OTP code (without resetting yet).
-    Returns a temporary token to confirm the OTP was valid.
-    """
-    email = req.email.strip().lower()
-    record = _otp_store.get(email)
-
-    if not record or record.get("purpose") != "reset":
-        raise HTTPException(status_code=400, detail="Code invalide ou expiré.")
-    if time.time() > record["expires"]:
-        _otp_store.pop(email, None)
-        raise HTTPException(status_code=400, detail="Le code a expiré. Demandez un nouveau.")
-    if record["code"] != req.code.strip():
-        raise HTTPException(status_code=400, detail="Code incorrect.")
-
-    # Mark as verified (keep in store until password is actually reset)
-    record["verified"] = True
-    return {"message": "Code vérifié avec succès.", "email": email}
-
-
-@router.post("/reset-password")
-async def reset_password(req: ResetPasswordRequest):
-    """
-    Step 3: User enters new password. OTP must have been verified in step 2.
-    Updates password via Supabase Admin API.
-    """
-    import httpx
-    email = req.email.strip().lower()
-    record = _otp_store.get(email)
-
-    if not record or record.get("purpose") != "reset" or not record.get("verified"):
-        raise HTTPException(status_code=400, detail="Session expirée. Recommencez le processus.")
-    if time.time() > record["expires"]:
-        _otp_store.pop(email, None)
-        raise HTTPException(status_code=400, detail="Le code a expiré. Demandez un nouveau.")
-    if record["code"] != req.code.strip():
-        raise HTTPException(status_code=400, detail="Code incorrect.")
-
-    if len(req.new_password) < 6:
-        raise HTTPException(status_code=400, detail="Le mot de passe doit contenir au moins 6 caractères.")
-
-    user_id = record.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=400, detail="Utilisateur introuvable.")
-
-    try:
-        async with httpx.AsyncClient(trust_env=False, timeout=10.0) as client:
-            # Update password via Supabase Auth Admin API
-            res = await client.put(
-                f"{settings.SUPABASE_URL}/auth/v1/admin/users/{user_id}",
-                json={"password": req.new_password},
-                headers={
-                    "apikey": settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY,
-                    "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_KEY}",
-                    "Content-Type": "application/json",
-                },
-            )
-            if res.status_code not in (200, 204):
-                logger.error(f"Supabase password reset failed: {res.status_code} {res.text}")
-                raise HTTPException(status_code=500, detail="Échec de la réinitialisation. Réessayez.")
-
-        # Clear OTP
-        _otp_store.pop(email, None)
-        logger.info(f"Password reset successful for {email}")
-        return {"message": "Mot de passe réinitialisé avec succès. Vous pouvez maintenant vous connecter."}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Reset password error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Erreur lors de la réinitialisation.")
 

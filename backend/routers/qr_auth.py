@@ -78,9 +78,9 @@ def authorize_qr_session(
     
     # تحديث الجلسة بمعلومات المستخدم
     session.status = "authorized"
-    session.token = current_user.get("token", "")
+    session.token = current_user.get("access_token", current_user.get("token", ""))
     session.role = current_user.get("role", "")
-    session.user_id = str(current_user.get("id", ""))
+    session.user_id = str(current_user.get("user_id", current_user.get("sub", "")))
     session.user_name = current_user.get("full_name", current_user.get("email", ""))
     session.academy_id = str(current_user.get("academy_id", ""))
     
