@@ -50,7 +50,7 @@ def generate_temp_password(length=12):
     random.shuffle(pwd)
     return "".join(pwd)
 
-@router.post("/", response_model=CoachResponse, dependencies=[Depends(require_role("admin", "super_admin"))])
+@router.post("/", response_model=CoachResponse, dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
 async def create_coach(coach: CoachCreate):
     try:
         coach_dict = coach.model_dump()
@@ -82,7 +82,13 @@ async def create_coach(coach: CoachCreate):
             coach_dict["user_id"] = auth_user["id"]
             logger.info("Created coach auth user %s for %s", auth_user["id"], email)
         except Exception as auth_err:
+            auth_msg = str(auth_err).lower()
             logger.error("Failed to create coach auth user: %s", auth_err, exc_info=True)
+            if "already" in auth_msg or "duplicate" in auth_msg or "422" in auth_msg:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"This email is already registered. | هاد الإيميل ديجا مسجّل: {email}"
+                )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to create auth account for coach: {str(auth_err)}"
@@ -121,7 +127,7 @@ async def create_coach(coach: CoachCreate):
             detail=f"[DEBUG] create_coach failed: {type(e).__name__}: {error_msg}"
         )
 
-@router.put("/{coach_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
+@router.put("/{coach_id}", dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
 async def update_coach(coach_id: str, coach: CoachCreate):
     try:
         coach_dict = coach.model_dump(exclude_none=True)
@@ -143,7 +149,7 @@ async def update_coach(coach_id: str, coach: CoachCreate):
             detail="An internal error occurred. Please try again."
         )
 
-@router.delete("/{coach_id}", dependencies=[Depends(require_role("admin", "super_admin"))])
+@router.delete("/{coach_id}", dependencies=[Depends(require_role("admin", "super_admin", "sous_admin"))])
 async def delete_coach(coach_id: str):
     try:
         await supabase.delete_coach(coach_id)
