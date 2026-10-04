@@ -1105,7 +1105,7 @@ class SupabaseHttpClient:
         now_str = datetime.datetime.utcnow().isoformat()
         return await self._get(
             f"/rest/v1/stories"
-            f"?select=*,users!user_id(full_name,photo_url)"
+            f"?select=*,users!user_id(full_name)"
             f"&expires_at=gt.{now_str}"
             f"&order=created_at.desc"
         )

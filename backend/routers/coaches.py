@@ -82,7 +82,13 @@ async def create_coach(coach: CoachCreate):
             coach_dict["user_id"] = auth_user["id"]
             logger.info("Created coach auth user %s for %s", auth_user["id"], email)
         except Exception as auth_err:
+            auth_msg = str(auth_err).lower()
             logger.error("Failed to create coach auth user: %s", auth_err, exc_info=True)
+            if "already" in auth_msg or "duplicate" in auth_msg or "422" in auth_msg:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"This email is already registered. | هاد الإيميل ديجا مسجّل: {email}"
+                )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to create auth account for coach: {str(auth_err)}"
