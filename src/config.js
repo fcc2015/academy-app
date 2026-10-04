@@ -1,5 +1,3 @@
-const _BASE = import.meta.env.DEV 
-  ? (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
-  : '';
-export const API_URL = `${_BASE}/api/v1`;
-
+const rawUrl = import.meta.env.VITE_API_URL || 'https://elghazali1987-academy-backend.hf.space';
+const _BASE = rawUrl.replace(/\/$/, '');
+export const API_URL = _BASE.endsWith('/api/v1') ? _BASE : `${_BASE}/api/v1`;
