@@ -1102,13 +1102,18 @@ class SupabaseHttpClient:
     async def get_stories(self):
         """Return active (non-expired) stories for the current academy."""
         import datetime
-        now_str = datetime.datetime.utcnow().isoformat()
-        return await self._get(
+        now_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        data = await self._get(
             f"/rest/v1/stories"
             f"?select=*,users!user_id(full_name)"
             f"&expires_at=gt.{now_str}"
             f"&order=created_at.desc"
         )
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict) and "users" in item and item["users"]:
+                    item["full_name"] = item["users"].get("full_name")
+        return data
 
     async def get_story_by_id(self, story_id: str):
         data = await self._get(f"/rest/v1/stories?id=eq.{story_id}&select=*")
