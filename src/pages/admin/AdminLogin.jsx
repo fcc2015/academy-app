@@ -85,7 +85,6 @@ const AdminLogin = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
-                credentials: 'include', // Receive httpOnly cookie from server
             });
 
             const data = await res.json();
@@ -133,7 +132,6 @@ const AdminLogin = () => {
                 if (data.access_token) roleHeaders['Authorization'] = `Bearer ${data.access_token}`;
                 const roleRes = await fetch(`${API_URL}/auth/role`, {
                     headers: roleHeaders,
-                    credentials: 'include',
                 });
                 if (roleRes.ok) {
                     const roleData = await roleRes.json();
@@ -165,7 +163,6 @@ const AdminLogin = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ temp_token: tempToken, code: totpCode }),
-                credentials: 'include',
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Invalid code');
@@ -198,7 +195,6 @@ const AdminLogin = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: creds.username, password: creds.password }),
-                credentials: 'include',
             });
             const data = await res.json();
             if (!res.ok) {

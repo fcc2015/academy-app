@@ -19,7 +19,7 @@ const loginAttempts = { count: 0, lockedUntil: null };
         localStorage.removeItem('token');         // legacy cleanup
         localStorage.removeItem('token_expires'); // legacy cleanup
         // Clear httpOnly cookie via backend (fire-and-forget)
-        fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
+        fetch(`${API_URL}/auth/logout`, { method: 'POST' }).catch(() => {});
     }
 })();
 
@@ -77,7 +77,7 @@ const SaasLogin = () => {
                 localStorage.removeItem('user_id');
                 localStorage.removeItem('token');         // legacy cleanup
                 localStorage.removeItem('token_expires'); // legacy cleanup
-                fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
+                fetch(`${API_URL}/auth/logout`, { method: 'POST' }).catch(() => {});
             }
         }
 
@@ -105,7 +105,6 @@ const SaasLogin = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
-                credentials: 'include', // Receive httpOnly cookie from server
             });
             const data = await res.json();
             if (!res.ok) {
@@ -222,7 +221,6 @@ const SaasLogin = () => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: regForm.admin_email, password: regForm.admin_password }),
-                    credentials: 'include', // Receive httpOnly cookie
                 });
                 const loginData = await loginRes.json();
                 if (loginRes.ok && loginData.user_id) {

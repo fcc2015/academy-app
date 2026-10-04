@@ -69,7 +69,6 @@ const ParentSignup = () => {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email: form.email.trim().toLowerCase(), password: form.password }),
-                        credentials: 'include',
                     });
                     if (loginRes.ok) {
                         const loginData = await loginRes.json();

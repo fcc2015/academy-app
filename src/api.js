@@ -46,7 +46,6 @@ async function tryRefreshToken() {
         'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
       },
       body: JSON.stringify({ refresh_token: refreshToken }),
-      credentials: 'include',
     });
 
     if (res.ok) {
@@ -124,7 +123,6 @@ export async function authFetch(url, options = {}) {
       const res = await fetchWithTimeout(url, {
         ...options,
         headers,
-        credentials: 'include', // Also send cookies as fallback
       });
 
       if (res.status === 401) {
@@ -168,7 +166,7 @@ export async function authFetch(url, options = {}) {
             if (newToken) {
               headers['Authorization'] = `Bearer ${newToken}`;
             }
-            return fetchWithTimeout(url, { ...options, headers, credentials: 'include' });
+            return fetchWithTimeout(url, { ...options, headers });
           }
           logout();
         }
@@ -235,7 +233,6 @@ export function logout() {
   // Clear server-side cookies (fire-and-forget)
   fetch(`${API_URL}/auth/logout`, {
     method: 'POST',
-    credentials: 'include',
   }).catch(() => {});
 
   // Clear client-side storage
