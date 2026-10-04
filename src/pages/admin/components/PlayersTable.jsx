@@ -213,7 +213,7 @@ const StatusCell = ({ player, t, isRTL, fetchPlayers }) => {
                 body: JSON.stringify({ account_status: newStatus })
             });
             if (res.ok) {
-                if (fetchPlayers) await fetchPlayers();
+                if (fetchPlayers) await fetchPlayers(false);
             } else {
                 setStatus(prevStatus);
                 Swal.fire({
@@ -301,7 +301,7 @@ const PlayersTable = ({
             throw new Error(detail);
         }
         // Silently refresh in the background so optimistic update is confirmed
-        if (fetchPlayers) fetchPlayers();
+        if (fetchPlayers) fetchPlayers(false);
     }, [fetchPlayers]);
 
     // Synchronize selectedPlayerIds array from parent with TanStack rowSelection object
@@ -389,8 +389,28 @@ const PlayersTable = ({
                                     isRTL={isRTL}
                                 />
                             </div>
-                            <div className="text-[11px] font-bold text-slate-400 mt-0.5">
-                                {t('players.bornOn')} {player.birth_date}
+                            <div className={`text-[11px] font-bold text-slate-400 mt-0.5 flex items-center gap-1.5 ${isRTL ? 'justify-end' : 'justify-start'}`}>
+                                <span>{t('players.bornOn')} {player.birth_date}</span>
+                                {player.user_id && (
+                                    <span
+                                        className="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono border border-slate-200 cursor-pointer hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors"
+                                        title={isRTL ? 'انقر لنسخ معرف اللاعب' : 'Click to copy Player ID'}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigator.clipboard.writeText(player.user_id);
+                                            Swal.fire({
+                                                toast: true,
+                                                position: 'top-end',
+                                                icon: 'success',
+                                                title: isRTL ? 'تم نسخ معرف اللاعب!' : 'Player ID copied!',
+                                                showConfirmButton: false,
+                                                timer: 1500
+                                            });
+                                        }}
+                                    >
+                                        #{player.user_id.slice(0, 8)}
+                                    </span>
+                                )}
                             </div>
                             <div className={`mt-1 flex items-center gap-2 ${isRTL ? 'justify-end' : 'justify-start'}`}>
                                 <TechnicalLevelCell player={player} onSave={handleInlineSave} />

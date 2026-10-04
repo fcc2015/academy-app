@@ -100,8 +100,8 @@ const PlayersManagement = () => {
     const [modalStep, setModalStep] = useState(1);
     const [branches, setBranches] = useState([]);
 
-    const fetchPlayers = async () => {
-        setLoading(true);
+    const fetchPlayers = async (showLoading = true) => {
+        if (showLoading) setLoading(true);
         setFetchError(null);
 
         // Run all API calls in parallel
@@ -163,7 +163,7 @@ const PlayersManagement = () => {
         } catch {
             setFetchError(isRTL ? 'تعذر الاتصال بالخادم. تأكد من أن السيرفر شغال.' : 'Cannot connect to server. Make sure the backend is running on port 8000.');
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
     };
 
