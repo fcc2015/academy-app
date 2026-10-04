@@ -499,18 +499,24 @@ const CoachesManagement = () => {
                     });
                 }
             } else {
-                const err = await res.json();
-                
-                // Parse specific Supabase errors to be more user-friendly
-                let errorMsg = err.detail || 'Failed to save coach';
-                if (errorMsg.includes('409 Conflict') || errorMsg.includes('duplicate key')) {
-                    errorMsg = isRTL ? 'هذا البريد الإلكتروني مسجل مسبقاً' : 'This email is already registered';
+                let errorMsg = '';
+                try {
+                    const err = await res.json();
+                    errorMsg = (err && err.detail) ? (typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail)) : '';
+                } catch {
+                    errorMsg = '';
                 }
-                
+
+                if (res.status === 409 || errorMsg.includes('409') || errorMsg.includes('duplicate key') || errorMsg.includes('already registered') || errorMsg.includes('déjà')) {
+                    errorMsg = isRTL ? 'هذا البريد الإلكتروني مسجل مسبقاً في النظام' : 'This email is already registered';
+                } else if (!errorMsg) {
+                    errorMsg = isRTL ? 'فشل حفظ بيانات المدرب (السيرفر غير متاح حالياً)' : 'Failed to save coach';
+                }
+
                 showBanner(errorMsg, 'error');
             }
         } catch (error) {
-            showBanner(`${isRTL ? 'فشل الاتصال' : 'Server error'}: ${error.message}`, 'error');
+            showBanner(`${isRTL ? 'خطأ في الاتصال' : 'Connection error'}: ${error.message}`, 'error');
         } finally { setIsSubmitting(false); }
     };
 
